@@ -6,6 +6,14 @@ interface TradingState {
   activeSymbol: string;
   setActiveSymbol: (symbol: string) => void;
 
+  // Active account
+  activeAccountId: string | null;
+  setActiveAccountId: (id: string) => void;
+
+  // Refresh trigger
+  refreshPositions: boolean;
+  triggerRefresh: () => void;
+
   // Price ticks
   prices: Record<string, PriceTick>;
   updatePrice: (tick: PriceTick) => void;
@@ -39,6 +47,12 @@ interface TradingState {
 export const useTradingStore = create<TradingState>((set) => ({
   activeSymbol: 'EURUSD',
   setActiveSymbol: (symbol) => set({ activeSymbol: symbol }),
+
+  activeAccountId: null,
+  setActiveAccountId: (id) => set({ activeAccountId: id }),
+
+  refreshPositions: false,
+  triggerRefresh: () => set((state) => ({ refreshPositions: !state.refreshPositions })),
 
   prices: {},
   updatePrice: (tick) =>

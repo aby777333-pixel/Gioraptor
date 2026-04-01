@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useTradingStore } from '@/stores/trading';
+import { orderService } from '@/lib/trading/order-service';
 import { formatPrice, formatCurrency, cn } from '@/lib/utils/format';
 
 type OrderTypeOption = 'market' | 'limit' | 'stop';
@@ -15,14 +16,22 @@ function getDecimals(symbol: string): number {
 }
 
 export default function OrderTicket() {
-  const { activeSymbol, prices, orderDirection, setOrderDirection, accountSummary } =
-    useTradingStore();
+  const {
+    activeSymbol,
+    prices,
+    orderDirection,
+    setOrderDirection,
+    activeAccountId,
+    triggerRefresh,
+  } = useTradingStore();
 
   const [lotSize, setLotSize] = useState('0.01');
   const [orderType, setOrderType] = useState<OrderTypeOption>('market');
   const [price, setPrice] = useState('');
   const [slValue, setSlValue] = useState('');
   const [tpValue, setTpValue] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const tick = prices[activeSymbol];
   const decimals = getDecimals(activeSymbol);
@@ -42,17 +51,86 @@ export default function OrderTicket() {
   const isBuy = orderDirection === 'BUY';
   const showPriceInput = orderType !== 'market';
 
-  function handlePlaceOrder() {
-    // Order placement will be connected to the backend later
-    console.log('Place order:', {
-      symbol: activeSymbol,
-      direction: orderDirection,
-      type: orderType,
-      lots: parseFloat(lotSize),
-      price: showPriceInput ? parseFloat(price) : null,
-      sl: slValue ? parseFloat(slValue) : null,
-      tp: tpValue ? parseFloat(tpValue) : null,
-    });
+  async function handlePlaceOrder() {
+    if (!activeAccountId) {
+      setFeedback({ type: 'error', message: 'No trading account selected' });
+      return;
+    }
+
+    if (lots <= 0) return;
+
+    setIsPlacing(true);
+    setFeedback(null);
+
+    try {
+      if (orderType === 'market') {
+        const fillPrice = isBuy ? ask : bid;
+        if (fillPrice <= 0) {
+          setFeedback({ type: 'error', message: 'No price available. Wait for market data.' });
+          setIsPlacing(false);
+          return;
+        }
+
+        const result = await orderService.placeMarketOrder({
+          accountId: activeAccountId,
+          symbol: activeSymbol,
+          direction: orderDirection,
+          size: lots,
+          sl: slValue ? parseFloat(slValue) : undefined,
+          tp: tpValue ? parseFloat(tpValue) : undefined,
+          fillPrice,
+        });
+
+        if (result?.success) {
+          setFeedback({
+            type: 'success',
+            message: `${orderDirection} ${lots} ${activeSymbol} filled @ ${formatPrice(result.fill_price, decimals)}`,
+          });
+          setSlValue('');
+          setTpValue('');
+          triggerRefresh();
+        } else {
+          setFeedback({ type: 'error', message: result?.error || 'Order failed' });
+        }
+      } else {
+        const orderPrice = parseFloat(price);
+        if (!orderPrice || orderPrice <= 0) {
+          setFeedback({ type: 'error', message: 'Enter a valid price for pending order' });
+          setIsPlacing(false);
+          return;
+        }
+
+        const result = await orderService.placePendingOrder({
+          accountId: activeAccountId,
+          symbol: activeSymbol,
+          direction: orderDirection,
+          orderType: orderType,
+          size: lots,
+          price: orderPrice,
+          sl: slValue ? parseFloat(slValue) : undefined,
+          tp: tpValue ? parseFloat(tpValue) : undefined,
+        });
+
+        if (result?.success) {
+          setFeedback({
+            type: 'success',
+            message: `${orderType.toUpperCase()} ${orderDirection} ${lots} ${activeSymbol} @ ${formatPrice(orderPrice, decimals)} placed`,
+          });
+          setPrice('');
+          setSlValue('');
+          setTpValue('');
+          triggerRefresh();
+        } else {
+          setFeedback({ type: 'error', message: result?.error || 'Order failed' });
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unexpected error placing order';
+      setFeedback({ type: 'error', message });
+    } finally {
+      setIsPlacing(false);
+      setTimeout(() => setFeedback(null), 5000);
+    }
   }
 
   return (
@@ -219,19 +297,37 @@ export default function OrderTicket() {
         <span className="font-mono">{formatCurrency(marginEstimate)}</span>
       </div>
 
+      {/* Feedback toast */}
+      {feedback && (
+        <div
+          className={cn(
+            'text-xs rounded px-3 py-2 font-medium',
+            feedback.type === 'success'
+              ? 'bg-green-600/20 text-green-400 border border-green-600/30'
+              : 'bg-red-600/20 text-red-400 border border-red-600/30'
+          )}
+        >
+          {feedback.message}
+        </div>
+      )}
+
       {/* Place Order button */}
       <button
         onClick={handlePlaceOrder}
-        disabled={lots <= 0}
+        disabled={lots <= 0 || isPlacing}
         className={cn(
           'w-full py-2.5 rounded font-bold text-sm uppercase tracking-wider transition-all',
           isBuy
             ? 'bg-green-600 hover:bg-green-500 text-white'
             : 'bg-red-600 hover:bg-red-500 text-white',
-          lots <= 0 && 'opacity-40 cursor-not-allowed'
+          (lots <= 0 || isPlacing) && 'opacity-40 cursor-not-allowed'
         )}
       >
-        {isBuy ? 'Place Buy Order' : 'Place Sell Order'}
+        {isPlacing
+          ? 'Placing...'
+          : isBuy
+            ? 'Place Buy Order'
+            : 'Place Sell Order'}
       </button>
     </div>
   );

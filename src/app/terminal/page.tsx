@@ -6,8 +6,11 @@ import ChartPanel from '@/components/trading/chart/ChartPanel';
 import OrderTicket from '@/components/trading/order-ticket/OrderTicket';
 import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
+import { usePriceEngine } from '@/hooks/usePriceEngine';
 
 export default function TerminalPage() {
+  const { ohlcvBuilder } = usePriceEngine();
+
   return (
     <div
       className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
@@ -32,7 +35,7 @@ export default function TerminalPage() {
 
       {/* ChartPanel - center, fills remaining space */}
       <div className="overflow-hidden">
-        <ChartPanel />
+        <ChartPanel ohlcvBuilder={ohlcvBuilder} />
       </div>
 
       {/* OrderTicket - right sidebar */}
