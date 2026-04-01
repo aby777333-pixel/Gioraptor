@@ -145,16 +145,16 @@ function AccountSummaryPanel() {
 }
 
 function LiveTVPanel() {
-  const [activeChannel, setActiveChannel] = useState<'bloomberg' | 'cnbc'>('bloomberg');
+  const [activeChannel, setActiveChannel] = useState<'cnbc' | 'yahoo'>('cnbc');
 
   const channels = {
-    bloomberg: {
-      label: 'Bloomberg',
-      src: 'https://www.youtube.com/embed/Ga3maNZ0x0w?autoplay=1&mute=1',
-    },
     cnbc: {
-      label: 'CNBC',
+      label: 'CNBC Live',
       src: 'https://www.youtube.com/embed/9NyxcX3rhQs?autoplay=1&mute=1',
+    },
+    yahoo: {
+      label: 'Yahoo Finance',
+      src: 'https://www.youtube.com/embed/dp_oeY5Zhpk?autoplay=1&mute=1',
     },
   };
 
