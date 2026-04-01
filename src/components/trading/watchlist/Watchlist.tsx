@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, ArrowUp, ArrowDown, Plus, Info, Star, X, Minus, Loader2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
-import { formatPrice, formatPercent, cn } from '@/lib/utils/format';
+import { orderService } from '@/lib/trading/order-service';
+import { formatPrice, cn } from '@/lib/utils/format';
 import type { WatchlistItem, InstrumentType } from '@/types/trading';
 
 interface WatchlistItemWithDirection extends WatchlistItem {
@@ -28,6 +29,8 @@ const defaultWatchlist: WatchlistItem[] = [
   { symbol: 'USOIL', description: 'US Crude Oil', type: 'energy' as InstrumentType, bid: 78.45, ask: 78.50, spread: 0.05, change: -0.32, change_pct: -0.407, high: 79.10, low: 78.20 },
 ];
 
+const QUICK_LOTS = [0.01, 0.10, 1.00];
+
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
   if (symbol.startsWith('XAU') || symbol.startsWith('ETH')) return 2;
@@ -37,9 +40,20 @@ function getDecimals(symbol: string): number {
   return 5;
 }
 
+function getLotStep(symbol: string): number {
+  if (symbol.startsWith('BTC')) return 0.01;
+  return 0.01;
+}
+
 export default function Watchlist() {
-  const { activeSymbol, setActiveSymbol, prices } = useTradingStore();
+  const { activeSymbol, setActiveSymbol, prices, activeAccountId, triggerRefresh } = useTradingStore();
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'favourites' | 'all'>('all');
+  const [favourites, setFavourites] = useState<Set<string>>(() => new Set(['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'US30', 'NAS100']));
+  const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
+  const [lotSize, setLotSize] = useState(0.01);
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   // Track previous prices for flash direction
   const prevPricesRef = useRef<Record<string, number>>({});
@@ -64,7 +78,6 @@ export default function Watchlist() {
     if (hasChange) {
       setFlashState((old) => ({ ...old, ...newFlash }));
 
-      // Clear flash after 400ms
       const timeout = setTimeout(() => {
         setFlashState((old) => {
           const cleared: Record<string, 'up' | 'down' | null> = {};
@@ -93,6 +106,66 @@ export default function Watchlist() {
     }
   }, [prices]);
 
+  const toggleFavourite = useCallback((symbol: string) => {
+    setFavourites((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) {
+        next.delete(symbol);
+      } else {
+        next.add(symbol);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSymbolClick = useCallback((symbol: string) => {
+    setActiveSymbol(symbol);
+    setExpandedSymbol((prev) => (prev === symbol ? null : symbol));
+    setOrderError(null);
+  }, [setActiveSymbol]);
+
+  const adjustLot = useCallback((delta: number) => {
+    setLotSize((prev) => {
+      const next = Math.round((prev + delta) * 100) / 100;
+      return Math.max(0.01, next);
+    });
+  }, []);
+
+  const handlePlaceOrder = useCallback(async (symbol: string, direction: 'BUY' | 'SELL') => {
+    if (!activeAccountId) {
+      setOrderError('No account selected');
+      return;
+    }
+
+    const live = prices[symbol];
+    if (!live) {
+      setOrderError('No price available');
+      return;
+    }
+
+    const fillPrice = direction === 'BUY' ? live.ask : live.bid;
+
+    setIsPlacing(true);
+    setOrderError(null);
+
+    try {
+      await orderService.placeMarketOrder({
+        accountId: activeAccountId,
+        symbol,
+        direction,
+        size: lotSize,
+        fillPrice,
+      });
+      triggerRefresh();
+      setExpandedSymbol(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Order failed';
+      setOrderError(message);
+    } finally {
+      setIsPlacing(false);
+    }
+  }, [activeAccountId, prices, lotSize, triggerRefresh]);
+
   const items = useMemo(() => {
     const list: WatchlistItemWithDirection[] = defaultWatchlist.map((item) => {
       const live = prices[item.symbol];
@@ -109,121 +182,385 @@ export default function Watchlist() {
       return { ...item, direction };
     });
 
-    if (!search.trim()) return list;
-    const q = search.toLowerCase();
-    return list.filter(
-      (item) =>
-        item.symbol.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q)
-    );
-  }, [search, prices]);
+    let filtered = list;
+
+    if (activeTab === 'favourites') {
+      filtered = filtered.filter((item) => favourites.has(item.symbol));
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          item.symbol.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [search, prices, activeTab, favourites]);
+
+  const favCount = favourites.size;
+  const allCount = defaultWatchlist.length;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ backgroundColor: '#0A0A0F' }}>
+      {/* Tabs: Favourites / All Symbols */}
+      <div
+        className="flex border-b"
+        style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+      >
+        <button
+          onClick={() => setActiveTab('favourites')}
+          className={cn(
+            'flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors',
+            activeTab === 'favourites'
+              ? 'opacity-100'
+              : 'opacity-40 hover:opacity-60'
+          )}
+          style={{
+            borderBottom: activeTab === 'favourites' ? '2px solid #29ABE2' : '2px solid transparent',
+            color: activeTab === 'favourites' ? '#29ABE2' : '#fff',
+          }}
+        >
+          Favourites ({favCount})
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={cn(
+            'flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors',
+            activeTab === 'all'
+              ? 'opacity-100'
+              : 'opacity-40 hover:opacity-60'
+          )}
+          style={{
+            borderBottom: activeTab === 'all' ? '2px solid #29ABE2' : '2px solid transparent',
+            color: activeTab === 'all' ? '#29ABE2' : '#fff',
+          }}
+        >
+          All Symbols ({allCount})
+        </button>
+      </div>
+
       {/* Search */}
-      <div className="p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="px-2 py-1.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <div
-          className="flex items-center gap-2 px-2 py-1.5 rounded text-sm"
+          className="flex items-center gap-1.5 px-2 py-1 rounded"
           style={{ backgroundColor: '#111118' }}
         >
-          <Search size={14} className="opacity-50 shrink-0" />
+          <Search size={12} className="opacity-40 shrink-0" />
           <input
             type="text"
-            placeholder="Search symbols..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm placeholder:opacity-40"
+            className="w-full bg-transparent outline-none text-[11px] placeholder:opacity-30"
+            style={{ color: '#fff' }}
           />
         </div>
       </div>
 
-      {/* Header */}
+      {/* Column Headers */}
       <div
-        className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-1 px-3 py-1 text-[10px] uppercase tracking-wider opacity-40 border-b"
+        className="grid grid-cols-[1fr_auto_auto] gap-1 px-3 py-1 text-[9px] uppercase tracking-wider opacity-30 border-b"
         style={{ borderColor: 'rgba(255,255,255,0.06)' }}
       >
         <span>Symbol</span>
-        <span className="text-right w-16">Bid</span>
-        <span className="text-right w-16">Ask</span>
-        <span className="text-right w-10">Sprd</span>
-        <span className="text-right w-12">Chg%</span>
+        <span className="text-right" style={{ width: 58 }}>Sell</span>
+        <span className="text-right" style={{ width: 58 }}>Buy</span>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Symbol List */}
+      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
         {items.map((item) => {
           const isActive = activeSymbol === item.symbol;
+          const isExpanded = expandedSymbol === item.symbol;
           const decimals = getDecimals(item.symbol);
-          const isPositive = item.change_pct >= 0;
           const flash = flashState[item.symbol];
+          const isFav = favourites.has(item.symbol);
 
           return (
-            <button
-              key={item.symbol}
-              onClick={() => setActiveSymbol(item.symbol)}
-              className={cn(
-                'w-full grid grid-cols-[1fr_auto_auto_auto_auto] gap-1 items-center px-3 py-1.5 text-xs transition-all hover:opacity-90',
-                isActive && 'border-l-2',
-                !isActive && 'border-l-2 border-transparent'
-              )}
-              style={{
-                borderLeftColor: isActive ? '#29ABE2' : 'transparent',
-                backgroundColor: flash === 'up'
-                  ? 'rgba(0,194,122,0.08)'
-                  : flash === 'down'
-                  ? 'rgba(193,18,31,0.08)'
-                  : isActive
-                  ? '#111118'
-                  : 'transparent',
-                transition: 'background-color 0.15s ease',
-              }}
-            >
-              <div className="text-left flex items-center gap-1">
-                <div>
-                  <div className="font-medium text-xs flex items-center gap-1">
-                    {item.symbol}
-                    {item.direction === 'up' && (
-                      <ArrowUp size={10} className="text-green-400" />
-                    )}
-                    {item.direction === 'down' && (
-                      <ArrowDown size={10} className="text-red-400" />
-                    )}
-                  </div>
-                  <div className="text-[10px] opacity-40 truncate">
-                    {item.description}
+            <div key={item.symbol}>
+              {/* Symbol Row */}
+              <button
+                onClick={() => handleSymbolClick(item.symbol)}
+                className="w-full grid grid-cols-[1fr_auto_auto] gap-1 items-center px-3 py-1.5 text-xs transition-all border-l-2"
+                style={{
+                  borderLeftColor: isActive ? '#29ABE2' : 'transparent',
+                  backgroundColor: flash === 'up'
+                    ? 'rgba(0,194,122,0.08)'
+                    : flash === 'down'
+                    ? 'rgba(193,18,31,0.08)'
+                    : isActive
+                    ? '#111118'
+                    : 'transparent',
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                {/* Symbol Name + Direction */}
+                <div className="text-left flex items-center gap-1 min-w-0">
+                  <div className="min-w-0">
+                    <div className="font-medium text-[11px] flex items-center gap-0.5" style={{ color: '#fff' }}>
+                      <span className="truncate">{item.symbol}</span>
+                      {item.direction === 'up' && (
+                        <ArrowUp size={9} style={{ color: '#00C27A' }} />
+                      )}
+                      {item.direction === 'down' && (
+                        <ArrowDown size={9} style={{ color: '#C1121F' }} />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <span
-                className={cn(
-                  'font-mono text-right w-16',
-                  flash === 'up' ? 'text-green-300' : flash === 'down' ? 'text-red-300' : isPositive ? 'text-green-400' : 'text-red-400'
-                )}
-              >
-                {formatPrice(item.bid, decimals)}
-              </span>
-              <span
-                className={cn(
-                  'font-mono text-right w-16',
-                  flash === 'up' ? 'text-green-300' : flash === 'down' ? 'text-red-300' : isPositive ? 'text-green-400' : 'text-red-400'
-                )}
-              >
-                {formatPrice(item.ask, decimals)}
-              </span>
-              <span className="font-mono text-right w-10 opacity-60">
-                {item.spread.toFixed(1)}
-              </span>
-              <span
-                className={cn(
-                  'font-mono text-right w-12 font-medium',
-                  isPositive ? 'text-green-400' : 'text-red-400'
-                )}
-              >
-                {formatPercent(item.change_pct)}
-              </span>
-            </button>
+
+                {/* Sell Price */}
+                <span
+                  className="font-mono text-right text-[11px]"
+                  style={{
+                    width: 58,
+                    color: flash === 'down' ? '#ff6b6b' : '#C1121F',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {formatPrice(item.bid, decimals)}
+                </span>
+
+                {/* Buy Price */}
+                <span
+                  className="font-mono text-right text-[11px]"
+                  style={{
+                    width: 58,
+                    color: flash === 'up' ? '#5dffa0' : '#00C27A',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {formatPrice(item.ask, decimals)}
+                </span>
+              </button>
+
+              {/* Expanded Order Widget */}
+              {isExpanded && (
+                <div
+                  className="border-b"
+                  style={{
+                    backgroundColor: '#111118',
+                    borderColor: 'rgba(255,255,255,0.06)',
+                    borderLeft: '2px solid #29ABE2',
+                  }}
+                >
+                  {/* Widget Header */}
+                  <div
+                    className="flex items-center justify-between px-3 py-1.5 border-b"
+                    style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-semibold" style={{ color: '#fff' }}>
+                        {item.symbol}
+                      </span>
+                      <span className="text-[10px] font-mono opacity-60">
+                        {formatPrice(item.bid, decimals)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavourite(item.symbol); }}
+                        className="p-0.5 rounded hover:opacity-80 transition-opacity"
+                        title={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Plus size={11} style={{ color: isFav ? '#29ABE2' : 'rgba(255,255,255,0.3)' }} />
+                      </button>
+                      <button
+                        className="p-0.5 rounded hover:opacity-80 transition-opacity"
+                        title="Info"
+                      >
+                        <Info size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavourite(item.symbol); }}
+                        className="p-0.5 rounded hover:opacity-80 transition-opacity"
+                        title="Star"
+                      >
+                        <Star
+                          size={11}
+                          style={{ color: isFav ? '#F5A623' : 'rgba(255,255,255,0.3)' }}
+                          fill={isFav ? '#F5A623' : 'none'}
+                        />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedSymbol(null); }}
+                        className="p-0.5 rounded hover:opacity-80 transition-opacity"
+                        title="Close"
+                      >
+                        <X size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SELL / LOT / BUY row */}
+                  <div className="px-2 py-2">
+                    <div className="flex items-stretch gap-1" style={{ height: 44 }}>
+                      {/* SELL Button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'SELL'); }}
+                        disabled={isPlacing}
+                        className="flex-1 flex flex-col items-center justify-center rounded transition-all"
+                        style={{
+                          backgroundColor: isPlacing ? 'rgba(193,18,31,0.08)' : 'rgba(193,18,31,0.15)',
+                          border: '1px solid rgba(193,18,31,0.2)',
+                          cursor: isPlacing ? 'wait' : 'pointer',
+                        }}
+                        onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.25)'; }}
+                        onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.15)'; }}
+                      >
+                        <span className="text-[8px] uppercase tracking-wider font-medium" style={{ color: '#C1121F' }}>
+                          Sell
+                        </span>
+                        <span className="font-mono text-[13px] font-bold leading-none" style={{ color: '#C1121F' }}>
+                          {isPlacing ? <Loader2 size={12} className="animate-spin" /> : formatPrice(item.bid, decimals)}
+                        </span>
+                      </button>
+
+                      {/* Lot Size Control */}
+                      <div className="flex flex-col items-center justify-center gap-0.5" style={{ width: 56 }}>
+                        <div className="flex items-center gap-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); adjustLot(-getLotStep(item.symbol)); }}
+                            className="flex items-center justify-center rounded-l transition-colors"
+                            style={{
+                              width: 16,
+                              height: 18,
+                              backgroundColor: '#1A1A24',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#252530'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#1A1A24'; }}
+                          >
+                            <Minus size={8} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                          </button>
+                          <input
+                            type="text"
+                            value={lotSize.toFixed(2)}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val) && val >= 0.01) setLotSize(val);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-center font-mono text-[11px] bg-transparent outline-none"
+                            style={{
+                              width: 36,
+                              height: 18,
+                              backgroundColor: '#1A1A24',
+                              borderTop: '1px solid rgba(255,255,255,0.06)',
+                              borderBottom: '1px solid rgba(255,255,255,0.06)',
+                              color: '#fff',
+                            }}
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); adjustLot(getLotStep(item.symbol)); }}
+                            className="flex items-center justify-center rounded-r transition-colors"
+                            style={{
+                              width: 16,
+                              height: 18,
+                              backgroundColor: '#1A1A24',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#252530'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#1A1A24'; }}
+                          >
+                            <Plus size={8} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                          </button>
+                        </div>
+                        <span className="text-[7px] uppercase tracking-wider opacity-30">Lots</span>
+                      </div>
+
+                      {/* BUY Button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'BUY'); }}
+                        disabled={isPlacing}
+                        className="flex-1 flex flex-col items-center justify-center rounded transition-all"
+                        style={{
+                          backgroundColor: isPlacing ? 'rgba(0,194,122,0.08)' : 'rgba(0,194,122,0.15)',
+                          border: '1px solid rgba(0,194,122,0.2)',
+                          cursor: isPlacing ? 'wait' : 'pointer',
+                        }}
+                        onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.25)'; }}
+                        onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.15)'; }}
+                      >
+                        <span className="text-[8px] uppercase tracking-wider font-medium" style={{ color: '#00C27A' }}>
+                          Buy
+                        </span>
+                        <span className="font-mono text-[13px] font-bold leading-none" style={{ color: '#00C27A' }}>
+                          {isPlacing ? <Loader2 size={12} className="animate-spin" /> : formatPrice(item.ask, decimals)}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Quick Lot Buttons */}
+                    <div className="flex items-center gap-1 mt-1.5">
+                      {QUICK_LOTS.map((lot) => (
+                        <button
+                          key={lot}
+                          onClick={(e) => { e.stopPropagation(); setLotSize(lot); }}
+                          className="flex-1 text-center py-0.5 rounded text-[9px] font-mono transition-colors"
+                          style={{
+                            backgroundColor: lotSize === lot ? 'rgba(41,171,226,0.15)' : '#1A1A24',
+                            border: lotSize === lot ? '1px solid rgba(41,171,226,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                            color: lotSize === lot ? '#29ABE2' : 'rgba(255,255,255,0.5)',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (lotSize !== lot) e.currentTarget.style.backgroundColor = '#252530';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (lotSize !== lot) e.currentTarget.style.backgroundColor = '#1A1A24';
+                          }}
+                        >
+                          {lot.toFixed(2)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Low / High */}
+                    <div
+                      className="flex items-center justify-between mt-1.5 px-1"
+                    >
+                      <div className="text-[9px]">
+                        <span className="opacity-30 mr-1">L</span>
+                        <span className="font-mono opacity-50" style={{ color: '#C1121F' }}>
+                          {formatPrice(item.low, decimals)}
+                        </span>
+                      </div>
+                      <div className="text-[9px]">
+                        <span className="opacity-30 mr-1">H</span>
+                        <span className="font-mono opacity-50" style={{ color: '#00C27A' }}>
+                          {formatPrice(item.high, decimals)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Error */}
+                    {orderError && (
+                      <div
+                        className="mt-1 px-1 py-0.5 rounded text-[9px] text-center"
+                        style={{
+                          backgroundColor: 'rgba(193,18,31,0.1)',
+                          color: '#C1121F',
+                          border: '1px solid rgba(193,18,31,0.2)',
+                        }}
+                      >
+                        {orderError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
+
+        {items.length === 0 && (
+          <div className="flex items-center justify-center py-8 text-[11px] opacity-30">
+            {activeTab === 'favourites' ? 'No favourites yet' : 'No symbols found'}
+          </div>
+        )}
       </div>
     </div>
   );

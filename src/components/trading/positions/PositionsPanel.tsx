@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Pencil, ArrowUpDown, Mail, FileText } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { formatPrice, formatPnL, formatLot, cn } from '@/lib/utils/format';
 import type { Position, Order } from '@/types/trading';
 
-type TabKey = 'positions' | 'pending' | 'history';
+type TabKey = 'positions' | 'pending' | 'history' | 'inbox' | 'logs';
 
 function getDecimals(symbol: string): number {
   if (symbol === 'USDJPY') return 3;
@@ -18,12 +18,9 @@ function getDecimals(symbol: string): number {
 }
 
 function calcFloatingPnl(pos: Position, currentBid: number, currentAsk: number): number {
-  // For BUY positions, PnL is based on selling at bid
-  // For SELL positions, PnL is based on buying at ask
   const closePrice = pos.direction === 'BUY' ? currentBid : currentAsk;
   if (!closePrice || closePrice <= 0) return pos.floating_pnl;
 
-  // Standard forex contract size is 100,000
   const contractSize = 100000;
   let pnl: number;
   if (pos.direction === 'BUY') {
@@ -32,17 +29,47 @@ function calcFloatingPnl(pos: Position, currentBid: number, currentAsk: number):
     pnl = (pos.open_price - closePrice) * pos.size * contractSize;
   }
 
-  // JPY pair adjustment
   if (pos.symbol === 'USDJPY' || pos.symbol.endsWith('JPY')) {
     pnl = pnl / 100;
   }
-  // Gold uses contract size of 100 typically
   if (pos.symbol.startsWith('XAU')) {
     pnl = (pos.direction === 'BUY' ? closePrice - pos.open_price : pos.open_price - closePrice) * pos.size * 100;
   }
 
   return pnl;
 }
+
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function calcPnlPercent(pnl: number, entryValue: number): string {
+  if (entryValue === 0) return '0.00';
+  return ((pnl / entryValue) * 100).toFixed(2);
+}
+
+/* ---------- inline styles ---------- */
+const S = {
+  headerBg: '#111118',
+  tableBg: '#0A0A0F',
+  rowHover: 'rgba(255,255,255,0.02)',
+  rowAltBg: 'rgba(255,255,255,0.015)',
+  border: 'rgba(255,255,255,0.06)',
+  accentBlue: '#29ABE2',
+  green: '#22c55e',
+  red: '#ef4444',
+  textDim: 'rgba(255,255,255,0.35)',
+  textMuted: 'rgba(255,255,255,0.50)',
+} as const;
+
+const colTemplate =
+  '42px 62px 52px 78px 58px 82px 88px 72px 72px 82px 88px 72px 82px 62px 58px 1fr';
+const histColTemplate =
+  '42px 62px 52px 78px 58px 82px 82px 72px 72px 72px 82px 62px 80px';
 
 export default function PositionsPanel() {
   const {
@@ -63,9 +90,9 @@ export default function PositionsPanel() {
   const [closingId, setClosingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  // Track positions with live PnL
   const [livePnl, setLivePnl] = useState<Record<string, number>>({});
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!activeAccountId) {
@@ -112,16 +139,13 @@ export default function PositionsPanel() {
     }
   }, [activeAccountId, setPositions, setPendingOrders, setAccountSummary]);
 
-  // Load data on mount and when refresh is triggered
   useEffect(() => {
     loadData();
   }, [loadData, refreshPositions]);
 
-  // Update floating PnL in real-time from price ticks
   const prevPricesRef = useRef(prices);
   useEffect(() => {
     if (openPositions.length === 0) return;
-    // Only recompute when prices actually change
     if (prevPricesRef.current === prices) return;
     prevPricesRef.current = prices;
 
@@ -142,7 +166,6 @@ export default function PositionsPanel() {
   }
 
   const totalProfit = openPositions.reduce((s, p) => s + getPnl(p), 0);
-  const totalSwap = openPositions.reduce((s, p) => s + (p.swap_accrued ?? 0), 0);
   const totalCommission = openPositions.reduce((s, p) => s + (p.commission ?? 0), 0);
 
   async function handleClosePosition(pos: Position) {
@@ -196,96 +219,219 @@ export default function PositionsPanel() {
     }
   }
 
-  const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: 'positions', label: 'Open Positions', count: openPositions.length },
-    { key: 'pending', label: 'Pending Orders', count: pendingOrders.length },
-    { key: 'history', label: 'History', count: tradeHistory.length },
+  function handleSort(field: string) {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  }
+
+  /* ---------- sort helpers ---------- */
+  function sortedPositions(): Position[] {
+    if (!sortField) return openPositions;
+    const arr = [...openPositions];
+    arr.sort((a, b) => {
+      let va: number | string = 0;
+      let vb: number | string = 0;
+      switch (sortField) {
+        case 'time': va = a.opened_at; vb = b.opened_at; break;
+        case 'type': va = a.direction; vb = b.direction; break;
+        case 'symbol': va = a.symbol; vb = b.symbol; break;
+        case 'size': va = a.size; vb = b.size; break;
+        case 'entry': va = a.open_price; vb = b.open_price; break;
+        case 'sl': va = a.sl ?? 0; vb = b.sl ?? 0; break;
+        case 'tp': va = a.tp ?? 0; vb = b.tp ?? 0; break;
+        case 'commission': va = a.commission ?? 0; vb = b.commission ?? 0; break;
+        case 'pnl': va = getPnl(a); vb = getPnl(b); break;
+        default: return 0;
+      }
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number);
+    });
+    return arr;
+  }
+
+  function sortedHistory(): Position[] {
+    if (!sortField) return tradeHistory;
+    const arr = [...tradeHistory];
+    arr.sort((a, b) => {
+      let va: number | string = 0;
+      let vb: number | string = 0;
+      switch (sortField) {
+        case 'time': va = a.opened_at; vb = b.opened_at; break;
+        case 'type': va = a.direction; vb = b.direction; break;
+        case 'symbol': va = a.symbol; vb = b.symbol; break;
+        case 'size': va = a.size; vb = b.size; break;
+        case 'entry': va = a.open_price; vb = b.open_price; break;
+        case 'pnl': va = a.realized_pnl ?? 0; vb = b.realized_pnl ?? 0; break;
+        default: return 0;
+      }
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number);
+    });
+    return arr;
+  }
+
+  /* ---------- column header component ---------- */
+  function ColHeader({ label, field, align }: { label: string; field?: string; align?: 'right' | 'center' }) {
+    return (
+      <span
+        className={cn(
+          'flex items-center gap-0.5 select-none',
+          align === 'right' && 'justify-end',
+          align === 'center' && 'justify-center',
+          field && 'cursor-pointer hover:opacity-80'
+        )}
+        onClick={field ? () => handleSort(field) : undefined}
+      >
+        {label}
+        {field && <ArrowUpDown size={8} style={{ opacity: sortField === field ? 0.9 : 0.3 }} />}
+      </span>
+    );
+  }
+
+  /* ---------- tab config ---------- */
+  const tabItems: { key: TabKey; label: string; count?: number; icon?: React.ReactNode }[] = [
+    { key: 'positions', label: '+ Order', count: openPositions.length },
+    { key: 'pending', label: 'Pending', count: pendingOrders.length },
+    { key: 'history', label: 'History' },
+    { key: 'inbox', label: 'Inbox', icon: <Mail size={10} /> },
+    { key: 'logs', label: 'Logs', icon: <FileText size={10} /> },
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab bar */}
+    <div className="flex flex-col h-full" style={{ background: S.tableBg }}>
+      {/* ===== HEADER BAR ===== */}
       <div
-        className="flex border-b shrink-0"
-        style={{ borderColor: 'var(--border)' }}
+        className="flex items-center shrink-0"
+        style={{
+          background: S.headerBg,
+          borderBottom: `1px solid ${S.border}`,
+          height: 32,
+        }}
       >
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              'px-4 py-2 text-xs font-medium transition-all border-b-2',
-              activeTab === tab.key
-                ? 'border-[#29ABE2] opacity-100'
-                : 'border-transparent opacity-50 hover:opacity-70'
-            )}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span
-                className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: 'var(--bg-elevated)' }}
+        {/* Tabs on left */}
+        <div className="flex items-center h-full">
+          {tabItems.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className="flex items-center gap-1 px-3 h-full text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                style={{
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
+                  borderBottom: isActive ? `2px solid ${S.accentBlue}` : '2px solid transparent',
+                  background: isActive ? 'rgba(41,171,226,0.06)' : 'transparent',
+                }}
               >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+                {tab.icon && <span style={{ opacity: isActive ? 1 : 0.5 }}>{tab.icon}</span>}
+                {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span
+                    className="text-[9px] px-1.5 py-0 rounded-sm font-bold"
+                    style={{
+                      background: isActive ? S.accentBlue : 'rgba(255,255,255,0.08)',
+                      color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Centered title */}
+        <div className="flex-1 flex justify-center">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: 'rgba(255,255,255,0.25)' }}
+          >
+            Order Desk
+          </span>
+        </div>
+
+        {/* Spacer for symmetry */}
+        <div style={{ width: 120 }} />
       </div>
 
-      {/* Feedback */}
+      {/* ===== FEEDBACK ===== */}
       {feedback && (
         <div
-          className={cn(
-            'text-xs px-3 py-1.5 font-medium',
-            feedback.type === 'success'
-              ? 'bg-green-600/20 text-green-400'
-              : 'bg-red-600/20 text-red-400'
-          )}
+          className="text-[10px] px-3 py-1 font-medium"
+          style={{
+            background: feedback.type === 'success' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+            color: feedback.type === 'success' ? S.green : S.red,
+            borderBottom: `1px solid ${S.border}`,
+          }}
         >
           {feedback.message}
         </div>
       )}
 
-      {/* Content */}
+      {/* ===== CONTENT ===== */}
       <div className="flex-1 overflow-auto">
         {isLoading && openPositions.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-xs opacity-30">
+          <div
+            className="flex items-center justify-center h-32 text-[10px]"
+            style={{ color: S.textDim }}
+          >
             Loading...
           </div>
         )}
 
+        {/* ---------- POSITIONS TAB ---------- */}
         {activeTab === 'positions' && (
           <>
             {openPositions.length === 0 && !isLoading ? (
-              <div className="flex items-center justify-center h-32 text-xs opacity-30">
+              <div
+                className="flex items-center justify-center h-32 text-[10px]"
+                style={{ color: S.textDim }}
+              >
                 {activeAccountId ? 'No open positions' : 'Select a trading account'}
               </div>
             ) : (
               <>
                 {/* Table header */}
                 <div
-                  className="grid grid-cols-[80px_50px_55px_75px_75px_65px_65px_55px_55px_70px_30px] gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wider opacity-40 border-b sticky top-0"
+                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
-                    borderColor: 'var(--border)',
-                    backgroundColor: 'var(--bg-surface)',
+                    gridTemplateColumns: colTemplate,
+                    background: S.headerBg,
+                    borderBottom: `1px solid ${S.border}`,
+                    color: S.textDim,
+                    height: 24,
+                    alignItems: 'center',
                   }}
                 >
-                  <span>Symbol</span>
-                  <span>Dir</span>
-                  <span className="text-right">Size</span>
-                  <span className="text-right">Open</span>
-                  <span className="text-right">Current</span>
-                  <span className="text-right">SL</span>
-                  <span className="text-right">TP</span>
-                  <span className="text-right">Swap</span>
-                  <span className="text-right">Comm</span>
-                  <span className="text-right">Profit</span>
-                  <span />
+                  <ColHeader label="#" />
+                  <ColHeader label="Time" field="time" />
+                  <ColHeader label="Type" field="type" />
+                  <ColHeader label="Symbol" field="symbol" />
+                  <ColHeader label="Lot Size" field="size" align="right" />
+                  <ColHeader label="Entry Price" field="entry" align="right" />
+                  <ColHeader label="Entry Value" align="right" />
+                  <ColHeader label="S/L" field="sl" align="right" />
+                  <ColHeader label="T/P" field="tp" align="right" />
+                  <ColHeader label="Market Price" align="right" />
+                  <ColHeader label="Market Value" align="right" />
+                  <ColHeader label="Commission" field="commission" align="right" />
+                  <ColHeader label="Profit/Loss" field="pnl" align="right" />
+                  <ColHeader label="P/L in %" align="right" />
+                  <ColHeader label="Actions" align="center" />
+                  <ColHeader label="Remark" />
                 </div>
 
                 {/* Position rows */}
-                {openPositions.map((pos) => {
+                {sortedPositions().map((pos, idx) => {
                   const dec = getDecimals(pos.symbol);
                   const pnl = getPnl(pos);
                   const isProfitable = pnl >= 0;
@@ -293,64 +439,148 @@ export default function PositionsPanel() {
                   const currentPrice = pos.direction === 'BUY'
                     ? (tick?.bid ?? pos.current_price)
                     : (tick?.ask ?? pos.current_price);
+                  const entryValue = pos.open_price * pos.size * 100000;
+                  const marketValue = currentPrice * pos.size * 100000;
+                  const pnlPct = calcPnlPercent(pnl, entryValue);
+                  const isAlt = idx % 2 === 1;
 
                   return (
                     <div
                       key={pos.id}
-                      className="grid grid-cols-[80px_50px_55px_75px_75px_65px_65px_55px_55px_70px_30px] gap-1 px-3 py-1.5 text-xs border-b hover:opacity-90 transition-opacity"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      style={{
+                        gridTemplateColumns: colTemplate,
+                        borderBottom: `1px solid ${S.border}`,
+                        background: isAlt ? S.rowAltBg : 'transparent',
+                        height: 28,
+                        alignItems: 'center',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = isAlt ? S.rowAltBg : 'transparent'; }}
                     >
-                      <span className="font-medium">{pos.symbol}</span>
-                      <span
-                        className={cn(
-                          'font-bold text-[10px]',
-                          pos.direction === 'BUY'
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        )}
-                      >
-                        {pos.direction}
+                      {/* # */}
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>
+                        {idx + 1}
                       </span>
-                      <span className="font-mono text-right">
+
+                      {/* TIME */}
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>
+                        {formatTime(pos.opened_at)}
+                      </span>
+
+                      {/* TYPE */}
+                      <span
+                        className="font-bold text-[10px]"
+                        style={{ color: pos.direction === 'BUY' ? S.green : S.red }}
+                      >
+                        {pos.direction === 'BUY' ? 'Buy' : 'Sell'}
+                      </span>
+
+                      {/* SYMBOL */}
+                      <span className="font-semibold text-[11px]" style={{ color: '#fff' }}>
+                        {pos.symbol}
+                      </span>
+
+                      {/* LOT SIZE */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.7)' }}>
                         {formatLot(pos.size)}
                       </span>
-                      <span className="font-mono text-right">
+
+                      {/* ENTRY PRICE */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)' }}>
                         {formatPrice(pos.open_price, dec)}
                       </span>
-                      <span className="font-mono text-right">
+
+                      {/* ENTRY VALUE */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
+                        {entryValue.toFixed(2)}
+                      </span>
+
+                      {/* S/L */}
+                      <span className="text-right flex items-center justify-end gap-0.5" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {pos.sl ? formatPrice(pos.sl, dec) : '--'}
+                        <Pencil size={8} style={{ opacity: 0.3, cursor: 'pointer', flexShrink: 0 }} />
+                      </span>
+
+                      {/* T/P */}
+                      <span className="text-right flex items-center justify-end gap-0.5" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {pos.tp ? formatPrice(pos.tp, dec) : '--'}
+                        <Pencil size={8} style={{ opacity: 0.3, cursor: 'pointer', flexShrink: 0 }} />
+                      </span>
+
+                      {/* MARKET PRICE */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)' }}>
                         {formatPrice(currentPrice, dec)}
                       </span>
-                      <span className="font-mono text-right opacity-60">
-                        {pos.sl ? formatPrice(pos.sl, dec) : '--'}
+
+                      {/* MARKET VALUE */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
+                        {marketValue.toFixed(2)}
                       </span>
-                      <span className="font-mono text-right opacity-60">
-                        {pos.tp ? formatPrice(pos.tp, dec) : '--'}
-                      </span>
-                      <span className="font-mono text-right opacity-60">
-                        {(pos.swap_accrued ?? 0).toFixed(2)}
-                      </span>
-                      <span className="font-mono text-right opacity-60">
+
+                      {/* COMMISSION */}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
                         {(pos.commission ?? 0).toFixed(2)}
                       </span>
+
+                      {/* PROFIT/LOSS */}
                       <span
-                        className={cn(
-                          'font-mono text-right font-bold',
-                          isProfitable ? 'text-green-400' : 'text-red-400'
-                        )}
+                        className="text-right font-bold"
+                        style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
                       >
                         {formatPnL(pnl)}
                       </span>
-                      <button
-                        onClick={() => handleClosePosition(pos)}
-                        disabled={closingId === pos.id}
-                        className={cn(
-                          'flex items-center justify-center hover:text-red-400 transition-colors opacity-50 hover:opacity-100',
-                          closingId === pos.id && 'opacity-20 cursor-not-allowed'
-                        )}
-                        title="Close position"
+
+                      {/* P/L IN % */}
+                      <span
+                        className="text-right font-bold text-[10px]"
+                        style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
                       >
-                        <X size={12} />
-                      </button>
+                        {isProfitable ? '+' : ''}{pnlPct}%
+                      </span>
+
+                      {/* ACTIONS */}
+                      <span className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleClosePosition(pos)}
+                          disabled={closingId === pos.id}
+                          className="flex items-center justify-center transition-colors"
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 3,
+                            opacity: closingId === pos.id ? 0.2 : 0.4,
+                            cursor: closingId === pos.id ? 'not-allowed' : 'pointer',
+                            color: '#fff',
+                          }}
+                          onMouseEnter={(e) => { if (closingId !== pos.id) { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = S.red; } }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = '#fff'; }}
+                          title="Close position"
+                        >
+                          <X size={12} />
+                        </button>
+                        <button
+                          className="flex items-center justify-center transition-colors"
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 3,
+                            opacity: 0.4,
+                            cursor: 'pointer',
+                            color: '#fff',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = S.accentBlue; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = '#fff'; }}
+                          title="Edit SL/TP"
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      </span>
+
+                      {/* REMARK */}
+                      <span style={{ color: S.textDim, fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        --
+                      </span>
                     </div>
                   );
                 })}
@@ -358,28 +588,38 @@ export default function PositionsPanel() {
                 {/* Summary row */}
                 {openPositions.length > 0 && (
                   <div
-                    className="grid grid-cols-[80px_50px_55px_75px_75px_65px_65px_55px_55px_70px_30px] gap-1 px-3 py-2 text-xs font-bold border-t"
+                    className="grid gap-0 px-2 text-[11px] font-bold"
                     style={{
-                      borderColor: 'var(--border)',
-                      backgroundColor: 'var(--bg-elevated)',
+                      gridTemplateColumns: colTemplate,
+                      borderTop: `1px solid ${S.border}`,
+                      background: S.headerBg,
+                      height: 28,
+                      alignItems: 'center',
                     }}
                   >
-                    <span className="col-span-7 opacity-50">Total</span>
-                    <span className="font-mono text-right opacity-60">
-                      {totalSwap.toFixed(2)}
-                    </span>
-                    <span className="font-mono text-right opacity-60">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
                       {totalCommission.toFixed(2)}
                     </span>
                     <span
-                      className={cn(
-                        'font-mono text-right',
-                        totalProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                      )}
+                      className="text-right"
+                      style={{ fontFamily: 'monospace', color: totalProfit >= 0 ? S.green : S.red }}
                     >
                       {formatPnL(totalProfit)}
                     </span>
                     <span />
+                    <span />
+                    <span style={{ color: S.textDim, fontSize: 9 }}>TOTAL</span>
                   </div>
                 )}
               </>
@@ -387,82 +627,104 @@ export default function PositionsPanel() {
           </>
         )}
 
+        {/* ---------- PENDING ORDERS TAB ---------- */}
         {activeTab === 'pending' && (
           <>
             {pendingOrders.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-xs opacity-30">
+              <div
+                className="flex items-center justify-center h-32 text-[10px]"
+                style={{ color: S.textDim }}
+              >
                 No pending orders
               </div>
             ) : (
               <>
                 <div
-                  className="grid grid-cols-[80px_50px_55px_60px_75px_65px_65px_60px_30px] gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wider opacity-40 border-b sticky top-0"
+                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
-                    borderColor: 'var(--border)',
-                    backgroundColor: 'var(--bg-surface)',
+                    gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
+                    background: S.headerBg,
+                    borderBottom: `1px solid ${S.border}`,
+                    color: S.textDim,
+                    height: 24,
+                    alignItems: 'center',
                   }}
                 >
-                  <span>Symbol</span>
-                  <span>Dir</span>
+                  <span>#</span>
+                  <span>Time</span>
                   <span>Type</span>
+                  <span>Symbol</span>
                   <span className="text-right">Size</span>
                   <span className="text-right">Price</span>
-                  <span className="text-right">SL</span>
-                  <span className="text-right">TP</span>
+                  <span className="text-right">S/L</span>
+                  <span className="text-right">T/P</span>
                   <span>Status</span>
-                  <span />
+                  <span className="text-center">Act</span>
                 </div>
 
-                {pendingOrders.map((ord) => {
+                {pendingOrders.map((ord, idx) => {
                   const dec = getDecimals(ord.symbol);
+                  const isAlt = idx % 2 === 1;
                   return (
                     <div
                       key={ord.id}
-                      className="grid grid-cols-[80px_50px_55px_60px_75px_65px_65px_60px_30px] gap-1 px-3 py-1.5 text-xs border-b hover:opacity-90 transition-opacity"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      style={{
+                        gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
+                        borderBottom: `1px solid ${S.border}`,
+                        background: isAlt ? S.rowAltBg : 'transparent',
+                        height: 28,
+                        alignItems: 'center',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = isAlt ? S.rowAltBg : 'transparent'; }}
                     >
-                      <span className="font-medium">{ord.symbol}</span>
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>{idx + 1}</span>
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>
+                        {formatTime(ord.created_at)}
+                      </span>
                       <span
-                        className={cn(
-                          'font-bold text-[10px]',
-                          ord.direction === 'BUY'
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        )}
+                        className="font-bold text-[10px]"
+                        style={{ color: ord.direction === 'BUY' ? S.green : S.red }}
                       >
-                        {ord.direction}
+                        {ord.direction === 'BUY' ? 'Buy' : 'Sell'}
                       </span>
-                      <span className="capitalize opacity-60">
-                        {ord.order_type}
-                      </span>
-                      <span className="font-mono text-right">
+                      <span className="font-semibold" style={{ color: '#fff' }}>{ord.symbol}</span>
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.7)' }}>
                         {formatLot(ord.requested_size)}
                       </span>
-                      <span className="font-mono text-right">
-                        {ord.requested_price
-                          ? formatPrice(ord.requested_price, dec)
-                          : '--'}
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)' }}>
+                        {ord.requested_price ? formatPrice(ord.requested_price, dec) : '--'}
                       </span>
-                      <span className="font-mono text-right opacity-60">
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
                         {ord.sl ? formatPrice(ord.sl, dec) : '--'}
                       </span>
-                      <span className="font-mono text-right opacity-60">
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
                         {ord.tp ? formatPrice(ord.tp, dec) : '--'}
                       </span>
-                      <span className="text-[10px] opacity-50 capitalize">
+                      <span className="capitalize text-[9px]" style={{ color: S.textMuted }}>
                         {ord.status.replace(/_/g, ' ')}
                       </span>
-                      <button
-                        onClick={() => handleCancelOrder(ord.id)}
-                        disabled={cancellingId === ord.id}
-                        className={cn(
-                          'flex items-center justify-center hover:text-red-400 transition-colors opacity-50 hover:opacity-100',
-                          cancellingId === ord.id && 'opacity-20 cursor-not-allowed'
-                        )}
-                        title="Cancel order"
-                      >
-                        <X size={12} />
-                      </button>
+                      <span className="flex items-center justify-center">
+                        <button
+                          onClick={() => handleCancelOrder(ord.id)}
+                          disabled={cancellingId === ord.id}
+                          className="flex items-center justify-center transition-colors"
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 3,
+                            opacity: cancellingId === ord.id ? 0.2 : 0.4,
+                            cursor: cancellingId === ord.id ? 'not-allowed' : 'pointer',
+                            color: '#fff',
+                          }}
+                          onMouseEnter={(e) => { if (cancellingId !== ord.id) { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = S.red; } }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = '#fff'; }}
+                          title="Cancel order"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
                     </div>
                   );
                 })}
@@ -471,79 +733,139 @@ export default function PositionsPanel() {
           </>
         )}
 
+        {/* ---------- HISTORY TAB ---------- */}
         {activeTab === 'history' && (
           <>
             {tradeHistory.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-xs opacity-30">
+              <div
+                className="flex items-center justify-center h-32 text-[10px]"
+                style={{ color: S.textDim }}
+              >
                 No trade history available
               </div>
             ) : (
               <>
                 <div
-                  className="grid grid-cols-[80px_50px_55px_75px_75px_70px_80px] gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wider opacity-40 border-b sticky top-0"
+                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
-                    borderColor: 'var(--border)',
-                    backgroundColor: 'var(--bg-surface)',
+                    gridTemplateColumns: histColTemplate,
+                    background: S.headerBg,
+                    borderBottom: `1px solid ${S.border}`,
+                    color: S.textDim,
+                    height: 24,
+                    alignItems: 'center',
                   }}
                 >
-                  <span>Symbol</span>
-                  <span>Dir</span>
-                  <span className="text-right">Size</span>
-                  <span className="text-right">Open</span>
-                  <span className="text-right">Close</span>
-                  <span className="text-right">PnL</span>
-                  <span className="text-right">Closed</span>
+                  <ColHeader label="#" />
+                  <ColHeader label="Time" field="time" />
+                  <ColHeader label="Type" field="type" />
+                  <ColHeader label="Symbol" field="symbol" />
+                  <ColHeader label="Lot Size" field="size" align="right" />
+                  <ColHeader label="Entry" field="entry" align="right" />
+                  <ColHeader label="Close" align="right" />
+                  <ColHeader label="S/L" align="right" />
+                  <ColHeader label="T/P" align="right" />
+                  <ColHeader label="Commission" align="right" />
+                  <ColHeader label="P/L" field="pnl" align="right" />
+                  <ColHeader label="P/L %" align="right" />
+                  <ColHeader label="Closed" align="right" />
                 </div>
 
-                {tradeHistory.map((pos) => {
+                {sortedHistory().map((pos, idx) => {
                   const dec = getDecimals(pos.symbol);
                   const pnl = pos.realized_pnl ?? 0;
                   const isProfitable = pnl >= 0;
+                  const entryValue = pos.open_price * pos.size * 100000;
+                  const pnlPct = calcPnlPercent(pnl, entryValue);
                   const closedDate = pos.closed_at
-                    ? new Date(pos.closed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    ? new Date(pos.closed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                     : '--';
+                  const isAlt = idx % 2 === 1;
 
                   return (
                     <div
                       key={pos.id}
-                      className="grid grid-cols-[80px_50px_55px_75px_75px_70px_80px] gap-1 px-3 py-1.5 text-xs border-b hover:opacity-90 transition-opacity"
-                      style={{ borderColor: 'var(--border)' }}
+                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      style={{
+                        gridTemplateColumns: histColTemplate,
+                        borderBottom: `1px solid ${S.border}`,
+                        background: isAlt ? S.rowAltBg : 'transparent',
+                        height: 28,
+                        alignItems: 'center',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = isAlt ? S.rowAltBg : 'transparent'; }}
                     >
-                      <span className="font-medium">{pos.symbol}</span>
-                      <span
-                        className={cn(
-                          'font-bold text-[10px]',
-                          pos.direction === 'BUY'
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        )}
-                      >
-                        {pos.direction}
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>{idx + 1}</span>
+                      <span style={{ color: S.textMuted, fontFamily: 'monospace', fontSize: 10 }}>
+                        {formatTime(pos.opened_at)}
                       </span>
-                      <span className="font-mono text-right">
+                      <span
+                        className="font-bold text-[10px]"
+                        style={{ color: pos.direction === 'BUY' ? S.green : S.red }}
+                      >
+                        {pos.direction === 'BUY' ? 'Buy' : 'Sell'}
+                      </span>
+                      <span className="font-semibold" style={{ color: '#fff' }}>{pos.symbol}</span>
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.7)' }}>
                         {formatLot(pos.size)}
                       </span>
-                      <span className="font-mono text-right">
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)' }}>
                         {formatPrice(pos.open_price, dec)}
                       </span>
-                      <span className="font-mono text-right">
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)' }}>
                         {pos.close_price ? formatPrice(pos.close_price, dec) : '--'}
                       </span>
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {pos.sl ? formatPrice(pos.sl, dec) : '--'}
+                      </span>
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {pos.tp ? formatPrice(pos.tp, dec) : '--'}
+                      </span>
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {(pos.commission ?? 0).toFixed(2)}
+                      </span>
                       <span
-                        className={cn(
-                          'font-mono text-right font-bold',
-                          isProfitable ? 'text-green-400' : 'text-red-400'
-                        )}
+                        className="text-right font-bold"
+                        style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
                       >
                         {formatPnL(pnl)}
                       </span>
-                      <span className="text-right opacity-50">{closedDate}</span>
+                      <span
+                        className="text-right font-bold text-[10px]"
+                        style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
+                      >
+                        {isProfitable ? '+' : ''}{pnlPct}%
+                      </span>
+                      <span className="text-right text-[9px]" style={{ color: S.textMuted }}>{closedDate}</span>
                     </div>
                   );
                 })}
               </>
             )}
           </>
+        )}
+
+        {/* ---------- INBOX TAB ---------- */}
+        {activeTab === 'inbox' && (
+          <div
+            className="flex flex-col items-center justify-center h-32 gap-2"
+            style={{ color: S.textDim }}
+          >
+            <Mail size={20} style={{ opacity: 0.3 }} />
+            <span className="text-[10px]">No messages</span>
+          </div>
+        )}
+
+        {/* ---------- LOGS TAB ---------- */}
+        {activeTab === 'logs' && (
+          <div
+            className="flex flex-col items-center justify-center h-32 gap-2"
+            style={{ color: S.textDim }}
+          >
+            <FileText size={20} style={{ opacity: 0.3 }} />
+            <span className="text-[10px]">No activity logs</span>
+          </div>
         )}
       </div>
     </div>

@@ -3,7 +3,6 @@
 import TopBar from '@/components/layout/TopBar';
 import Watchlist from '@/components/trading/watchlist/Watchlist';
 import ChartPanel from '@/components/trading/chart/ChartPanel';
-import OrderTicket from '@/components/trading/order-ticket/OrderTicket';
 import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
 import { usePriceEngine } from '@/hooks/usePriceEngine';
@@ -16,8 +15,8 @@ export default function TerminalPage() {
       className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
       style={{
         display: 'grid',
-        gridTemplateRows: '48px 1fr 240px 32px',
-        gridTemplateColumns: '240px 1fr 280px',
+        gridTemplateRows: '42px 1fr 200px 28px',
+        gridTemplateColumns: '260px 1fr',
       }}
     >
       {/* TopBar - spans full width */}
@@ -36,11 +35,6 @@ export default function TerminalPage() {
       {/* ChartPanel - center, fills remaining space */}
       <div className="overflow-hidden">
         <ChartPanel ohlcvBuilder={ohlcvBuilder} />
-      </div>
-
-      {/* OrderTicket - right sidebar */}
-      <div className="border-l border-[var(--border)] overflow-hidden">
-        <OrderTicket />
       </div>
 
       {/* PositionsPanel - spans full width */}

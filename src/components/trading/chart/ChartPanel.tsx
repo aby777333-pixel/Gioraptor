@@ -20,7 +20,29 @@ import type {
   DeepPartial,
   ChartOptions,
 } from 'lightweight-charts';
-import { BarChart3, Crosshair, CandlestickChart, TrendingUp } from 'lucide-react';
+import {
+  BarChart3,
+  Crosshair,
+  CandlestickChart,
+  TrendingUp,
+  MousePointer2,
+  Minus,
+  MoveVertical,
+  GitCommitHorizontal,
+  Type,
+  Square,
+  Ruler,
+  ZoomIn,
+  ZoomOut,
+  Magnet,
+  Lock,
+  Eye,
+  EyeOff,
+  Trash2,
+  Filter,
+  Undo2,
+  Redo2,
+} from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 import { formatPrice } from '@/lib/utils/format';
@@ -37,6 +59,56 @@ interface ChartPanelProps {
   ohlcvBuilder: OHLCVBuilder | null;
 }
 
+// Symbol descriptions for the toolbar display
+const SYMBOL_DESCRIPTIONS: Record<string, string> = {
+  EURUSD: 'Euro vs US Dollar',
+  GBPUSD: 'British Pound vs US Dollar',
+  USDJPY: 'US Dollar vs Japanese Yen',
+  XAUUSD: 'Gold vs US Dollar',
+  XAGUSD: 'Silver vs US Dollar',
+  BTCUSD: 'Bitcoin vs US Dollar',
+  ETHUSD: 'Ethereum vs US Dollar',
+  US30: 'Dow Jones Industrial Average',
+  NAS100: 'Nasdaq 100 Index',
+  SPX500: 'S&P 500 Index',
+  USDCHF: 'US Dollar vs Swiss Franc',
+  AUDUSD: 'Australian Dollar vs US Dollar',
+  NZDUSD: 'New Zealand Dollar vs US Dollar',
+  USDCAD: 'US Dollar vs Canadian Dollar',
+  EURJPY: 'Euro vs Japanese Yen',
+  GBPJPY: 'British Pound vs Japanese Yen',
+  EURGBP: 'Euro vs British Pound',
+  USOIL: 'US Crude Oil',
+  UKOIL: 'UK Brent Crude Oil',
+  NATGAS: 'Natural Gas',
+};
+
+// Drawing tool definitions
+type DrawingToolId =
+  | 'cursor'
+  | 'crosshair'
+  | 'trendline'
+  | 'horizontal'
+  | 'vertical'
+  | 'fibonacci'
+  | 'text'
+  | 'rectangle'
+  | 'measure'
+  | 'zoomin'
+  | 'zoomout'
+  | 'magnet'
+  | 'lock'
+  | 'visibility'
+  | 'deleteall';
+
+interface DrawingTool {
+  id: DrawingToolId;
+  label: string;
+  icon: React.ReactNode;
+  group: number; // for separator grouping
+  toggle?: boolean; // if true, it's a toggle button not a single-select
+}
+
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
   if (symbol.startsWith('XAU') || symbol.startsWith('ETH')) return 2;
@@ -46,11 +118,48 @@ function getDecimals(symbol: string): number {
   return 5;
 }
 
+// Tooltip component for drawing tools
+function ToolTooltip({ label, visible }: { label: string; visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div
+      className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none whitespace-nowrap"
+      style={{
+        backgroundColor: '#1a1a28',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 4,
+        padding: '4px 8px',
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.85)',
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+      }}
+    >
+      {label}
+    </div>
+  );
+}
+
 export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   const { activeSymbol, prices } = useTradingStore();
   const [selectedTf, setSelectedTf] = useState<string>('1H');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [crosshairEnabled, setCrosshairEnabled] = useState(true);
+
+  // Drawing tools state
+  const [activeTool, setActiveTool] = useState<DrawingToolId>('cursor');
+  const [magnetMode, setMagnetMode] = useState(false);
+  const [lockDrawings, setLockDrawings] = useState(false);
+  const [showDrawings, setShowDrawings] = useState(true);
+  const [hoveredTool, setHoveredTool] = useState<DrawingToolId | null>(null);
+
+  // OHLC overlay state from crosshair
+  const [ohlcValues, setOhlcValues] = useState<{
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  } | null>(null);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -60,6 +169,59 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   const priceLineRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']> | null>(null);
   const linePriceLineRef = useRef<ReturnType<ISeriesApi<'Line'>['createPriceLine']> | null>(null);
   const lastBarTimeRef = useRef<number>(0);
+
+  // Drawing tools configuration
+  const drawingTools: DrawingTool[] = [
+    { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={18} />, group: 1 },
+    { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={18} />, group: 1 },
+    { id: 'trendline', label: 'Trend Line', icon: <TrendingUp size={18} />, group: 2 },
+    { id: 'horizontal', label: 'Horizontal Line', icon: <Minus size={18} />, group: 2 },
+    { id: 'vertical', label: 'Vertical Line', icon: <MoveVertical size={18} />, group: 2 },
+    { id: 'fibonacci', label: 'Fibonacci Retracement', icon: <GitCommitHorizontal size={18} />, group: 3 },
+    { id: 'text', label: 'Text Annotation', icon: <Type size={18} />, group: 3 },
+    { id: 'rectangle', label: 'Rectangle', icon: <Square size={18} />, group: 3 },
+    { id: 'measure', label: 'Measure Tool', icon: <Ruler size={18} />, group: 4 },
+    { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={18} />, group: 4 },
+    { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={18} />, group: 4 },
+    { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={18} />, group: 5, toggle: true },
+    { id: 'lock', label: 'Lock Drawings', icon: <Lock size={18} />, group: 5, toggle: true },
+    { id: 'visibility', label: showDrawings ? 'Hide Drawings' : 'Show Drawings', icon: showDrawings ? <Eye size={18} /> : <EyeOff size={18} />, group: 5, toggle: true },
+    { id: 'deleteall', label: 'Delete All Drawings', icon: <Trash2 size={18} />, group: 6, toggle: true },
+  ];
+
+  // Handle drawing tool click
+  const handleToolClick = (tool: DrawingTool) => {
+    if (tool.id === 'magnet') {
+      setMagnetMode(!magnetMode);
+    } else if (tool.id === 'lock') {
+      setLockDrawings(!lockDrawings);
+    } else if (tool.id === 'visibility') {
+      setShowDrawings(!showDrawings);
+    } else if (tool.id === 'deleteall') {
+      // No-op for now (visual only)
+    } else if (tool.id === 'zoomin') {
+      chartRef.current?.timeScale().applyOptions({
+        barSpacing: (chartRef.current.timeScale().options().barSpacing ?? 8) + 2,
+      });
+    } else if (tool.id === 'zoomout') {
+      const current = chartRef.current?.timeScale().options().barSpacing ?? 8;
+      chartRef.current?.timeScale().applyOptions({
+        barSpacing: Math.max(2, current - 2),
+      });
+    } else {
+      setActiveTool(tool.id);
+    }
+  };
+
+  // Check if a tool is "active" visually
+  const isToolActive = (tool: DrawingTool): boolean => {
+    if (tool.id === 'magnet') return magnetMode;
+    if (tool.id === 'lock') return lockDrawings;
+    if (tool.id === 'visibility') return !showDrawings;
+    if (tool.id === 'deleteall') return false;
+    if (tool.id === 'zoomin' || tool.id === 'zoomout') return false;
+    return activeTool === tool.id;
+  };
 
   // Create chart on mount
   useEffect(() => {
@@ -108,6 +270,23 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
     const chart = createChart(chartContainerRef.current, chartOptions);
     chartRef.current = chart;
+
+    // Subscribe to crosshair move for OHLC display
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.seriesData) {
+        setOhlcValues(null);
+        return;
+      }
+      const candleData = param.seriesData.get(candleSeriesRef.current!) as CandlestickData | undefined;
+      if (candleData && 'open' in candleData) {
+        setOhlcValues({
+          open: candleData.open,
+          high: candleData.high,
+          low: candleData.low,
+          close: candleData.close,
+        });
+      }
+    });
 
     // Candlestick series
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -303,10 +482,85 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   // Current price info for overlay
   const currentTick = prices[activeSymbol];
   const decimals = getDecimals(activeSymbol);
+  const symbolDesc = SYMBOL_DESCRIPTIONS[activeSymbol] || activeSymbol;
+  const tfLabel = selectedTf;
+  const chartTypeLabel = chartType === 'candlestick' ? 'C' : 'L';
+
+  // Determine OHLC display values (crosshair or latest bar)
+  const displayOhlc = ohlcValues || (currentTick ? {
+    open: currentTick.mid,
+    high: currentTick.mid,
+    low: currentTick.mid,
+    close: currentTick.mid,
+  } : null);
+
+  // Render group separators
+  const renderToolsWithSeparators = () => {
+    const elements: React.ReactNode[] = [];
+    let lastGroup = 0;
+
+    drawingTools.forEach((tool) => {
+      // Add separator between groups
+      if (tool.group !== lastGroup && lastGroup !== 0) {
+        elements.push(
+          <div
+            key={`sep-${tool.group}`}
+            className="w-full my-1"
+            style={{
+              height: 1,
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              marginLeft: 4,
+              marginRight: 4,
+              width: 'calc(100% - 8px)',
+            }}
+          />
+        );
+      }
+      lastGroup = tool.group;
+
+      const active = isToolActive(tool);
+
+      elements.push(
+        <div key={tool.id} className="relative flex items-center justify-center">
+          <button
+            onClick={() => handleToolClick(tool)}
+            onMouseEnter={() => setHoveredTool(tool.id)}
+            onMouseLeave={() => setHoveredTool(null)}
+            className="flex items-center justify-center transition-all duration-150"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 4,
+              backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'transparent',
+              color: active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
+              opacity: active ? 1 : undefined,
+            }}
+            onMouseOver={(e) => {
+              if (!active) {
+                e.currentTarget.style.color = 'rgba(255,255,255,1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!active) {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
+          >
+            {tool.icon}
+          </button>
+          <ToolTooltip label={tool.label} visible={hoveredTool === tool.id} />
+        </div>
+      );
+    });
+
+    return elements;
+  };
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Chart toolbar */}
+      {/* Chart toolbar - spans full width */}
       <div
         className="flex items-center gap-1 px-3 py-1 border-b shrink-0"
         style={{
@@ -314,13 +568,55 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
           borderColor: 'rgba(255,255,255,0.06)',
         }}
       >
+        {/* Connection indicator */}
+        <div
+          className="w-2 h-2 rounded-full mr-2 shrink-0"
+          style={{
+            backgroundColor: currentTick ? '#00C27A' : '#C1121F',
+            boxShadow: currentTick ? '0 0 6px rgba(0,194,122,0.5)' : '0 0 6px rgba(193,18,31,0.5)',
+          }}
+        />
+
         {/* Symbol label */}
         <span
-          className="text-xs font-bold mr-3 font-mono"
+          className="text-xs font-bold mr-1 font-mono shrink-0"
           style={{ color: '#29ABE2' }}
         >
           {activeSymbol}
         </span>
+
+        {/* Symbol description, timeframe, chart type */}
+        <span className="text-[10px] font-mono opacity-30 mr-3 shrink-0 hidden md:inline">
+          {symbolDesc} &middot; {tfLabel} &middot; {chartTypeLabel}
+        </span>
+
+        {/* OHLC values */}
+        {displayOhlc && (
+          <div className="flex items-center gap-2 mr-3 shrink-0 hidden lg:flex">
+            <span className="text-[10px] font-mono">
+              <span className="opacity-30">O </span>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{formatPrice(displayOhlc.open, decimals)}</span>
+            </span>
+            <span className="text-[10px] font-mono">
+              <span className="opacity-30">H </span>
+              <span style={{ color: '#00C27A' }}>{formatPrice(displayOhlc.high, decimals)}</span>
+            </span>
+            <span className="text-[10px] font-mono">
+              <span className="opacity-30">L </span>
+              <span style={{ color: '#C1121F' }}>{formatPrice(displayOhlc.low, decimals)}</span>
+            </span>
+            <span className="text-[10px] font-mono">
+              <span className="opacity-30">C </span>
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{formatPrice(displayOhlc.close, decimals)}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Divider */}
+        <div
+          className="w-px h-4 mx-1 shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+        />
 
         {/* Timeframe buttons */}
         {timeframes.map((tf) => (
@@ -328,7 +624,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
             key={tf}
             onClick={() => setSelectedTf(tf)}
             className={cn(
-              'px-2 py-1 text-[11px] font-mono rounded transition-all',
+              'px-2 py-1 text-[11px] font-mono rounded transition-all shrink-0',
               selectedTf === tf
                 ? 'font-bold opacity-100'
                 : 'opacity-40 hover:opacity-70'
@@ -344,7 +640,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Divider */}
         <div
-          className="w-px h-4 mx-2"
+          className="w-px h-4 mx-1 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
         />
 
@@ -352,7 +648,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <button
           onClick={() => setChartType(chartType === 'candlestick' ? 'line' : 'candlestick')}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity',
+            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0',
             'opacity-60 hover:opacity-90'
           )}
           style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
@@ -372,7 +668,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <button
           onClick={() => setCrosshairEnabled(!crosshairEnabled)}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity',
+            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0',
             crosshairEnabled ? 'opacity-90' : 'opacity-40'
           )}
           style={{
@@ -382,44 +678,91 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         >
           <Crosshair size={12} />
         </button>
+
+        {/* Indicators button */}
+        <button
+          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+          title="Indicators"
+        >
+          <Filter size={12} />
+          <span className="hidden sm:inline">Indicators</span>
+        </button>
+
+        {/* Divider */}
+        <div
+          className="w-px h-4 mx-1 shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+        />
+
+        {/* Undo / Redo */}
+        <button
+          className="flex items-center justify-center p-1 rounded transition-opacity opacity-30 hover:opacity-60 shrink-0"
+          style={{ backgroundColor: 'transparent' }}
+          title="Undo"
+        >
+          <Undo2 size={13} />
+        </button>
+        <button
+          className="flex items-center justify-center p-1 rounded transition-opacity opacity-30 hover:opacity-60 shrink-0"
+          style={{ backgroundColor: 'transparent' }}
+          title="Redo"
+        >
+          <Redo2 size={13} />
+        </button>
       </div>
 
-      {/* Chart area */}
-      <div className="flex-1 relative" style={{ backgroundColor: '#0A0A0F' }}>
-        <div ref={chartContainerRef} className="absolute inset-0" />
+      {/* Main area: Drawing sidebar + Chart */}
+      <div className="flex-1 flex min-h-0">
+        {/* Drawing tools sidebar */}
+        <div
+          className="flex flex-col items-center py-2 gap-0.5 shrink-0 overflow-y-auto"
+          style={{
+            width: 36,
+            backgroundColor: '#111118',
+            borderRight: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          {renderToolsWithSeparators()}
+        </div>
 
-        {/* Bid/Ask spread overlay */}
-        {currentTick && (
-          <div
-            className="absolute top-2 right-2 z-10 px-3 py-1.5 rounded"
-            style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}
-          >
-            <div className="flex items-center gap-3 text-[11px] font-mono">
-              <div>
-                <span className="opacity-40 mr-1">B</span>
-                <span className="text-green-400">{formatPrice(currentTick.bid, decimals)}</span>
-              </div>
-              <div>
-                <span className="opacity-40 mr-1">A</span>
-                <span className="text-red-400">{formatPrice(currentTick.ask, decimals)}</span>
-              </div>
-              <div className="opacity-40">
-                <span className="mr-1">S</span>
-                <span>{currentTick.spread.toFixed(decimals > 3 ? 1 : decimals)}</span>
+        {/* Chart area */}
+        <div className="flex-1 relative" style={{ backgroundColor: '#0A0A0F' }}>
+          <div ref={chartContainerRef} className="absolute inset-0" />
+
+          {/* Bid/Ask spread overlay */}
+          {currentTick && (
+            <div
+              className="absolute top-2 right-2 z-10 px-3 py-1.5 rounded"
+              style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-center gap-3 text-[11px] font-mono">
+                <div>
+                  <span className="opacity-40 mr-1">B</span>
+                  <span className="text-green-400">{formatPrice(currentTick.bid, decimals)}</span>
+                </div>
+                <div>
+                  <span className="opacity-40 mr-1">A</span>
+                  <span className="text-red-400">{formatPrice(currentTick.ask, decimals)}</span>
+                </div>
+                <div className="opacity-40">
+                  <span className="mr-1">S</span>
+                  <span>{currentTick.spread.toFixed(decimals > 3 ? 1 : decimals)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Loading state when no builder */}
-        {!ohlcvBuilder && (
-          <div className="absolute inset-0 flex items-center justify-center z-5">
-            <div className="text-center opacity-30">
-              <BarChart3 size={48} className="mx-auto mb-3 animate-pulse" />
-              <div className="text-sm font-medium">Initializing chart...</div>
+          {/* Loading state when no builder */}
+          {!ohlcvBuilder && (
+            <div className="absolute inset-0 flex items-center justify-center z-5">
+              <div className="text-center opacity-30">
+                <BarChart3 size={48} className="mx-auto mb-3 animate-pulse" />
+                <div className="text-sm font-medium">Initializing chart...</div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

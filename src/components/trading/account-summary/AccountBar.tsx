@@ -1,7 +1,7 @@
 'use client';
 
 import { useTradingStore } from '@/stores/trading';
-import { formatCurrency, cn } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function AccountBar() {
   const { accountSummary } = useTradingStore();
@@ -15,40 +15,66 @@ export default function AccountBar() {
     floating_pnl,
   } = accountSummary;
 
-  const items = [
-    { label: 'Balance', value: formatCurrency(balance), color: null },
-    { label: 'Equity', value: formatCurrency(equity), color: null },
-    { label: 'Margin', value: formatCurrency(margin_used), color: null },
-    { label: 'Free Margin', value: formatCurrency(free_margin), color: null },
-    {
-      label: 'Margin Level',
-      value: margin_level_pct > 0 ? `${margin_level_pct.toFixed(1)}%` : '--',
-      color: null,
-    },
-    {
-      label: 'P/L',
-      value: `${floating_pnl >= 0 ? '+' : ''}${formatCurrency(floating_pnl)}`,
-      color: floating_pnl >= 0 ? 'text-green-400' : 'text-red-400',
-    },
-  ];
+  const pnlColor = floating_pnl >= 0 ? '#00C853' : '#FF5252';
+  const pnlSign = floating_pnl >= 0 ? '+' : '';
 
   return (
     <div
-      className="flex items-center justify-center gap-6 px-4 border-t select-none"
+      className="flex items-center justify-center gap-4 px-4 select-none"
       style={{
-        height: 32,
+        height: 28,
         backgroundColor: 'var(--bg-surface)',
-        borderColor: 'var(--border)',
+        fontSize: 11,
       }}
     >
-      {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5 text-[11px]">
-          <span className="opacity-40">{item.label}</span>
-          <span className={cn('font-mono font-medium', item.color)}>
-            {item.value}
-          </span>
-        </div>
-      ))}
+      <Item label="Currency" value="USD" />
+      <Sep />
+      <Item label="Balance" value={formatCurrency(balance)} />
+      <Sep />
+      <Item label="Equity" value={formatCurrency(equity)} />
+      <Sep />
+      <Item label="Margin" value={formatCurrency(margin_used)} />
+      <Sep />
+      <Item label="Free Margin" value={formatCurrency(free_margin)} />
+      <Sep />
+      <Item
+        label="Margin Level"
+        value={margin_level_pct > 0 ? `${margin_level_pct.toFixed(2)}%` : '--'}
+      />
+      <Sep />
+      <Item
+        label="Net P&L"
+        value={`${pnlSign}${formatCurrency(floating_pnl)}`}
+        valueColor={pnlColor}
+      />
     </div>
+  );
+}
+
+function Item({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span style={{ opacity: 0.4 }}>{label}:</span>
+      <span
+        className="font-mono font-medium"
+        style={valueColor ? { color: valueColor } : undefined}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Sep() {
+  return (
+    <span style={{ opacity: 0.15 }}>|</span>
   );
 }
