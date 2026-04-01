@@ -204,23 +204,23 @@ export default function Watchlist() {
   const allCount = defaultWatchlist.length;
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: '#0A0A0F' }}>
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Tabs: Favourites / All Symbols */}
       <div
         className="flex border-b"
-        style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+        style={{ borderColor: 'var(--border)' }}
       >
         <button
           onClick={() => setActiveTab('favourites')}
           className={cn(
-            'flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors',
+            'flex-1 py-2.5 text-[12px] font-medium uppercase tracking-wider transition-colors',
             activeTab === 'favourites'
               ? 'opacity-100'
               : 'opacity-40 hover:opacity-60'
           )}
           style={{
             borderBottom: activeTab === 'favourites' ? '2px solid #29ABE2' : '2px solid transparent',
-            color: activeTab === 'favourites' ? '#29ABE2' : '#fff',
+            color: activeTab === 'favourites' ? '#29ABE2' : 'var(--text-primary)',
           }}
         >
           Favourites ({favCount})
@@ -228,14 +228,14 @@ export default function Watchlist() {
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
-            'flex-1 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors',
+            'flex-1 py-2.5 text-[12px] font-medium uppercase tracking-wider transition-colors',
             activeTab === 'all'
               ? 'opacity-100'
               : 'opacity-40 hover:opacity-60'
           )}
           style={{
             borderBottom: activeTab === 'all' ? '2px solid #29ABE2' : '2px solid transparent',
-            color: activeTab === 'all' ? '#29ABE2' : '#fff',
+            color: activeTab === 'all' ? '#29ABE2' : 'var(--text-primary)',
           }}
         >
           All Symbols ({allCount})
@@ -243,31 +243,31 @@ export default function Watchlist() {
       </div>
 
       {/* Search */}
-      <div className="px-2 py-1.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
         <div
-          className="flex items-center gap-1.5 px-2 py-1 rounded"
-          style={{ backgroundColor: '#111118' }}
+          className="flex items-center gap-2 px-3 py-2 rounded"
+          style={{ backgroundColor: 'var(--bg-surface)' }}
         >
-          <Search size={12} className="opacity-40 shrink-0" />
+          <Search size={14} className="opacity-40 shrink-0" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search symbols..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-transparent outline-none text-[11px] placeholder:opacity-30"
-            style={{ color: '#fff' }}
+            className="w-full bg-transparent outline-none text-[13px] placeholder:opacity-30"
+            style={{ color: 'var(--text-primary)' }}
           />
         </div>
       </div>
 
       {/* Column Headers */}
       <div
-        className="grid grid-cols-[1fr_auto_auto] gap-1 px-3 py-1 text-[9px] uppercase tracking-wider opacity-30 border-b"
-        style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+        className="grid grid-cols-[1fr_auto_auto] gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wider opacity-40 border-b font-semibold"
+        style={{ borderColor: 'var(--border)' }}
       >
         <span>Symbol</span>
-        <span className="text-right" style={{ width: 58 }}>Sell</span>
-        <span className="text-right" style={{ width: 58 }}>Buy</span>
+        <span className="text-right" style={{ width: 64 }}>Sell</span>
+        <span className="text-right" style={{ width: 64 }}>Buy</span>
       </div>
 
       {/* Symbol List */}
@@ -284,7 +284,7 @@ export default function Watchlist() {
               {/* Symbol Row */}
               <button
                 onClick={() => handleSymbolClick(item.symbol)}
-                className="w-full grid grid-cols-[1fr_auto_auto] gap-1 items-center px-3 py-1.5 text-xs transition-all border-l-2"
+                className="w-full grid grid-cols-[1fr_auto_auto] gap-1 items-center px-3 py-2.5 text-xs transition-all border-l-2"
                 style={{
                   borderLeftColor: isActive ? '#29ABE2' : 'transparent',
                   backgroundColor: flash === 'up'
@@ -292,21 +292,21 @@ export default function Watchlist() {
                     : flash === 'down'
                     ? 'rgba(193,18,31,0.08)'
                     : isActive
-                    ? '#111118'
+                    ? 'var(--bg-surface)'
                     : 'transparent',
                   transition: 'background-color 0.15s ease',
                 }}
               >
                 {/* Symbol Name + Direction */}
-                <div className="text-left flex items-center gap-1 min-w-0">
+                <div className="text-left flex items-center gap-1.5 min-w-0">
                   <div className="min-w-0">
-                    <div className="font-medium text-[11px] flex items-center gap-0.5" style={{ color: '#fff' }}>
+                    <div className="font-medium text-[13px] flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
                       <span className="truncate">{item.symbol}</span>
                       {item.direction === 'up' && (
-                        <ArrowUp size={9} style={{ color: '#00C27A' }} />
+                        <ArrowUp size={10} style={{ color: '#00C27A' }} />
                       )}
                       {item.direction === 'down' && (
-                        <ArrowDown size={9} style={{ color: '#C1121F' }} />
+                        <ArrowDown size={10} style={{ color: '#C1121F' }} />
                       )}
                     </div>
                   </div>
@@ -314,9 +314,9 @@ export default function Watchlist() {
 
                 {/* Sell Price */}
                 <span
-                  className="font-mono text-right text-[11px]"
+                  className="font-mono text-right text-[13px] font-medium"
                   style={{
-                    width: 58,
+                    width: 64,
                     color: flash === 'down' ? '#ff6b6b' : '#C1121F',
                     transition: 'color 0.15s',
                   }}
@@ -326,9 +326,9 @@ export default function Watchlist() {
 
                 {/* Buy Price */}
                 <span
-                  className="font-mono text-right text-[11px]"
+                  className="font-mono text-right text-[13px] font-medium"
                   style={{
-                    width: 58,
+                    width: 64,
                     color: flash === 'up' ? '#5dffa0' : '#00C27A',
                     transition: 'color 0.15s',
                   }}
@@ -349,14 +349,14 @@ export default function Watchlist() {
                 >
                   {/* Widget Header */}
                   <div
-                    className="flex items-center justify-between px-3 py-1.5 border-b"
-                    style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                    className="flex items-center justify-between px-3 py-2 border-b"
+                    style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-semibold" style={{ color: '#fff' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {item.symbol}
                       </span>
-                      <span className="text-[10px] font-mono opacity-60">
+                      <span className="text-[12px] font-mono opacity-60">
                         {formatPrice(item.bid, decimals)}
                       </span>
                     </div>
@@ -396,13 +396,13 @@ export default function Watchlist() {
                   </div>
 
                   {/* SELL / LOT / BUY row */}
-                  <div className="px-2 py-2">
-                    <div className="flex items-stretch gap-1" style={{ height: 44 }}>
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-stretch gap-1.5" style={{ height: 52 }}>
                       {/* SELL Button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'SELL'); }}
                         disabled={isPlacing}
-                        className="flex-1 flex flex-col items-center justify-center rounded transition-all"
+                        className="flex-1 flex flex-col items-center justify-center rounded transition-all py-3"
                         style={{
                           backgroundColor: isPlacing ? 'rgba(193,18,31,0.08)' : 'rgba(193,18,31,0.15)',
                           border: '1px solid rgba(193,18,31,0.2)',
@@ -411,11 +411,11 @@ export default function Watchlist() {
                         onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.25)'; }}
                         onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.15)'; }}
                       >
-                        <span className="text-[8px] uppercase tracking-wider font-medium" style={{ color: '#C1121F' }}>
+                        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#C1121F' }}>
                           Sell
                         </span>
-                        <span className="font-mono text-[13px] font-bold leading-none" style={{ color: '#C1121F' }}>
-                          {isPlacing ? <Loader2 size={12} className="animate-spin" /> : formatPrice(item.bid, decimals)}
+                        <span className="font-mono text-[16px] font-bold leading-none mt-0.5" style={{ color: '#C1121F' }}>
+                          {isPlacing ? <Loader2 size={14} className="animate-spin" /> : formatPrice(item.bid, decimals)}
                         </span>
                       </button>
 
@@ -476,7 +476,7 @@ export default function Watchlist() {
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'BUY'); }}
                         disabled={isPlacing}
-                        className="flex-1 flex flex-col items-center justify-center rounded transition-all"
+                        className="flex-1 flex flex-col items-center justify-center rounded transition-all py-3"
                         style={{
                           backgroundColor: isPlacing ? 'rgba(0,194,122,0.08)' : 'rgba(0,194,122,0.15)',
                           border: '1px solid rgba(0,194,122,0.2)',
@@ -485,22 +485,22 @@ export default function Watchlist() {
                         onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.25)'; }}
                         onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.15)'; }}
                       >
-                        <span className="text-[8px] uppercase tracking-wider font-medium" style={{ color: '#00C27A' }}>
+                        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#00C27A' }}>
                           Buy
                         </span>
-                        <span className="font-mono text-[13px] font-bold leading-none" style={{ color: '#00C27A' }}>
-                          {isPlacing ? <Loader2 size={12} className="animate-spin" /> : formatPrice(item.ask, decimals)}
+                        <span className="font-mono text-[16px] font-bold leading-none mt-0.5" style={{ color: '#00C27A' }}>
+                          {isPlacing ? <Loader2 size={14} className="animate-spin" /> : formatPrice(item.ask, decimals)}
                         </span>
                       </button>
                     </div>
 
                     {/* Quick Lot Buttons */}
-                    <div className="flex items-center gap-1 mt-1.5">
+                    <div className="flex items-center gap-1.5 mt-2">
                       {QUICK_LOTS.map((lot) => (
                         <button
                           key={lot}
                           onClick={(e) => { e.stopPropagation(); setLotSize(lot); }}
-                          className="flex-1 text-center py-0.5 rounded text-[9px] font-mono transition-colors"
+                          className="flex-1 text-center py-1 rounded text-[11px] font-mono transition-colors"
                           style={{
                             backgroundColor: lotSize === lot ? 'rgba(41,171,226,0.15)' : '#1A1A24',
                             border: lotSize === lot ? '1px solid rgba(41,171,226,0.3)' : '1px solid rgba(255,255,255,0.06)',
@@ -520,15 +520,15 @@ export default function Watchlist() {
 
                     {/* Low / High */}
                     <div
-                      className="flex items-center justify-between mt-1.5 px-1"
+                      className="flex items-center justify-between mt-2 px-1"
                     >
-                      <div className="text-[9px]">
+                      <div className="text-[11px]">
                         <span className="opacity-30 mr-1">L</span>
                         <span className="font-mono opacity-50" style={{ color: '#C1121F' }}>
                           {formatPrice(item.low, decimals)}
                         </span>
                       </div>
-                      <div className="text-[9px]">
+                      <div className="text-[11px]">
                         <span className="opacity-30 mr-1">H</span>
                         <span className="font-mono opacity-50" style={{ color: '#00C27A' }}>
                           {formatPrice(item.high, decimals)}
@@ -539,7 +539,7 @@ export default function Watchlist() {
                     {/* Error */}
                     {orderError && (
                       <div
-                        className="mt-1 px-1 py-0.5 rounded text-[9px] text-center"
+                        className="mt-1.5 px-2 py-1 rounded text-[11px] text-center"
                         style={{
                           backgroundColor: 'rgba(193,18,31,0.1)',
                           color: '#C1121F',
@@ -557,7 +557,7 @@ export default function Watchlist() {
         })}
 
         {items.length === 0 && (
-          <div className="flex items-center justify-center py-8 text-[11px] opacity-30">
+          <div className="flex items-center justify-center py-8 text-[13px] opacity-30">
             {activeTab === 'favourites' ? 'No favourites yet' : 'No symbols found'}
           </div>
         )}

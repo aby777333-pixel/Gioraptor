@@ -172,21 +172,21 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
   // Drawing tools configuration
   const drawingTools: DrawingTool[] = [
-    { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={18} />, group: 1 },
-    { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={18} />, group: 1 },
-    { id: 'trendline', label: 'Trend Line', icon: <TrendingUp size={18} />, group: 2 },
-    { id: 'horizontal', label: 'Horizontal Line', icon: <Minus size={18} />, group: 2 },
-    { id: 'vertical', label: 'Vertical Line', icon: <MoveVertical size={18} />, group: 2 },
-    { id: 'fibonacci', label: 'Fibonacci Retracement', icon: <GitCommitHorizontal size={18} />, group: 3 },
-    { id: 'text', label: 'Text Annotation', icon: <Type size={18} />, group: 3 },
-    { id: 'rectangle', label: 'Rectangle', icon: <Square size={18} />, group: 3 },
-    { id: 'measure', label: 'Measure Tool', icon: <Ruler size={18} />, group: 4 },
-    { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={18} />, group: 4 },
-    { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={18} />, group: 4 },
-    { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={18} />, group: 5, toggle: true },
-    { id: 'lock', label: 'Lock Drawings', icon: <Lock size={18} />, group: 5, toggle: true },
-    { id: 'visibility', label: showDrawings ? 'Hide Drawings' : 'Show Drawings', icon: showDrawings ? <Eye size={18} /> : <EyeOff size={18} />, group: 5, toggle: true },
-    { id: 'deleteall', label: 'Delete All Drawings', icon: <Trash2 size={18} />, group: 6, toggle: true },
+    { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={20} />, group: 1 },
+    { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={20} />, group: 1 },
+    { id: 'trendline', label: 'Trend Line', icon: <TrendingUp size={20} />, group: 2 },
+    { id: 'horizontal', label: 'Horizontal Line', icon: <Minus size={20} />, group: 2 },
+    { id: 'vertical', label: 'Vertical Line', icon: <MoveVertical size={20} />, group: 2 },
+    { id: 'fibonacci', label: 'Fibonacci Retracement', icon: <GitCommitHorizontal size={20} />, group: 3 },
+    { id: 'text', label: 'Text Annotation', icon: <Type size={20} />, group: 3 },
+    { id: 'rectangle', label: 'Rectangle', icon: <Square size={20} />, group: 3 },
+    { id: 'measure', label: 'Measure Tool', icon: <Ruler size={20} />, group: 4 },
+    { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={20} />, group: 4 },
+    { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={20} />, group: 4 },
+    { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={20} />, group: 5, toggle: true },
+    { id: 'lock', label: 'Lock Drawings', icon: <Lock size={20} />, group: 5, toggle: true },
+    { id: 'visibility', label: showDrawings ? 'Hide Drawings' : 'Show Drawings', icon: showDrawings ? <Eye size={20} /> : <EyeOff size={20} />, group: 5, toggle: true },
+    { id: 'deleteall', label: 'Delete All Drawings', icon: <Trash2 size={20} />, group: 6, toggle: true },
   ];
 
   // Handle drawing tool click
@@ -528,8 +528,8 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
             onMouseLeave={() => setHoveredTool(null)}
             className="flex items-center justify-center transition-all duration-150"
             style={{
-              width: 28,
-              height: 28,
+              width: 32,
+              height: 32,
               borderRadius: 4,
               backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'transparent',
               color: active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
@@ -562,10 +562,10 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     <div className="flex flex-col h-full w-full">
       {/* Chart toolbar - spans full width */}
       <div
-        className="flex items-center gap-1 px-3 py-1 border-b shrink-0"
+        className="flex items-center gap-1.5 px-4 py-2 border-b shrink-0"
         style={{
-          backgroundColor: '#111118',
-          borderColor: 'rgba(255,255,255,0.06)',
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border)',
         }}
       >
         {/* Connection indicator */}
@@ -579,35 +579,35 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Symbol label */}
         <span
-          className="text-xs font-bold mr-1 font-mono shrink-0"
+          className="text-[14px] font-bold mr-1.5 font-mono shrink-0"
           style={{ color: '#29ABE2' }}
         >
           {activeSymbol}
         </span>
 
         {/* Symbol description, timeframe, chart type */}
-        <span className="text-[10px] font-mono opacity-30 mr-3 shrink-0 hidden md:inline">
+        <span className="text-[12px] font-mono opacity-30 mr-3 shrink-0 hidden md:inline">
           {symbolDesc} &middot; {tfLabel} &middot; {chartTypeLabel}
         </span>
 
         {/* OHLC values */}
         {displayOhlc && (
-          <div className="flex items-center gap-2 mr-3 shrink-0 hidden lg:flex">
-            <span className="text-[10px] font-mono">
+          <div className="flex items-center gap-3 mr-3 shrink-0 hidden lg:flex">
+            <span className="text-[12px] font-mono">
               <span className="opacity-30">O </span>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{formatPrice(displayOhlc.open, decimals)}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{formatPrice(displayOhlc.open, decimals)}</span>
             </span>
-            <span className="text-[10px] font-mono">
+            <span className="text-[12px] font-mono">
               <span className="opacity-30">H </span>
               <span style={{ color: '#00C27A' }}>{formatPrice(displayOhlc.high, decimals)}</span>
             </span>
-            <span className="text-[10px] font-mono">
+            <span className="text-[12px] font-mono">
               <span className="opacity-30">L </span>
               <span style={{ color: '#C1121F' }}>{formatPrice(displayOhlc.low, decimals)}</span>
             </span>
-            <span className="text-[10px] font-mono">
+            <span className="text-[12px] font-mono">
               <span className="opacity-30">C </span>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{formatPrice(displayOhlc.close, decimals)}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{formatPrice(displayOhlc.close, decimals)}</span>
             </span>
           </div>
         )}
@@ -624,7 +624,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
             key={tf}
             onClick={() => setSelectedTf(tf)}
             className={cn(
-              'px-2 py-1 text-[11px] font-mono rounded transition-all shrink-0',
+              'px-3 py-1.5 text-[12px] font-mono rounded transition-all shrink-0',
               selectedTf === tf
                 ? 'font-bold opacity-100'
                 : 'opacity-40 hover:opacity-70'
@@ -648,16 +648,16 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <button
           onClick={() => setChartType(chartType === 'candlestick' ? 'line' : 'candlestick')}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0',
+            'flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity shrink-0',
             'opacity-60 hover:opacity-90'
           )}
           style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
           title={chartType === 'candlestick' ? 'Switch to line' : 'Switch to candlestick'}
         >
           {chartType === 'candlestick' ? (
-            <CandlestickChart size={12} />
+            <CandlestickChart size={14} />
           ) : (
-            <TrendingUp size={12} />
+            <TrendingUp size={14} />
           )}
           <span className="hidden sm:inline">
             {chartType === 'candlestick' ? 'Candles' : 'Line'}
@@ -668,7 +668,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <button
           onClick={() => setCrosshairEnabled(!crosshairEnabled)}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0',
+            'flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity shrink-0',
             crosshairEnabled ? 'opacity-90' : 'opacity-40'
           )}
           style={{
@@ -676,16 +676,16 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
           }}
           title="Toggle crosshair"
         >
-          <Crosshair size={12} />
+          <Crosshair size={14} />
         </button>
 
         {/* Indicators button */}
         <button
-          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
           title="Indicators"
         >
-          <Filter size={12} />
+          <Filter size={14} />
           <span className="hidden sm:inline">Indicators</span>
         </button>
 
@@ -718,9 +718,9 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <div
           className="flex flex-col items-center py-2 gap-0.5 shrink-0 overflow-y-auto"
           style={{
-            width: 36,
-            backgroundColor: '#111118',
-            borderRight: '1px solid rgba(255,255,255,0.06)',
+            width: 40,
+            backgroundColor: 'var(--bg-surface)',
+            borderRight: '1px solid var(--border)',
           }}
         >
           {renderToolsWithSeparators()}
@@ -736,7 +736,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
               className="absolute top-2 right-2 z-10 px-3 py-1.5 rounded"
               style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <div className="flex items-center gap-3 text-[11px] font-mono">
+              <div className="flex items-center gap-3 text-[12px] font-mono">
                 <div>
                   <span className="opacity-40 mr-1">B</span>
                   <span className="text-green-400">{formatPrice(currentTick.bid, decimals)}</span>

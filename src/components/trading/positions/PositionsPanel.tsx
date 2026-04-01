@@ -313,7 +313,7 @@ export default function PositionsPanel() {
         style={{
           background: S.headerBg,
           borderBottom: `1px solid ${S.border}`,
-          height: 32,
+          height: 36,
         }}
       >
         {/* Tabs on left */}
@@ -324,9 +324,9 @@ export default function PositionsPanel() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className="flex items-center gap-1 px-3 h-full text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                className="flex items-center gap-1.5 px-4 h-full text-[13px] font-semibold uppercase tracking-wider transition-colors"
                 style={{
-                  color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                   borderBottom: isActive ? `2px solid ${S.accentBlue}` : '2px solid transparent',
                   background: isActive ? 'rgba(41,171,226,0.06)' : 'transparent',
                 }}
@@ -335,7 +335,7 @@ export default function PositionsPanel() {
                 {tab.label}
                 {tab.count !== undefined && tab.count > 0 && (
                   <span
-                    className="text-[9px] px-1.5 py-0 rounded-sm font-bold"
+                    className="text-[10px] px-1.5 py-0 rounded-sm font-bold"
                     style={{
                       background: isActive ? S.accentBlue : 'rgba(255,255,255,0.08)',
                       color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
@@ -352,8 +352,8 @@ export default function PositionsPanel() {
         {/* Centered title */}
         <div className="flex-1 flex justify-center">
           <span
-            className="text-[10px] font-bold uppercase tracking-[0.2em]"
-            style={{ color: 'rgba(255,255,255,0.25)' }}
+            className="text-[14px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: 'var(--text-muted)', fontWeight: 600 }}
           >
             Order Desk
           </span>
@@ -366,7 +366,7 @@ export default function PositionsPanel() {
       {/* ===== FEEDBACK ===== */}
       {feedback && (
         <div
-          className="text-[10px] px-3 py-1 font-medium"
+          className="text-[12px] px-3 py-1.5 font-medium"
           style={{
             background: feedback.type === 'success' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
             color: feedback.type === 'success' ? S.green : S.red,
@@ -381,7 +381,7 @@ export default function PositionsPanel() {
       <div className="flex-1 overflow-auto">
         {isLoading && openPositions.length === 0 && (
           <div
-            className="flex items-center justify-center h-32 text-[10px]"
+            className="flex items-center justify-center h-32 text-[12px]"
             style={{ color: S.textDim }}
           >
             Loading...
@@ -393,7 +393,7 @@ export default function PositionsPanel() {
           <>
             {openPositions.length === 0 && !isLoading ? (
               <div
-                className="flex items-center justify-center h-32 text-[10px]"
+                className="flex items-center justify-center h-32 text-[12px]"
                 style={{ color: S.textDim }}
               >
                 {activeAccountId ? 'No open positions' : 'Select a trading account'}
@@ -402,13 +402,13 @@ export default function PositionsPanel() {
               <>
                 {/* Table header */}
                 <div
-                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
+                  className="grid gap-0 px-2 text-[11px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
                     gridTemplateColumns: colTemplate,
                     background: S.headerBg,
                     borderBottom: `1px solid ${S.border}`,
                     color: S.textDim,
-                    height: 24,
+                    height: 28,
                     alignItems: 'center',
                   }}
                 >
@@ -447,12 +447,12 @@ export default function PositionsPanel() {
                   return (
                     <div
                       key={pos.id}
-                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      className="grid gap-0 px-2 text-[12px] transition-colors"
                       style={{
                         gridTemplateColumns: colTemplate,
                         borderBottom: `1px solid ${S.border}`,
                         background: isAlt ? S.rowAltBg : 'transparent',
-                        height: 28,
+                        height: 32,
                         alignItems: 'center',
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
@@ -470,7 +470,7 @@ export default function PositionsPanel() {
 
                       {/* TYPE */}
                       <span
-                        className="font-bold text-[10px]"
+                        className="font-bold text-[12px]"
                         style={{ color: pos.direction === 'BUY' ? S.green : S.red }}
                       >
                         {pos.direction === 'BUY' ? 'Buy' : 'Sell'}
@@ -533,7 +533,7 @@ export default function PositionsPanel() {
 
                       {/* P/L IN % */}
                       <span
-                        className="text-right font-bold text-[10px]"
+                        className="text-right font-bold text-[11px]"
                         style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
                       >
                         {isProfitable ? '+' : ''}{pnlPct}%
@@ -632,7 +632,7 @@ export default function PositionsPanel() {
           <>
             {pendingOrders.length === 0 ? (
               <div
-                className="flex items-center justify-center h-32 text-[10px]"
+                className="flex items-center justify-center h-32 text-[12px]"
                 style={{ color: S.textDim }}
               >
                 No pending orders
@@ -640,13 +640,13 @@ export default function PositionsPanel() {
             ) : (
               <>
                 <div
-                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
+                  className="grid gap-0 px-2 text-[11px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
                     gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
                     background: S.headerBg,
                     borderBottom: `1px solid ${S.border}`,
                     color: S.textDim,
-                    height: 24,
+                    height: 28,
                     alignItems: 'center',
                   }}
                 >
@@ -668,12 +668,12 @@ export default function PositionsPanel() {
                   return (
                     <div
                       key={ord.id}
-                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      className="grid gap-0 px-2 text-[12px] transition-colors"
                       style={{
                         gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
                         borderBottom: `1px solid ${S.border}`,
                         background: isAlt ? S.rowAltBg : 'transparent',
-                        height: 28,
+                        height: 32,
                         alignItems: 'center',
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
@@ -684,7 +684,7 @@ export default function PositionsPanel() {
                         {formatTime(ord.created_at)}
                       </span>
                       <span
-                        className="font-bold text-[10px]"
+                        className="font-bold text-[12px]"
                         style={{ color: ord.direction === 'BUY' ? S.green : S.red }}
                       >
                         {ord.direction === 'BUY' ? 'Buy' : 'Sell'}
@@ -738,7 +738,7 @@ export default function PositionsPanel() {
           <>
             {tradeHistory.length === 0 ? (
               <div
-                className="flex items-center justify-center h-32 text-[10px]"
+                className="flex items-center justify-center h-32 text-[12px]"
                 style={{ color: S.textDim }}
               >
                 No trade history available
@@ -746,13 +746,13 @@ export default function PositionsPanel() {
             ) : (
               <>
                 <div
-                  className="grid gap-0 px-2 text-[9px] uppercase tracking-wider font-semibold sticky top-0 z-10"
+                  className="grid gap-0 px-2 text-[11px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
                     gridTemplateColumns: histColTemplate,
                     background: S.headerBg,
                     borderBottom: `1px solid ${S.border}`,
                     color: S.textDim,
-                    height: 24,
+                    height: 28,
                     alignItems: 'center',
                   }}
                 >
@@ -785,12 +785,12 @@ export default function PositionsPanel() {
                   return (
                     <div
                       key={pos.id}
-                      className="grid gap-0 px-2 text-[11px] transition-colors"
+                      className="grid gap-0 px-2 text-[12px] transition-colors"
                       style={{
                         gridTemplateColumns: histColTemplate,
                         borderBottom: `1px solid ${S.border}`,
                         background: isAlt ? S.rowAltBg : 'transparent',
-                        height: 28,
+                        height: 32,
                         alignItems: 'center',
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = S.rowHover; }}
@@ -801,7 +801,7 @@ export default function PositionsPanel() {
                         {formatTime(pos.opened_at)}
                       </span>
                       <span
-                        className="font-bold text-[10px]"
+                        className="font-bold text-[12px]"
                         style={{ color: pos.direction === 'BUY' ? S.green : S.red }}
                       >
                         {pos.direction === 'BUY' ? 'Buy' : 'Sell'}
@@ -832,7 +832,7 @@ export default function PositionsPanel() {
                         {formatPnL(pnl)}
                       </span>
                       <span
-                        className="text-right font-bold text-[10px]"
+                        className="text-right font-bold text-[11px]"
                         style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
                       >
                         {isProfitable ? '+' : ''}{pnlPct}%
@@ -853,7 +853,7 @@ export default function PositionsPanel() {
             style={{ color: S.textDim }}
           >
             <Mail size={20} style={{ opacity: 0.3 }} />
-            <span className="text-[10px]">No messages</span>
+            <span className="text-[12px]">No messages</span>
           </div>
         )}
 
@@ -864,7 +864,7 @@ export default function PositionsPanel() {
             style={{ color: S.textDim }}
           >
             <FileText size={20} style={{ opacity: 0.3 }} />
-            <span className="text-[10px]">No activity logs</span>
+            <span className="text-[12px]">No activity logs</span>
           </div>
         )}
       </div>

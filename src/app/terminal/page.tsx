@@ -15,8 +15,8 @@ export default function TerminalPage() {
       className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
       style={{
         display: 'grid',
-        gridTemplateRows: '42px 1fr 200px 28px',
-        gridTemplateColumns: '240px 1fr',
+        gridTemplateRows: '48px 1fr 220px 32px',
+        gridTemplateColumns: '250px 1fr',
       }}
     >
       {/* TopBar - spans full width */}

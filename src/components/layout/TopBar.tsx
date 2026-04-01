@@ -8,7 +8,6 @@ import {
   LogOut,
   Settings,
   RefreshCw,
-  BarChart3,
   Mic,
   MoreHorizontal,
   Bot,
@@ -17,9 +16,8 @@ import {
   Newspaper,
   Users,
   PieChart,
-  ShoppingCart,
-  HelpCircle,
   Activity,
+  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import VoiceTrading from '@/components/trading/VoiceTrading';
@@ -39,13 +37,13 @@ export default function TopBar() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<TradingAccount | null>(null);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [latency, setLatency] = useState(18);
   const [speed] = useState(13.3);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
 
   const accountRef = useRef<HTMLDivElement>(null);
-  const moreRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -53,8 +51,8 @@ export default function TopBar() {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setAccountDropdownOpen(false);
       }
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        setMoreMenuOpen(false);
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setHelpMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -160,129 +158,116 @@ export default function TopBar() {
   const userName = 'Trader';
   const accountNum = selectedAccount?.account_number ?? '---';
 
-  const moreMenuItems = [
-    { href: '/terminal/ea-builder', icon: <Bot size={13} />, label: 'EA Builder' },
-    { href: '/terminal/signals', icon: <Brain size={13} />, label: 'AI Signals' },
-    { href: '/terminal/calendar', icon: <Calendar size={13} />, label: 'Calendar' },
-    { href: '/terminal/news', icon: <Newspaper size={13} />, label: 'News' },
-    { href: '/terminal/copy-trading', icon: <Users size={13} />, label: 'Copy Trading' },
-    { href: '/terminal/pamm', icon: <PieChart size={13} />, label: 'PAMM' },
+  const helpMenuItems = [
+    { href: '/terminal/ea-builder', icon: <Bot size={14} />, label: 'EA Builder' },
+    { href: '/terminal/signals', icon: <Brain size={14} />, label: 'AI Signals' },
+    { href: '/terminal/calendar', icon: <Calendar size={14} />, label: 'Calendar' },
+    { href: '/terminal/news', icon: <Newspaper size={14} />, label: 'News' },
+    { href: '/terminal/copy-trading', icon: <Users size={14} />, label: 'Copy Trading' },
+    { href: '/terminal/pamm', icon: <PieChart size={14} />, label: 'PAMM' },
   ];
 
   return (
     <div
-      className="flex items-center px-2 border-b select-none gap-0"
+      className="flex items-center px-3 border-b select-none"
       style={{
-        height: 42,
+        height: 48,
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border)',
-        fontSize: 12,
+        fontSize: 13,
       }}
     >
       {/* ── Logo ── */}
-      <div className="flex items-center gap-1.5 shrink-0 mr-3">
-        <div
-          className="flex items-center justify-center rounded"
-          style={{
-            width: 26,
-            height: 26,
-            backgroundColor: '#29ABE2',
-            color: '#000',
-            fontWeight: 800,
-            fontSize: 11,
-            lineHeight: 1,
-          }}
-        >
-          G4
-        </div>
-        <div className="flex flex-col leading-none">
-          <span className="font-bold text-[11px]" style={{ color: '#29ABE2' }}>
-            GIO4X
-          </span>
-          <span className="text-[9px] opacity-50 -mt-px">Raptor</span>
-        </div>
+      <div className="flex items-center gap-2 shrink-0 mr-4">
+        <img src="/logo.png" alt="GIO4X" style={{ height: 28 }} />
       </div>
 
       <Separator />
 
-      {/* ── Main nav: only 3 items ── */}
-      <NavTab icon={<BarChart3 size={13} />} label="Market View" active />
-      <NavTab icon={<ShoppingCart size={13} />} label="New Order" />
-      <NavTab icon={<HelpCircle size={13} />} label="Help" />
-
-      {/* ── More menu (three dots) ── */}
-      <div className="relative" ref={moreRef}>
-        <button
-          onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-opacity hover:opacity-80"
-          style={moreMenuOpen ? { backgroundColor: 'var(--bg-elevated)', opacity: 1 } : { opacity: 0.5 }}
-          title="More tools"
-        >
-          <MoreHorizontal size={15} />
-        </button>
-
-        {moreMenuOpen && (
-          <div
-            className="absolute top-full left-0 mt-1 w-48 rounded shadow-lg z-50 border py-1"
-            style={{
-              backgroundColor: 'var(--bg-elevated)',
-              borderColor: 'var(--border)',
-            }}
+      {/* ── Main nav: bullet-dot items ── */}
+      <div className="flex items-center gap-1">
+        <NavItem label="View" active />
+        <NavItem label="New Order" />
+        <div className="relative" ref={helpRef}>
+          <button
+            onClick={() => setHelpMenuOpen(!helpMenuOpen)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] transition-colors',
+              helpMenuOpen ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            )}
+            style={helpMenuOpen ? { backgroundColor: 'var(--bg-elevated)' } : undefined}
           >
-            {moreMenuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMoreMenuOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-1.5 text-[11px] hover:opacity-80 transition-opacity"
-                style={{ color: 'rgba(255,255,255,0.7)' }}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        )}
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: helpMenuOpen ? '#29ABE2' : 'var(--text-muted)' }}
+            />
+            Help
+            <ChevronDown size={12} className="opacity-50" />
+          </button>
+
+          {helpMenuOpen && (
+            <div
+              className="absolute top-full left-0 mt-1 w-52 rounded-lg shadow-xl z-50 border py-1.5"
+              style={{
+                backgroundColor: 'var(--bg-elevated)',
+                borderColor: 'var(--border)',
+              }}
+            >
+              {helpMenuItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setHelpMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2 text-[13px] transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <Separator />
 
       {/* ── Active symbol + timeframe ── */}
-      <div className="flex items-center gap-1.5 px-2">
-        <span
-          className="inline-block w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: '#00C853' }}
-        />
-        <span className="font-mono font-semibold text-[12px]">
+      <div className="flex items-center gap-2 px-3">
+        <Search size={14} className="opacity-40" />
+        <span className="font-mono font-semibold text-[13px]">
           {activeSymbol}
         </span>
         <span
-          className="text-[10px] font-mono px-1 py-px rounded"
+          className="text-[11px] font-mono px-1.5 py-0.5 rounded"
           style={{
             backgroundColor: 'var(--bg-elevated)',
-            opacity: 0.7,
+            opacity: 0.8,
           }}
         >
           1D
         </span>
         <span
-          className="text-[10px] font-mono px-1 py-px rounded"
+          className="text-[11px] font-mono px-1.5 py-0.5 rounded"
           style={{
             backgroundColor: 'var(--bg-elevated)',
-            opacity: 0.7,
+            opacity: 0.8,
           }}
         >
           1m
         </span>
+        <ChevronDown size={12} className="opacity-40" />
       </div>
 
       {/* ── Indicators button ── */}
       <button
-        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] opacity-50 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] opacity-60 hover:opacity-90 transition-opacity"
         style={{ backgroundColor: 'var(--bg-elevated)' }}
         title="Indicators"
       >
-        <Activity size={12} />
+        <Activity size={14} />
         Indicators
       </button>
 
@@ -290,43 +275,48 @@ export default function TopBar() {
       <div className="flex-1" />
 
       {/* ── Connection status ── */}
-      <div className="flex items-center gap-2 px-2 text-[11px] font-mono opacity-70">
+      <div className="flex items-center gap-2 px-3 text-[13px] font-mono opacity-70">
         <span
-          className="inline-block w-2 h-2 rounded-full"
+          className="inline-block w-2 h-2 rounded-full shrink-0"
           style={{ backgroundColor: latency < 40 ? '#00C853' : '#FFC107' }}
         />
         <span>{latency}ms</span>
         <span className="opacity-40">|</span>
         <span>{speed} Mbps</span>
+        <ChevronDown size={11} className="opacity-40" />
       </div>
 
       {/* ── Refresh ── */}
       <button
-        className="p-1 rounded hover:opacity-70 transition-opacity"
+        className="p-1.5 rounded hover:opacity-70 transition-opacity"
         title="Refresh"
         onClick={() => window.location.reload()}
       >
-        <RefreshCw size={13} className="opacity-50" />
+        <RefreshCw size={15} className="opacity-50" />
       </button>
 
       {/* ── Theme toggle ── */}
       <button
-        onClick={toggleTheme}
-        className="p-1 rounded hover:opacity-70 transition-opacity"
+        onClick={() => {
+          const newTheme = theme === 'dark' ? 'light' : 'dark';
+          toggleTheme();
+          document.documentElement.setAttribute('data-theme', newTheme);
+        }}
+        className="p-1.5 rounded hover:opacity-70 transition-opacity"
         title="Toggle theme"
       >
-        {theme === 'dark' ? <Sun size={14} className="opacity-50" /> : <Moon size={14} className="opacity-50" />}
+        {theme === 'dark' ? <Sun size={16} className="opacity-60" /> : <Moon size={16} className="opacity-60" />}
       </button>
 
       {/* ── Voice Trading ── */}
       <div className="relative">
         <button
           onClick={() => setVoicePanelOpen(!voicePanelOpen)}
-          className="p-1 rounded hover:opacity-70 transition-opacity"
+          className="p-1.5 rounded hover:opacity-70 transition-opacity"
           title="Voice Trading"
           style={voicePanelOpen ? { color: '#29ABE2' } : undefined}
         >
-          <Mic size={14} className={voicePanelOpen ? '' : 'opacity-50'} />
+          <Mic size={16} className={voicePanelOpen ? '' : 'opacity-50'} />
         </button>
 
         {voicePanelOpen && (
@@ -345,25 +335,25 @@ export default function TopBar() {
       <div className="relative" ref={accountRef}>
         <button
           onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-[13px] hover:opacity-80 transition-opacity"
           style={{ backgroundColor: 'var(--bg-elevated)' }}
         >
           <span className="opacity-60">{userName}</span>
           <span className="font-mono font-medium">{accountNum}</span>
           {selectedAccount?.is_demo && (
             <span
-              className="text-[9px] font-bold px-1 rounded"
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded"
               style={{ backgroundColor: '#29ABE2', color: '#000' }}
             >
               DEMO
             </span>
           )}
-          <ChevronDown size={12} className="opacity-40" />
+          <ChevronDown size={13} className="opacity-40" />
         </button>
 
         {accountDropdownOpen && (
           <div
-            className="absolute top-full right-0 mt-1 w-60 rounded shadow-lg z-50 border py-1"
+            className="absolute top-full right-0 mt-1 w-64 rounded-lg shadow-xl z-50 border py-1.5"
             style={{
               backgroundColor: 'var(--bg-elevated)',
               borderColor: 'var(--border)',
@@ -374,16 +364,18 @@ export default function TopBar() {
                 key={acc.id}
                 onClick={() => handleSelectAccount(acc)}
                 className={cn(
-                  'w-full flex items-center justify-between px-3 py-1.5 text-[11px] hover:opacity-80 transition-opacity',
+                  'w-full flex items-center justify-between px-4 py-2 text-[13px] transition-colors',
                   selectedAccount?.id === acc.id && 'opacity-100',
                   selectedAccount?.id !== acc.id && 'opacity-50'
                 )}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{acc.account_number}</span>
                   {acc.is_demo && (
                     <span
-                      className="text-[9px] font-bold px-1 rounded"
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                       style={{ backgroundColor: '#29ABE2', color: '#000' }}
                     >
                       DEMO
@@ -397,22 +389,22 @@ export default function TopBar() {
             ))}
 
             <div
-              className="my-1 h-px"
+              className="my-1.5 h-px"
               style={{ backgroundColor: 'var(--border)' }}
             />
 
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:opacity-70 transition-opacity"
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] hover:opacity-70 transition-opacity"
               onClick={() => setAccountDropdownOpen(false)}
             >
-              <Settings size={12} />
+              <Settings size={14} />
               Settings
             </button>
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:opacity-70 transition-opacity"
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] hover:opacity-70 transition-opacity"
               onClick={() => setAccountDropdownOpen(false)}
             >
-              <LogOut size={12} />
+              <LogOut size={14} />
               Sign Out
             </button>
           </div>
@@ -427,27 +419,24 @@ export default function TopBar() {
 function Separator() {
   return (
     <div
-      className="mx-1.5 h-5"
+      className="mx-2 h-6"
       style={{ width: 1, backgroundColor: 'var(--border)' }}
     />
   );
 }
 
-function NavTab({
+function NavItem({
   active,
-  icon,
   label,
 }: {
   active?: boolean;
-  onClick?: () => void;
-  icon: React.ReactNode;
   label: string;
 }) {
   return (
     <button
       className={cn(
-        'flex items-center gap-1 px-2.5 py-1 rounded text-[11px] transition-opacity',
-        active ? 'opacity-100' : 'opacity-50 hover:opacity-70'
+        'flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] transition-colors',
+        active ? 'opacity-100' : 'opacity-60 hover:opacity-90'
       )}
       style={
         active
@@ -455,7 +444,10 @@ function NavTab({
           : undefined
       }
     >
-      {icon}
+      <span
+        className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: active ? '#29ABE2' : 'var(--text-muted)' }}
+      />
       {label}
     </button>
   );

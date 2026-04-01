@@ -20,12 +20,12 @@ export default function AccountBar() {
 
   return (
     <div
-      className="flex items-center justify-center gap-4 px-4 select-none"
+      className="flex items-center justify-center gap-6 px-4 select-none"
       style={{
-        height: 28,
-        backgroundColor: '#0A0A0F',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        fontSize: 11,
+        height: 32,
+        backgroundColor: 'var(--bg-primary)',
+        borderTop: '1px solid var(--border)',
+        fontSize: 12,
       }}
     >
       <Item label="Account Currency" value="USD" />
@@ -62,11 +62,11 @@ function Item({
   valueColor?: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span style={{ color: '#29ABE2', opacity: 0.85 }}>{label}:</span>
+    <div className="flex items-center gap-2">
+      <span style={{ color: '#29ABE2', opacity: 0.85, fontSize: 12 }}>{label}:</span>
       <span
         className="font-mono font-medium"
-        style={{ color: valueColor ?? '#fff' }}
+        style={{ color: valueColor ?? 'var(--text-primary)', fontSize: 13 }}
       >
         {value}
       </span>

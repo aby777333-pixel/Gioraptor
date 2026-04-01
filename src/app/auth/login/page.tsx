@@ -37,10 +37,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-8">
-            <div className="h-8 w-8 rounded-lg bg-[#29ABE2] flex items-center justify-center font-bold text-sm text-white">
-              G4
-            </div>
-            <span className="text-lg font-semibold text-white tracking-tight">GIO4X Raptor</span>
+            <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 32 }} />
           </Link>
           <h1 className="text-2xl font-bold text-white">Sign in to Raptor</h1>
           <p className="mt-2 text-sm text-zinc-500">
