@@ -41,28 +41,8 @@ export default function RightPanel() {
         {activeTab === 'tools' && (
           <div className="flex flex-col h-full">
             <TradingTools />
-            {/* Bloomberg TV Live */}
-            <div className="p-3">
-              <div
-                className="rounded-lg overflow-hidden"
-                style={{
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                }}
-              >
-                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-2" style={{ backgroundColor: '#111118', color: '#29ABE2' }}>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Bloomberg TV Live
-                </div>
-                <iframe
-                  src="https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1"
-                  title="Bloomberg TV Live"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                  style={{ width: '100%', height: 160, border: 'none', backgroundColor: '#000' }}
-                />
-              </div>
-            </div>
+            {/* Live TV Streams */}
+            <LiveTVPanel />
           </div>
         )}
       </div>
@@ -160,6 +140,66 @@ function AccountSummaryPanel() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function LiveTVPanel() {
+  const [activeChannel, setActiveChannel] = useState<'bloomberg' | 'cnbc'>('bloomberg');
+
+  const channels = {
+    bloomberg: {
+      label: 'Bloomberg TV',
+      src: 'https://www.youtube.com/embed/kfLbOqoroFo?autoplay=1&mute=1',
+    },
+    cnbc: {
+      label: 'CNBC Business',
+      src: 'https://www.youtube.com/embed/9NyxcX3rhQs?autoplay=1&mute=1',
+    },
+  };
+
+  const current = channels[activeChannel];
+
+  return (
+    <div className="p-3 flex flex-col gap-2">
+      <div className="flex gap-1">
+        {(Object.keys(channels) as Array<keyof typeof channels>).map((key) => (
+          <button
+            key={key}
+            onClick={() => setActiveChannel(key)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-semibold transition-all"
+            style={{
+              backgroundColor: activeChannel === key ? 'rgba(41,171,226,0.15)' : 'var(--bg-elevated)',
+              color: activeChannel === key ? '#29ABE2' : 'rgba(255,255,255,0.4)',
+              border: activeChannel === key ? '1px solid rgba(41,171,226,0.3)' : '1px solid var(--border)',
+            }}
+          >
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: activeChannel === key ? '#FF0000' : 'rgba(255,255,255,0.15)',
+              }}
+            />
+            {channels[key].label}
+          </button>
+        ))}
+      </div>
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{
+          border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        }}
+      >
+        <iframe
+          key={activeChannel}
+          src={current.src}
+          title={current.label}
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+          style={{ width: '100%', height: 155, border: 'none', backgroundColor: '#000' }}
+        />
+      </div>
     </div>
   );
 }
