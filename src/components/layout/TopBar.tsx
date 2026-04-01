@@ -179,22 +179,22 @@ export default function TopBar() {
       <Separator />
 
       {/* ── Nav items: all inline, evenly spaced ── */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
         <NavItem label="View" active />
-        <Separator />
+        <span className="text-[10px] opacity-20">●</span>
         <NavItem label="New Order" />
-        <Separator />
+        <span className="text-[10px] opacity-20">●</span>
         <NavItem label="Help" />
-        <Separator />
+        <span className="text-[10px] opacity-20">●</span>
         {helpMenuItems.map((item, i) => (
-          <span key={item.href} className="flex items-center">
+          <span key={item.href} className="flex items-center gap-1">
             <Link
               href={item.href}
-              className="px-3 py-1 rounded text-[12px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
+              className="px-2 py-1 rounded text-[12px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
             >
               {item.label}
             </Link>
-            {i < helpMenuItems.length - 1 && <Separator />}
+            {i < helpMenuItems.length - 1 && <span className="text-[10px] opacity-20">●</span>}
           </span>
         ))}
       </div>
