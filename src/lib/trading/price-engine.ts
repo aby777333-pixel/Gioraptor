@@ -1,9 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-// GIO4X RAPTOR — Simulated Price Engine
+// GIO4X RAPTOR — Simulated Price Engine (with live data support)
 // Generates realistic forex/crypto/metal/index tick data
+// Falls back to simulation when Twelve Data API is unavailable
 // ═══════════════════════════════════════════════════════════════
 
 import type { PriceTick, InstrumentType } from '@/types/trading';
+import {
+  fetchMultipleQuotes,
+  isApiKeyConfigured,
+  type TwelveDataQuote,
+} from './twelve-data';
 
 interface InstrumentConfig {
   symbol: string;
@@ -46,6 +52,14 @@ const INSTRUMENTS: InstrumentConfig[] = [
   { symbol: 'NATGAS', type: 'energy', basePrice: 2.15, volatility: 0.003, halfSpread: 0.002, decimals: 3 },
 ];
 
+/** Symbols that Twelve Data supports via forex pairs */
+const LIVE_CAPABLE_SYMBOLS = [
+  'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD',
+  'EURGBP', 'EURJPY', 'GBPJPY',
+  'XAUUSD', 'XAGUSD',
+  'BTCUSD', 'ETHUSD',
+];
+
 function gaussianRandom(): number {
   // Box-Muller transform for normally distributed random numbers
   let u = 0;
@@ -65,7 +79,14 @@ export class PriceEngine {
   private configs: Map<string, InstrumentConfig> = new Map();
   private midPrices: Map<string, number> = new Map();
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private liveIntervalId: ReturnType<typeof setInterval> | null = null;
   private running = false;
+
+  /** Whether the engine is currently using live API data as the price base */
+  public isLiveData = false;
+
+  /** Timestamp of last successful live data fetch */
+  private lastLiveFetch = 0;
 
   constructor() {
     for (const cfg of INSTRUMENTS) {
@@ -87,14 +108,78 @@ export class PriceEngine {
     }
   }
 
+  /**
+   * Try to fetch real prices from Twelve Data and update the base mid prices.
+   * Only fetches symbols that Twelve Data supports.
+   */
+  async fetchRealPrices(): Promise<boolean> {
+    if (!isApiKeyConfigured()) return false;
+
+    try {
+      const quotes = await fetchMultipleQuotes(LIVE_CAPABLE_SYMBOLS);
+      let updatedCount = 0;
+
+      for (const [symbol, quote] of Object.entries(quotes)) {
+        const price = parseFloat(quote.close);
+        if (!isNaN(price) && price > 0) {
+          this.midPrices.set(symbol, price);
+
+          // Also update the base price on the config so mean reversion
+          // targets the real market level
+          const cfg = this.configs.get(symbol);
+          if (cfg) {
+            cfg.basePrice = price;
+          }
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        this.isLiveData = true;
+        this.lastLiveFetch = Date.now();
+        return true;
+      }
+    } catch {
+      // Silent fail - will continue with simulated data
+    }
+
+    return false;
+  }
+
+  /**
+   * Apply a single Twelve Data quote to update the mid price for a symbol.
+   */
+  applyQuote(symbol: string, quote: TwelveDataQuote): void {
+    const price = parseFloat(quote.close);
+    if (isNaN(price) || price <= 0) return;
+
+    this.midPrices.set(symbol, price);
+    const cfg = this.configs.get(symbol);
+    if (cfg) {
+      cfg.basePrice = price;
+    }
+  }
+
   start(callback: (ticks: PriceTick[]) => void, intervalMs: number = 500): void {
     if (this.running) return;
     this.running = true;
 
+    // Start the simulated tick interval (sub-second updates with small noise)
     this.intervalId = setInterval(() => {
       const ticks = this.generateTicks();
       callback(ticks);
     }, intervalMs);
+
+    // Start a slower live data fetch interval (every 10 seconds)
+    // to stay well within the 8 calls/min free tier limit
+    if (isApiKeyConfigured()) {
+      // Initial fetch
+      this.fetchRealPrices();
+
+      this.liveIntervalId = setInterval(() => {
+        this.fetchRealPrices();
+      }, 10_000);
+    }
   }
 
   stop(): void {
@@ -102,6 +187,10 @@ export class PriceEngine {
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.liveIntervalId !== null) {
+      clearInterval(this.liveIntervalId);
+      this.liveIntervalId = null;
     }
   }
 

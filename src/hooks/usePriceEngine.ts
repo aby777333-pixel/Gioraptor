@@ -8,6 +8,7 @@ import { useTradingStore } from '@/stores/trading';
 export function usePriceEngine() {
   const updatePrice = useTradingStore((s) => s.updatePrice);
   const [isRunning, setIsRunning] = useState(false);
+  const [isLiveData, setIsLiveData] = useState(false);
 
   const priceEngineRef = useRef<PriceEngine | null>(null);
   const ohlcvBuilderRef = useRef<OHLCVBuilder | null>(null);
@@ -35,6 +36,10 @@ export function usePriceEngine() {
         updatePrice(tick);
         builder.processTick(tick);
       }
+      // Sync the live data flag from the engine
+      if (engine.isLiveData !== isLiveData) {
+        setIsLiveData(engine.isLiveData);
+      }
     }, 500);
     setIsRunning(true);
 
@@ -52,5 +57,6 @@ export function usePriceEngine() {
     priceEngine: priceEngineRef.current,
     ohlcvBuilder: ready ? ohlcvBuilderRef.current : null,
     isRunning,
+    isLiveData,
   };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   createChart,
   CandlestickSeries,
@@ -50,6 +50,21 @@ import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { TF_TO_RESOLUTION } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 import type { PriceTick } from '@/types/trading';
+import IndicatorPanel, {
+  INDICATOR_DEFS,
+  type IndicatorId,
+  type IndicatorConfig,
+} from './IndicatorPanel';
+import {
+  sma,
+  ema,
+  rsi,
+  macd,
+  bollingerBands,
+  atr,
+  stochastic,
+  vwap,
+} from '@/lib/trading/indicators';
 
 const timeframes = ['1m', '5m', '15m', '1H', '4H', '1D'] as const;
 
@@ -57,6 +72,7 @@ type ChartType = 'candlestick' | 'line';
 
 interface ChartPanelProps {
   ohlcvBuilder: OHLCVBuilder | null;
+  isLiveData?: boolean;
 }
 
 // Symbol descriptions for the toolbar display
@@ -246,11 +262,40 @@ function renderDrawings(ctx: CanvasRenderingContext2D, drawings: Drawing[], canv
   }
 }
 
-export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
+// ─── Indicator color definitions ───────────────────────────────
+
+const INDICATOR_COLORS: Record<string, string> = {
+  sma9: '#FFFF00',        // yellow
+  sma21: '#00FFFF',       // cyan
+  sma50: '#FFA500',       // orange
+  sma200: '#FFFFFF',      // white
+  ema9: '#FF6B6B',
+  ema21: '#4ECDC4',
+  ema50: '#FFE66D',
+  vwap: '#E040FB',
+  bbands_upper: 'rgba(41,171,226,0.5)',
+  bbands_middle: 'rgba(41,171,226,0.3)',
+  bbands_lower: 'rgba(41,171,226,0.5)',
+  rsi14: '#FF9800',
+  macd_macd: '#2196F3',
+  macd_signal: '#FF5722',
+  macd_hist_pos: 'rgba(0,194,122,0.4)',
+  macd_hist_neg: 'rgba(193,18,31,0.4)',
+  atr14: '#AB47BC',
+  stoch_k: '#2196F3',
+  stoch_d: '#FF5722',
+};
+
+export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPanelProps) {
   const { activeSymbol, prices } = useTradingStore();
   const [selectedTf, setSelectedTf] = useState<string>('1H');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [crosshairEnabled, setCrosshairEnabled] = useState(true);
+
+  // Indicator state
+  const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(new Set());
+  const [indicatorParams, setIndicatorParams] = useState<Record<IndicatorId, Record<string, number>>>({} as Record<IndicatorId, Record<string, number>>);
 
   // Drawing tools state
   const [activeTool, setActiveTool] = useState<DrawingToolId>('cursor');
@@ -285,6 +330,27 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   const lastBarTimeRef = useRef<number>(0);
   // Track the last known crosshair price for horizontal line drawing via chart click
   const lastCrosshairPriceRef = useRef<number | null>(null);
+
+  // Indicator series refs - we'll store them by IndicatorId + suffix
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<'Line'> | ISeriesApi<'Histogram'>>>(new Map());
+
+  // ─── Indicator toggle / params handlers ──────────────────────
+
+  const handleIndicatorToggle = useCallback((id: IndicatorId) => {
+    setActiveIndicators((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleIndicatorParamsUpdate = useCallback((id: IndicatorId, params: Record<string, number>) => {
+    setIndicatorParams((prev) => ({ ...prev, [id]: params }));
+  }, []);
 
   // Drawing tools configuration - ALL enabled, no "(Pro)" labels
   const drawingTools: DrawingTool[] = [
@@ -639,6 +705,8 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
     return () => {
       resizeObserver.disconnect();
+      // Clean up indicator series
+      indicatorSeriesRef.current.clear();
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -668,6 +736,292 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
       lineSeriesRef.current.applyOptions({ visible: chartType === 'line' });
     }
   }, [chartType]);
+
+  // ────────────────────────────────────────────────────────
+  // Helper: build or get an indicator LineSeries on the chart
+  // ────────────────────────────────────────────────────────
+  const getOrCreateIndicatorSeries = useCallback(
+    (key: string, color: string, priceScaleId?: string, lineWidth: number = 1): ISeriesApi<'Line'> => {
+      const existing = indicatorSeriesRef.current.get(key);
+      if (existing) return existing as ISeriesApi<'Line'>;
+
+      const chart = chartRef.current;
+      if (!chart) throw new Error('Chart not initialized');
+
+      const series = chart.addSeries(LineSeries, {
+        color,
+        lineWidth: lineWidth as 1 | 2 | 3 | 4,
+        priceScaleId: priceScaleId || 'right',
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+
+      if (priceScaleId && priceScaleId !== 'right') {
+        series.priceScale().applyOptions({
+          scaleMargins: { top: 0.8, bottom: 0 },
+        });
+      }
+
+      indicatorSeriesRef.current.set(key, series);
+      return series;
+    },
+    []
+  );
+
+  const getOrCreateHistogramSeries = useCallback(
+    (key: string, priceScaleId: string): ISeriesApi<'Histogram'> => {
+      const existing = indicatorSeriesRef.current.get(key);
+      if (existing) return existing as ISeriesApi<'Histogram'>;
+
+      const chart = chartRef.current;
+      if (!chart) throw new Error('Chart not initialized');
+
+      const series = chart.addSeries(HistogramSeries, {
+        priceScaleId,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+
+      series.priceScale().applyOptions({
+        scaleMargins: { top: 0.85, bottom: 0 },
+      });
+
+      indicatorSeriesRef.current.set(key, series);
+      return series;
+    },
+    []
+  );
+
+  // Remove indicator series that are no longer active
+  const cleanupIndicatorSeries = useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const activeKeys = new Set<string>();
+    for (const id of activeIndicators) {
+      if (id === 'bbands') {
+        activeKeys.add('bbands_upper');
+        activeKeys.add('bbands_middle');
+        activeKeys.add('bbands_lower');
+      } else if (id === 'macd') {
+        activeKeys.add('macd_macd');
+        activeKeys.add('macd_signal');
+        activeKeys.add('macd_hist');
+      } else if (id === 'stoch') {
+        activeKeys.add('stoch_k');
+        activeKeys.add('stoch_d');
+      } else {
+        activeKeys.add(id);
+      }
+    }
+
+    for (const [key, series] of indicatorSeriesRef.current.entries()) {
+      if (!activeKeys.has(key)) {
+        try {
+          chart.removeSeries(series);
+        } catch { /* noop */ }
+        indicatorSeriesRef.current.delete(key);
+      }
+    }
+  }, [activeIndicators]);
+
+  // ────────────────────────────────────────────────────────
+  // Apply indicator data to chart series
+  // ────────────────────────────────────────────────────────
+  const applyIndicators = useCallback(
+    (times: Time[], closes: number[], highs: number[], lows: number[], volumes: number[]) => {
+      if (!chartRef.current || times.length === 0) return;
+
+      cleanupIndicatorSeries();
+
+      for (const id of activeIndicators) {
+        const def = INDICATOR_DEFS.find((d) => d.id === id);
+        if (!def) continue;
+        const params = indicatorParams[id] || def.defaultParams;
+
+        try {
+          switch (id) {
+            case 'sma9':
+            case 'sma21':
+            case 'sma50':
+            case 'sma200': {
+              const period = params.period || def.defaultParams.period;
+              const values = sma(closes, period);
+              const series = getOrCreateIndicatorSeries(id, INDICATOR_COLORS[id], undefined, 1);
+              const data: LineData[] = [];
+              for (let i = 0; i < values.length; i++) {
+                if (values[i] !== null) {
+                  data.push({ time: times[i], value: values[i]! });
+                }
+              }
+              series.setData(data);
+              break;
+            }
+
+            case 'ema9':
+            case 'ema21':
+            case 'ema50': {
+              const period = params.period || def.defaultParams.period;
+              const values = ema(closes, period);
+              const series = getOrCreateIndicatorSeries(id, INDICATOR_COLORS[id], undefined, 1);
+              const data: LineData[] = [];
+              for (let i = 0; i < values.length; i++) {
+                if (values[i] !== null) {
+                  data.push({ time: times[i], value: values[i]! });
+                }
+              }
+              series.setData(data);
+              break;
+            }
+
+            case 'vwap': {
+              const values = vwap(highs, lows, closes, volumes);
+              const series = getOrCreateIndicatorSeries(id, INDICATOR_COLORS[id], undefined, 1);
+              const data: LineData[] = values.map((v, i) => ({
+                time: times[i],
+                value: v,
+              }));
+              series.setData(data);
+              break;
+            }
+
+            case 'bbands': {
+              const period = params.period || 20;
+              const stdDev = params.stdDev || 2;
+              const bb = bollingerBands(closes, period, stdDev);
+
+              const upperSeries = getOrCreateIndicatorSeries('bbands_upper', INDICATOR_COLORS.bbands_upper, undefined, 1);
+              const middleSeries = getOrCreateIndicatorSeries('bbands_middle', INDICATOR_COLORS.bbands_middle, undefined, 1);
+              const lowerSeries = getOrCreateIndicatorSeries('bbands_lower', INDICATOR_COLORS.bbands_lower, undefined, 1);
+
+              const upperData: LineData[] = [];
+              const middleData: LineData[] = [];
+              const lowerData: LineData[] = [];
+
+              for (let i = 0; i < bb.upper.length; i++) {
+                if (bb.upper[i] !== null) {
+                  upperData.push({ time: times[i], value: bb.upper[i]! });
+                  middleData.push({ time: times[i], value: bb.middle[i]! });
+                  lowerData.push({ time: times[i], value: bb.lower[i]! });
+                }
+              }
+
+              upperSeries.setData(upperData);
+              middleSeries.setData(middleData);
+              lowerSeries.setData(lowerData);
+              break;
+            }
+
+            case 'rsi14': {
+              const period = params.period || 14;
+              const values = rsi(closes, period);
+              const series = getOrCreateIndicatorSeries(id, INDICATOR_COLORS[id], 'rsi', 1);
+              series.priceScale().applyOptions({
+                scaleMargins: { top: 0.8, bottom: 0 },
+              });
+              const data: LineData[] = [];
+              for (let i = 0; i < values.length; i++) {
+                if (values[i] !== null) {
+                  data.push({ time: times[i], value: values[i]! });
+                }
+              }
+              series.setData(data);
+              break;
+            }
+
+            case 'macd': {
+              const fast = params.fast || 12;
+              const slow = params.slow || 26;
+              const signal = params.signal || 9;
+              const m = macd(closes, fast, slow, signal);
+
+              const macdSeries = getOrCreateIndicatorSeries('macd_macd', INDICATOR_COLORS.macd_macd, 'macd', 1);
+              macdSeries.priceScale().applyOptions({
+                scaleMargins: { top: 0.82, bottom: 0 },
+              });
+              const signalSeries = getOrCreateIndicatorSeries('macd_signal', INDICATOR_COLORS.macd_signal, 'macd', 1);
+              const histSeries = getOrCreateHistogramSeries('macd_hist', 'macd');
+
+              const macdData: LineData[] = [];
+              const signalData: LineData[] = [];
+              const histData: HistogramData[] = [];
+
+              for (let i = 0; i < m.macd.length; i++) {
+                if (m.macd[i] !== null) {
+                  macdData.push({ time: times[i], value: m.macd[i]! });
+                }
+                if (m.signal[i] !== null) {
+                  signalData.push({ time: times[i], value: m.signal[i]! });
+                }
+                if (m.histogram[i] !== null) {
+                  histData.push({
+                    time: times[i],
+                    value: m.histogram[i]!,
+                    color: m.histogram[i]! >= 0
+                      ? INDICATOR_COLORS.macd_hist_pos
+                      : INDICATOR_COLORS.macd_hist_neg,
+                  });
+                }
+              }
+
+              macdSeries.setData(macdData);
+              signalSeries.setData(signalData);
+              histSeries.setData(histData);
+              break;
+            }
+
+            case 'atr14': {
+              const period = params.period || 14;
+              const values = atr(highs, lows, closes, period);
+              const series = getOrCreateIndicatorSeries(id, INDICATOR_COLORS[id], 'atr', 1);
+              series.priceScale().applyOptions({
+                scaleMargins: { top: 0.85, bottom: 0 },
+              });
+              const data: LineData[] = [];
+              for (let i = 0; i < values.length; i++) {
+                if (values[i] !== null) {
+                  data.push({ time: times[i], value: values[i]! });
+                }
+              }
+              series.setData(data);
+              break;
+            }
+
+            case 'stoch': {
+              const kPeriod = params.kPeriod || 14;
+              const dPeriod = params.dPeriod || 3;
+              const s = stochastic(highs, lows, closes, kPeriod, dPeriod);
+
+              const kSeries = getOrCreateIndicatorSeries('stoch_k', INDICATOR_COLORS.stoch_k, 'stoch', 1);
+              kSeries.priceScale().applyOptions({
+                scaleMargins: { top: 0.82, bottom: 0 },
+              });
+              const dSeries = getOrCreateIndicatorSeries('stoch_d', INDICATOR_COLORS.stoch_d, 'stoch', 1);
+
+              const kData: LineData[] = [];
+              const dData: LineData[] = [];
+
+              for (let i = 0; i < s.k.length; i++) {
+                if (s.k[i] !== null) {
+                  kData.push({ time: times[i], value: s.k[i]! });
+                }
+                if (s.d[i] !== null) {
+                  dData.push({ time: times[i], value: s.d[i]! });
+                }
+              }
+
+              kSeries.setData(kData);
+              dSeries.setData(dData);
+              break;
+            }
+          }
+        } catch {
+          // Silently skip indicators that fail to compute
+        }
+      }
+    },
+    [activeIndicators, indicatorParams, cleanupIndicatorSeries, getOrCreateIndicatorSeries, getOrCreateHistogramSeries]
+  );
 
   // Load data when symbol or timeframe changes
   const loadChartData = useCallback(() => {
@@ -730,9 +1084,17 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     priceLineRef.current = candleSeriesRef.current.createPriceLine(priceLineOptions);
     linePriceLineRef.current = lineSeriesRef.current.createPriceLine(priceLineOptions);
 
+    // Apply indicators to the loaded data
+    const times = allBars.map((b) => b.time as Time);
+    const closes = allBars.map((b) => b.close);
+    const highs = allBars.map((b) => b.high);
+    const lows = allBars.map((b) => b.low);
+    const volumes = allBars.map((b) => b.volume);
+    applyIndicators(times, closes, highs, lows, volumes);
+
     // Scroll to latest
     chartRef.current?.timeScale().scrollToRealTime();
-  }, [activeSymbol, selectedTf, ohlcvBuilder]);
+  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators]);
 
   useEffect(() => {
     loadChartData();
@@ -895,6 +1257,18 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
           }}
         />
 
+        {/* Live / Simulated badge */}
+        <span
+          className="text-[9px] font-bold px-1.5 py-0.5 rounded mr-1 shrink-0 uppercase tracking-wider"
+          style={{
+            backgroundColor: isLiveData ? 'rgba(0,194,122,0.15)' : 'rgba(255,152,0,0.15)',
+            color: isLiveData ? '#00C27A' : '#FF9800',
+            border: `1px solid ${isLiveData ? 'rgba(0,194,122,0.3)' : 'rgba(255,152,0,0.3)'}`,
+          }}
+        >
+          {isLiveData ? 'LIVE' : 'SIM'}
+        </span>
+
         {/* Symbol label */}
         <span
           className="text-[13px] font-bold mr-1 font-mono shrink-0"
@@ -973,11 +1347,19 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Indicators button */}
         <button
-          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
-          style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+          onClick={() => setShowIndicatorPanel(!showIndicatorPanel)}
+          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0"
+          style={{
+            backgroundColor: activeIndicators.size > 0 ? 'rgba(41,171,226,0.15)' : 'rgba(255,255,255,0.04)',
+            color: activeIndicators.size > 0 ? '#29ABE2' : undefined,
+            opacity: activeIndicators.size > 0 ? 1 : 0.5,
+          }}
           title="Indicators"
         >
           <Filter size={13} />
+          {activeIndicators.size > 0 && (
+            <span className="text-[9px] font-bold">{activeIndicators.size}</span>
+          )}
         </button>
 
         {/* Divider */}
@@ -1032,6 +1414,17 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
             onMouseMove={handleDrawMove}
             onMouseUp={handleDrawEnd}
           />
+
+          {/* Indicator Panel dropdown */}
+          {showIndicatorPanel && (
+            <IndicatorPanel
+              activeIndicators={activeIndicators}
+              indicatorParams={indicatorParams}
+              onToggle={handleIndicatorToggle}
+              onUpdateParams={handleIndicatorParamsUpdate}
+              onClose={() => setShowIndicatorPanel(false)}
+            />
+          )}
 
           {/* Bid/Ask spread overlay */}
           {currentTick && (

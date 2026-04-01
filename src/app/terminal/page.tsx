@@ -8,7 +8,7 @@ import AccountBar from '@/components/trading/account-summary/AccountBar';
 import { usePriceEngine } from '@/hooks/usePriceEngine';
 
 export default function TerminalPage() {
-  const { ohlcvBuilder } = usePriceEngine();
+  const { ohlcvBuilder, isLiveData } = usePriceEngine();
 
   return (
     <div
@@ -34,7 +34,7 @@ export default function TerminalPage() {
 
       {/* ChartPanel - center, fills remaining space */}
       <div className="overflow-hidden">
-        <ChartPanel ohlcvBuilder={ohlcvBuilder} />
+        <ChartPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
       </div>
 
       {/* PositionsPanel - spans full width */}
