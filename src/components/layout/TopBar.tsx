@@ -236,50 +236,59 @@ export default function TopBar() {
       {/* ── Spacer ── */}
       <div className="flex-1" />
 
-      {/* ── Connection status ── */}
-      <div className="flex items-center gap-2 px-3 text-[13px] font-mono opacity-70">
-        <span
-          className="inline-block w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: latency < 40 ? '#00C853' : '#FFC107' }}
-        />
-        <span>{latency}ms</span>
-        <span className="opacity-40">|</span>
-        <span>{speed} Mbps</span>
-        <ChevronDown size={11} className="opacity-40" />
-      </div>
+      {/* ── Right side controls with proper spacing ── */}
+      <div className="flex items-center gap-3">
 
-      {/* ── Refresh ── */}
-      <button
-        className="p-1.5 rounded hover:opacity-70 transition-opacity"
-        title="Refresh"
-        onClick={() => window.location.reload()}
-      >
-        <RefreshCw size={15} className="opacity-50" />
-      </button>
+        {/* Connection status */}
+        <div className="flex items-center gap-2 px-3 text-[13px] font-mono opacity-70">
+          <span
+            className="inline-block w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: latency < 40 ? '#00C853' : '#FFC107' }}
+          />
+          <span>{latency}ms</span>
+          <span className="opacity-40">|</span>
+          <span>{speed} Mbps</span>
+        </div>
 
-      {/* ── Theme toggle ── */}
-      <button
-        onClick={() => {
-          const newTheme = theme === 'dark' ? 'light' : 'dark';
-          toggleTheme();
-          document.documentElement.setAttribute('data-theme', newTheme);
-        }}
-        className="p-1.5 rounded hover:opacity-70 transition-opacity"
-        title="Toggle theme"
-      >
-        {theme === 'dark' ? <Sun size={16} className="opacity-60" /> : <Moon size={16} className="opacity-60" />}
-      </button>
+        <Separator />
 
-      {/* ── Voice Trading ── */}
-      <div className="relative">
+        {/* Refresh */}
+        <button
+          className="p-2 rounded hover:opacity-70 transition-opacity"
+          title="Refresh"
+          onClick={() => window.location.reload()}
+        >
+          <RefreshCw size={16} className="opacity-50" />
+        </button>
+
+        {/* Theme toggle */}
+        <button
+          onClick={() => {
+            const newTheme = theme === 'dark' ? 'light' : 'dark';
+            toggleTheme();
+            document.documentElement.setAttribute('data-theme', newTheme);
+          }}
+          className="p-2 rounded hover:opacity-70 transition-opacity"
+          title="Toggle theme"
+        >
+          {theme === 'dark' ? <Sun size={16} className="opacity-60" /> : <Moon size={16} className="opacity-60" />}
+        </button>
+
+        {/* Voice Trading */}
         <button
           onClick={() => setVoicePanelOpen(!voicePanelOpen)}
-          className="p-1.5 rounded hover:opacity-70 transition-opacity"
+          className="p-2 rounded hover:opacity-70 transition-opacity"
           title="Voice Trading"
           style={voicePanelOpen ? { color: '#29ABE2' } : undefined}
         >
           <Mic size={16} className={voicePanelOpen ? '' : 'opacity-50'} />
         </button>
+
+      </div>
+
+      {/* Voice panel dropdown */}
+      <div className="relative">
+        <div /> {/* anchor */}
 
         {voicePanelOpen && (
           <div
