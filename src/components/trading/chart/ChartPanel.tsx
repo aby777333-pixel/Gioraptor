@@ -107,11 +107,21 @@ interface DrawingTool {
   icon: React.ReactNode;
   group: number; // for separator grouping
   toggle?: boolean; // if true, it's a toggle button not a single-select
-  disabled?: boolean; // if true, tool is not functional (requires Pro license)
 }
 
-// Tools that require TradingView Pro license (not available in Lightweight Charts)
-const PRO_ONLY_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'measure'];
+// Drawing data stored for canvas overlay
+interface Drawing {
+  type: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
+  text?: string;
+}
+
+// The set of tools that use the canvas overlay for drawing interactions
+const CANVAS_DRAWING_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'measure'];
 
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
@@ -123,25 +133,117 @@ function getDecimals(symbol: string): number {
 }
 
 // Tooltip component for drawing tools
-function ToolTooltip({ label, visible, disabled }: { label: string; visible: boolean; disabled?: boolean }) {
+function ToolTooltip({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
     <div
       className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none whitespace-nowrap"
       style={{
         backgroundColor: '#1a1a28',
-        border: `1px solid ${disabled ? 'rgba(255,165,0,0.2)' : 'rgba(255,255,255,0.1)'}`,
+        border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: 4,
         padding: '4px 8px',
         fontSize: 11,
-        color: disabled ? 'rgba(255,165,0,0.8)' : 'rgba(255,255,255,0.85)',
+        color: 'rgba(255,255,255,0.85)',
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
       }}
     >
-      {disabled ? `${label} - Requires Pro license` : label}
+      {label}
     </div>
   );
+}
+
+// Fibonacci levels
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+
+// Render all stored drawings onto a canvas context
+function renderDrawings(ctx: CanvasRenderingContext2D, drawings: Drawing[], canvasWidth: number, canvasHeight: number) {
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+  for (const d of drawings) {
+    ctx.strokeStyle = d.color;
+    ctx.fillStyle = d.color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+
+    switch (d.type) {
+      case 'trendline':
+        ctx.beginPath();
+        ctx.moveTo(d.startX, d.startY);
+        ctx.lineTo(d.endX, d.endY);
+        ctx.stroke();
+        break;
+
+      case 'horizontal':
+        ctx.setLineDash([6, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, d.startY);
+        ctx.lineTo(canvasWidth, d.startY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+
+      case 'vertical':
+        ctx.setLineDash([6, 3]);
+        ctx.beginPath();
+        ctx.moveTo(d.startX, 0);
+        ctx.lineTo(d.startX, canvasHeight);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+
+      case 'rectangle':
+        ctx.strokeRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY);
+        break;
+
+      case 'fibonacci': {
+        const top = Math.min(d.startY, d.endY);
+        const bottom = Math.max(d.startY, d.endY);
+        const range = bottom - top;
+        ctx.font = '10px JetBrains Mono, monospace';
+        for (const level of FIB_LEVELS) {
+          const y = bottom - level * range;
+          ctx.setLineDash(level === 0 || level === 1 ? [] : [4, 3]);
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(d.startX, y);
+          ctx.lineTo(d.endX, y);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.fillText(`${(level * 100).toFixed(1)}%`, d.endX + 4, y + 3);
+        }
+        ctx.setLineDash([]);
+        break;
+      }
+
+      case 'measure': {
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(d.startX, d.startY);
+        ctx.lineTo(d.endX, d.endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // distance label
+        const dx = d.endX - d.startX;
+        const dy = d.endY - d.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy).toFixed(0);
+        const midX = (d.startX + d.endX) / 2;
+        const midY = (d.startY + d.endY) / 2;
+        ctx.font = '11px JetBrains Mono, monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${dist}px`, midX + 6, midY - 6);
+        break;
+      }
+
+      case 'text':
+        if (d.text) {
+          ctx.font = '13px JetBrains Mono, monospace';
+          ctx.fillText(d.text, d.startX, d.startY);
+        }
+        break;
+    }
+  }
 }
 
 export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
@@ -156,6 +258,14 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   const [lockDrawings, setLockDrawings] = useState(false);
   const [showDrawings, setShowDrawings] = useState(true);
   const [hoveredTool, setHoveredTool] = useState<DrawingToolId | null>(null);
+
+  // Canvas drawing state
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [previewEnd, setPreviewEnd] = useState<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const customPriceLinesRef = useRef<Array<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>>>([]);
 
   // OHLC overlay state from crosshair
   const [ohlcValues, setOhlcValues] = useState<{
@@ -173,18 +283,20 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
   const priceLineRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']> | null>(null);
   const linePriceLineRef = useRef<ReturnType<ISeriesApi<'Line'>['createPriceLine']> | null>(null);
   const lastBarTimeRef = useRef<number>(0);
+  // Track the last known crosshair price for horizontal line drawing via chart click
+  const lastCrosshairPriceRef = useRef<number | null>(null);
 
-  // Drawing tools configuration
+  // Drawing tools configuration - ALL enabled, no "(Pro)" labels
   const drawingTools: DrawingTool[] = [
     { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={18} />, group: 1 },
     { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={18} />, group: 1 },
-    { id: 'trendline', label: 'Trend Line (Pro)', icon: <TrendingUp size={18} />, group: 2, disabled: true },
-    { id: 'horizontal', label: 'Horizontal Line (Pro)', icon: <Minus size={18} />, group: 2, disabled: true },
-    { id: 'vertical', label: 'Vertical Line (Pro)', icon: <MoveVertical size={18} />, group: 2, disabled: true },
-    { id: 'fibonacci', label: 'Fibonacci (Pro)', icon: <GitCommitHorizontal size={18} />, group: 3, disabled: true },
-    { id: 'text', label: 'Text (Pro)', icon: <Type size={18} />, group: 3, disabled: true },
-    { id: 'rectangle', label: 'Rectangle (Pro)', icon: <Square size={18} />, group: 3, disabled: true },
-    { id: 'measure', label: 'Measure (Pro)', icon: <Ruler size={18} />, group: 4, disabled: true },
+    { id: 'trendline', label: 'Trend Line', icon: <TrendingUp size={18} />, group: 2 },
+    { id: 'horizontal', label: 'Horizontal Line', icon: <Minus size={18} />, group: 2 },
+    { id: 'vertical', label: 'Vertical Line', icon: <MoveVertical size={18} />, group: 2 },
+    { id: 'fibonacci', label: 'Fibonacci', icon: <GitCommitHorizontal size={18} />, group: 3 },
+    { id: 'text', label: 'Text', icon: <Type size={18} />, group: 3 },
+    { id: 'rectangle', label: 'Rectangle', icon: <Square size={18} />, group: 3 },
+    { id: 'measure', label: 'Measure', icon: <Ruler size={18} />, group: 4 },
     { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={18} />, group: 4 },
     { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={18} />, group: 4 },
     { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={18} />, group: 5, toggle: true },
@@ -195,7 +307,6 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
   // Handle drawing tool click
   const handleToolClick = (tool: DrawingTool) => {
-    if (tool.disabled) return; // Pro-only tools are not functional
     if (tool.id === 'magnet') {
       setMagnetMode(!magnetMode);
     } else if (tool.id === 'lock') {
@@ -203,7 +314,20 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     } else if (tool.id === 'visibility') {
       setShowDrawings(!showDrawings);
     } else if (tool.id === 'deleteall') {
-      // No-op for now (visual only)
+      // Clear canvas drawings
+      setDrawings([]);
+      // Remove custom price lines
+      for (const pl of customPriceLinesRef.current) {
+        try {
+          candleSeriesRef.current?.removePriceLine(pl);
+        } catch { /* noop */ }
+      }
+      customPriceLinesRef.current = [];
+      // Clear canvas
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
     } else if (tool.id === 'zoomin') {
       chartRef.current?.timeScale().applyOptions({
         barSpacing: (chartRef.current.timeScale().options().barSpacing ?? 8) + 2,
@@ -227,6 +351,181 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     if (tool.id === 'zoomin' || tool.id === 'zoomout') return false;
     return activeTool === tool.id;
   };
+
+  // ============================
+  // Canvas drawing event handlers
+  // ============================
+  const handleDrawStart = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (lockDrawings) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (activeTool === 'text') {
+      const text = prompt('Enter text:');
+      if (text) {
+        setDrawings((prev) => [...prev, { type: 'text', startX: x, startY: y, endX: x, endY: y, color: '#29ABE2', text }]);
+      }
+      return;
+    }
+
+    if (activeTool === 'vertical') {
+      setDrawings((prev) => [...prev, { type: 'vertical', startX: x, startY: y, endX: x, endY: y, color: '#29ABE2' }]);
+      return;
+    }
+
+    if (activeTool === 'horizontal') {
+      // For horizontal line via canvas, draw at click Y
+      setDrawings((prev) => [...prev, { type: 'horizontal', startX: x, startY: y, endX: x, endY: y, color: '#29ABE2' }]);
+      // Also create a real price line if we have crosshair price
+      if (lastCrosshairPriceRef.current !== null && candleSeriesRef.current) {
+        const pl = candleSeriesRef.current.createPriceLine({
+          price: lastCrosshairPriceRef.current,
+          color: '#29ABE2',
+          lineWidth: 1 as const,
+          lineStyle: LineStyle.Dotted,
+          lineVisible: true,
+          axisLabelVisible: true,
+          axisLabelColor: '#29ABE2',
+          axisLabelTextColor: '#ffffff',
+        });
+        customPriceLinesRef.current.push(pl);
+      }
+      return;
+    }
+
+    // For trendline, rectangle, fibonacci, measure - need start+end
+    setDrawStart({ x, y });
+    setIsDrawing(true);
+  }, [activeTool, lockDrawings]);
+
+  const handleDrawMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !drawStart) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setPreviewEnd({ x, y });
+  }, [isDrawing, drawStart]);
+
+  const handleDrawEnd = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !drawStart) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setDrawings((prev) => [
+      ...prev,
+      {
+        type: activeTool,
+        startX: drawStart.x,
+        startY: drawStart.y,
+        endX: x,
+        endY: y,
+        color: '#29ABE2',
+      },
+    ]);
+
+    setIsDrawing(false);
+    setDrawStart(null);
+    setPreviewEnd(null);
+  }, [isDrawing, drawStart, activeTool]);
+
+  // ============================
+  // Repaint canvas whenever drawings or preview changes
+  // ============================
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (!showDrawings) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    // Render stored drawings
+    renderDrawings(ctx, drawings, canvas.width, canvas.height);
+
+    // Render in-progress preview
+    if (isDrawing && drawStart && previewEnd) {
+      ctx.strokeStyle = 'rgba(41,171,226,0.6)';
+      ctx.fillStyle = 'rgba(41,171,226,0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+
+      switch (activeTool) {
+        case 'trendline':
+        case 'measure':
+          ctx.beginPath();
+          ctx.moveTo(drawStart.x, drawStart.y);
+          ctx.lineTo(previewEnd.x, previewEnd.y);
+          ctx.stroke();
+          if (activeTool === 'measure') {
+            const dx = previewEnd.x - drawStart.x;
+            const dy = previewEnd.y - drawStart.y;
+            const dist = Math.sqrt(dx * dx + dy * dy).toFixed(0);
+            ctx.font = '11px JetBrains Mono, monospace';
+            ctx.fillStyle = '#ffffff';
+            ctx.setLineDash([]);
+            ctx.fillText(`${dist}px`, (drawStart.x + previewEnd.x) / 2 + 6, (drawStart.y + previewEnd.y) / 2 - 6);
+          }
+          break;
+        case 'rectangle':
+          ctx.strokeRect(drawStart.x, drawStart.y, previewEnd.x - drawStart.x, previewEnd.y - drawStart.y);
+          break;
+        case 'fibonacci': {
+          const top = Math.min(drawStart.y, previewEnd.y);
+          const bottom = Math.max(drawStart.y, previewEnd.y);
+          const range = bottom - top;
+          ctx.font = '10px JetBrains Mono, monospace';
+          for (const level of FIB_LEVELS) {
+            const y = bottom - level * range;
+            ctx.beginPath();
+            ctx.moveTo(drawStart.x, y);
+            ctx.lineTo(previewEnd.x, y);
+            ctx.stroke();
+          }
+          break;
+        }
+      }
+      ctx.setLineDash([]);
+    }
+  }, [drawings, isDrawing, drawStart, previewEnd, showDrawings, activeTool]);
+
+  // ============================
+  // Canvas resize observer - keep canvas size synced with chart container
+  // ============================
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
+
+    const syncSize = () => {
+      const { width, height } = parent.getBoundingClientRect();
+      const dpr = 1; // use 1:1 for simplicity; drawings are pixel-based
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      // Redraw after resize
+      const ctx = canvas.getContext('2d');
+      if (ctx && showDrawings) {
+        renderDrawings(ctx, drawings, canvas.width, canvas.height);
+      }
+    };
+
+    syncSize();
+    const ro = new ResizeObserver(syncSize);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [drawings, showDrawings]);
 
   // Create chart on mount
   useEffect(() => {
@@ -276,7 +575,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     const chart = createChart(chartContainerRef.current, chartOptions);
     chartRef.current = chart;
 
-    // Subscribe to crosshair move for OHLC display
+    // Subscribe to crosshair move for OHLC display and tracking price under cursor
     chart.subscribeCrosshairMove((param) => {
       if (!param.time || !param.seriesData) {
         setOhlcValues(null);
@@ -290,6 +589,13 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
           low: candleData.low,
           close: candleData.close,
         });
+      }
+      // Track price under cursor for horizontal line creation
+      if (param.point) {
+        const price = candleSeriesRef.current?.coordinateToPrice(param.point.y);
+        if (price !== null && price !== undefined) {
+          lastCrosshairPriceRef.current = price;
+        }
       }
     });
 
@@ -499,6 +805,9 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
     close: currentTick.mid,
   } : null);
 
+  // Whether the drawing canvas should capture pointer events
+  const canvasActive = CANVAS_DRAWING_TOOLS.includes(activeTool) && !lockDrawings;
+
   // Render group separators
   const renderToolsWithSeparators = () => {
     const elements: React.ReactNode[] = [];
@@ -525,8 +834,6 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
       const active = isToolActive(tool);
 
-      const isDisabled = tool.disabled === true;
-
       elements.push(
         <div key={tool.id} className="relative flex items-center justify-center">
           <button
@@ -539,28 +846,25 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
               height: 30,
               borderRadius: 4,
               backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'transparent',
-              color: isDisabled ? 'rgba(255,255,255,0.15)' : active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              color: active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
+              cursor: 'pointer',
             }}
             onMouseOver={(e) => {
-              if (!active && !isDisabled) {
+              if (!active) {
                 e.currentTarget.style.color = 'rgba(255,255,255,1)';
                 e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
               }
             }}
             onMouseOut={(e) => {
-              if (!active && !isDisabled) {
+              if (!active) {
                 e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }
             }}
           >
             {tool.icon}
-            {isDisabled && (
-              <Lock size={7} style={{ position: 'absolute', bottom: 2, right: 2, color: 'rgba(255,165,0,0.5)' }} />
-            )}
           </button>
-          <ToolTooltip label={tool.label} visible={hoveredTool === tool.id} disabled={isDisabled} />
+          <ToolTooltip label={tool.label} visible={hoveredTool === tool.id} />
         </div>
       );
     });
@@ -715,10 +1019,24 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
         <div className="flex-1 relative" style={{ backgroundColor: '#0A0A0F' }}>
           <div ref={chartContainerRef} className="absolute inset-0" />
 
+          {/* Drawing canvas overlay */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+            style={{
+              pointerEvents: canvasActive ? 'auto' : 'none',
+              zIndex: 10,
+              cursor: canvasActive ? 'crosshair' : 'default',
+            }}
+            onMouseDown={handleDrawStart}
+            onMouseMove={handleDrawMove}
+            onMouseUp={handleDrawEnd}
+          />
+
           {/* Bid/Ask spread overlay */}
           {currentTick && (
             <div
-              className="absolute top-2 right-2 z-10 px-3 py-1.5 rounded"
+              className="absolute top-2 right-2 z-20 px-3 py-1.5 rounded"
               style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div className="flex items-center gap-3 text-[12px] font-mono">

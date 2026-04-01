@@ -187,7 +187,7 @@ export default function TopBar() {
           <Link
             key={item.href}
             href={item.href}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
+            className="flex items-center gap-1 px-3 py-1 rounded text-[13px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
           >
             {item.label}
           </Link>
