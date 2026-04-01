@@ -35,10 +35,36 @@ export default function RightPanel() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'order' && <OrderTicket />}
         {activeTab === 'account' && <AccountSummaryPanel />}
-        {activeTab === 'tools' && <TradingTools />}
+        {activeTab === 'tools' && (
+          <div className="flex flex-col h-full">
+            <TradingTools />
+            {/* Bloomberg TV Live */}
+            <div className="p-3">
+              <div
+                className="rounded-lg overflow-hidden"
+                style={{
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-2" style={{ backgroundColor: '#111118', color: '#29ABE2' }}>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Bloomberg TV Live
+                </div>
+                <iframe
+                  src="https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1"
+                  title="Bloomberg TV Live"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  style={{ width: '100%', height: 160, border: 'none', backgroundColor: '#000' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -76,10 +102,7 @@ function AccountSummaryPanel() {
   return (
     <div className="flex flex-col p-3 gap-3">
       {/* Margin health indicator */}
-      <div
-        className="rounded p-3"
-        style={{ backgroundColor: 'var(--bg-elevated)' }}
-      >
+      <div className="stat-card">
         <div className="text-[10px] uppercase tracking-wider opacity-40 mb-2">
           Margin Health
         </div>
@@ -103,8 +126,7 @@ function AccountSummaryPanel() {
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex items-center justify-between px-3 py-2 rounded"
-          style={{ backgroundColor: 'var(--bg-elevated)' }}
+          className="stat-card flex items-center justify-between"
         >
           <span className="text-xs opacity-50">{item.label}</span>
           <span

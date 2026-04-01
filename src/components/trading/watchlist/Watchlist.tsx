@@ -401,11 +401,12 @@ export default function Watchlist() {
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'SELL'); }}
                         disabled={isPlacing}
-                        className="flex-1 flex flex-col items-center justify-center rounded transition-all py-3"
+                        className="flex-1 flex flex-col items-center justify-center rounded-lg transition-all py-3 btn-sell-glow"
                         style={{
                           backgroundColor: isPlacing ? 'rgba(193,18,31,0.08)' : 'rgba(193,18,31,0.15)',
                           border: '1px solid rgba(193,18,31,0.2)',
                           cursor: isPlacing ? 'wait' : 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                         }}
                         onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.25)'; }}
                         onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(193,18,31,0.15)'; }}
@@ -475,11 +476,12 @@ export default function Watchlist() {
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePlaceOrder(item.symbol, 'BUY'); }}
                         disabled={isPlacing}
-                        className="flex-1 flex flex-col items-center justify-center rounded transition-all py-3"
+                        className="flex-1 flex flex-col items-center justify-center rounded-lg transition-all py-3 btn-buy-glow"
                         style={{
                           backgroundColor: isPlacing ? 'rgba(0,194,122,0.08)' : 'rgba(0,194,122,0.15)',
                           border: '1px solid rgba(0,194,122,0.2)',
                           cursor: isPlacing ? 'wait' : 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                         }}
                         onMouseEnter={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.25)'; }}
                         onMouseLeave={(e) => { if (!isPlacing) e.currentTarget.style.backgroundColor = 'rgba(0,194,122,0.15)'; }}

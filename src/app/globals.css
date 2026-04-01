@@ -105,3 +105,56 @@ body {
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
+
+/* Card system - rounded edges, shadows, backlight on hover */
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.card:hover {
+  border-color: rgba(41,171,226,0.3);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 0 15px rgba(41,171,226,0.08);
+  transform: translateY(-1px);
+}
+
+/* Stat card variant */
+.stat-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.stat-card:hover {
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 20px rgba(41,171,226,0.06);
+}
+
+/* Tool card (calculators etc) */
+.tool-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.tool-card:hover {
+  border-color: rgba(41,171,226,0.2);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25), 0 0 10px rgba(41,171,226,0.05);
+}
+
+/* Button glow on hover */
+.btn-glow:hover {
+  box-shadow: 0 0 12px rgba(41,171,226,0.3);
+}
+.btn-buy-glow:hover {
+  box-shadow: 0 0 12px rgba(0,194,122,0.3);
+}
+.btn-sell-glow:hover {
+  box-shadow: 0 0 12px rgba(193,18,31,0.3);
+}
