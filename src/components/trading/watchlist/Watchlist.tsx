@@ -263,7 +263,7 @@ export default function Watchlist() {
       {/* Column Headers */}
       <div
         className="grid gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wider opacity-40 border-b font-semibold"
-        style={{ borderColor: 'var(--border)', gridTemplateColumns: '1fr 68px 68px' }}
+        style={{ borderColor: 'var(--border)', gridTemplateColumns: '1fr 75px 75px' }}
       >
         <span>Symbol</span>
         <span className="text-right">Sell</span>
@@ -286,7 +286,7 @@ export default function Watchlist() {
                 onClick={() => handleSymbolClick(item.symbol)}
                 className="w-full grid gap-1 items-center px-3 text-xs transition-all border-l-2"
                 style={{
-                  gridTemplateColumns: '1fr 68px 68px',
+                  gridTemplateColumns: '1fr 75px 75px',
                   minHeight: 36,
                   borderLeftColor: isActive ? '#29ABE2' : 'transparent',
                   backgroundColor: flash === 'up'
