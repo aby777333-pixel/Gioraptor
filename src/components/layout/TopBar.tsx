@@ -171,12 +171,12 @@ export default function TopBar() {
 
   return (
     <div
-      className="flex items-center px-3 border-b select-none"
+      className="flex items-center px-2 border-b select-none"
       style={{
-        height: 48,
+        height: 44,
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border)',
-        fontSize: 13,
+        fontSize: 12,
       }}
     >
       {/* ── Logo ── */}
@@ -198,7 +198,7 @@ export default function TopBar() {
           <span key={item.href} className="flex items-center gap-1">
             <Link
               href={item.href}
-              className="px-2 py-1 rounded text-[12px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
+              className="px-2 py-1 rounded text-[11px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
             >
               {item.label}
             </Link>

@@ -149,11 +149,11 @@ function LiveTVPanel() {
 
   const channels = {
     bloomberg: {
-      label: 'Bloomberg TV',
-      src: 'https://www.youtube.com/embed/kfLbOqoroFo?autoplay=1&mute=1',
+      label: 'Bloomberg',
+      src: 'https://www.youtube.com/embed/Ga3maNZ0x0w?autoplay=1&mute=1',
     },
     cnbc: {
-      label: 'CNBC Business',
+      label: 'CNBC',
       src: 'https://www.youtube.com/embed/9NyxcX3rhQs?autoplay=1&mute=1',
     },
   };

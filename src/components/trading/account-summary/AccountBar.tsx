@@ -85,19 +85,19 @@ export default function AccountBar() {
 
   return (
     <div
-      className="flex items-center justify-between px-4 select-none"
+      className="flex items-center justify-between px-3 select-none"
       style={{
-        height: 32,
+        height: 30,
         backgroundColor: 'var(--bg-primary)',
         borderTop: '1px solid var(--border)',
-        fontSize: 12,
+        fontSize: 11,
       }}
     >
       {/* Left: Session indicators */}
       <SessionIndicators />
 
       {/* Center: Account stats */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <Item label="Balance" value={formatCurrency(balance)} />
         <Sep />
         <Item label="Equity" value={formatCurrency(equity)} />
