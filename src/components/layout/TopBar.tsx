@@ -9,7 +9,6 @@ import {
   Settings,
   RefreshCw,
   Mic,
-  MoreHorizontal,
   Bot,
   Brain,
   Calendar,
@@ -37,22 +36,17 @@ export default function TopBar() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<TradingAccount | null>(null);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [latency, setLatency] = useState(18);
   const [speed] = useState(13.3);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
 
   const accountRef = useRef<HTMLDivElement>(null);
-  const helpRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setAccountDropdownOpen(false);
-      }
-      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
-        setHelpMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -184,52 +178,20 @@ export default function TopBar() {
 
       <Separator />
 
-      {/* ── Main nav: bullet-dot items ── */}
-      <div className="flex items-center gap-1">
+      {/* ── Nav items: all inline, evenly spaced ── */}
+      <div className="flex items-center gap-0.5">
         <NavItem label="View" active />
         <NavItem label="New Order" />
-        <div className="relative" ref={helpRef}>
-          <button
-            onClick={() => setHelpMenuOpen(!helpMenuOpen)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] transition-colors',
-              helpMenuOpen ? 'opacity-100' : 'opacity-60 hover:opacity-90'
-            )}
-            style={helpMenuOpen ? { backgroundColor: 'var(--bg-elevated)' } : undefined}
+        <NavItem label="Help" />
+        {helpMenuItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] opacity-50 hover:opacity-90 transition-opacity whitespace-nowrap"
           >
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: helpMenuOpen ? '#29ABE2' : 'var(--text-muted)' }}
-            />
-            Help
-            <ChevronDown size={12} className="opacity-50" />
-          </button>
-
-          {helpMenuOpen && (
-            <div
-              className="absolute top-full left-0 mt-1 w-52 rounded-lg shadow-xl z-50 border py-1.5"
-              style={{
-                backgroundColor: 'var(--bg-elevated)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              {helpMenuItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setHelpMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2 text-[13px] transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+            {item.label}
+          </Link>
+        ))}
       </div>
 
       <Separator />
