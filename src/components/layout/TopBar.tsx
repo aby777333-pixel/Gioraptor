@@ -10,7 +10,16 @@ import {
   RefreshCw,
   BarChart3,
   Wallet,
+  Bot,
+  Brain,
+  Mic,
+  Calendar,
+  Newspaper,
+  Users,
+  PieChart,
 } from 'lucide-react';
+import Link from 'next/link';
+import VoiceTrading from '@/components/trading/VoiceTrading';
 import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 import { createClient } from '@/lib/supabase/client';
@@ -33,6 +42,7 @@ export default function TopBar() {
   const [activeTab, setActiveTab] = useState<TopBarTab>('market');
   const [latency, setLatency] = useState(18);
   const [speed] = useState(13.3);
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
 
   const accountRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
@@ -201,6 +211,60 @@ export default function TopBar() {
         label="Accounts"
       />
 
+      <Link
+        href="/terminal/ea-builder"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="EA Strategy Builder"
+      >
+        <Bot size={13} />
+        EA Builder
+      </Link>
+
+      <Link
+        href="/terminal/signals"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="AI Signal Scanner"
+      >
+        <Brain size={13} />
+        AI Signals
+      </Link>
+
+      <Link
+        href="/terminal/calendar"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="Economic Calendar"
+      >
+        <Calendar size={13} />
+        Calendar
+      </Link>
+
+      <Link
+        href="/terminal/news"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="Market News"
+      >
+        <Newspaper size={13} />
+        News
+      </Link>
+
+      <Link
+        href="/terminal/copy-trading"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="Copy Trading"
+      >
+        <Users size={13} />
+        Copy Trade
+      </Link>
+
+      <Link
+        href="/terminal/pamm"
+        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
+        title="PAMM Funds"
+      >
+        <PieChart size={13} />
+        PAMM
+      </Link>
+
       <Separator />
 
       {/* ── Active symbol + timeframe ── */}
@@ -254,6 +318,27 @@ export default function TopBar() {
       >
         <RefreshCw size={13} className="opacity-50" />
       </button>
+
+      {/* ── Voice Trading ── */}
+      <div className="relative">
+        <button
+          onClick={() => setVoicePanelOpen(!voicePanelOpen)}
+          className="p-1 rounded hover:opacity-70 transition-opacity"
+          title="Voice Trading"
+          style={voicePanelOpen ? { color: '#29ABE2' } : undefined}
+        >
+          <Mic size={14} className={voicePanelOpen ? '' : 'opacity-50'} />
+        </button>
+
+        {voicePanelOpen && (
+          <div
+            className="absolute top-full right-0 mt-1 z-50"
+            style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))' }}
+          >
+            <VoiceTrading onClose={() => setVoicePanelOpen(false)} />
+          </div>
+        )}
+      </div>
 
       <Separator />
 
