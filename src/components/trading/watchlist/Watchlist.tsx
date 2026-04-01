@@ -315,7 +315,7 @@ export default function Watchlist() {
 
                 {/* Sell Price */}
                 <span
-                  className="font-mono text-right text-[13px] font-medium"
+                  className="font-mono text-right text-[12px] font-medium"
                   style={{
                     color: flash === 'down' ? '#ff6b6b' : '#C1121F',
                     transition: 'color 0.15s',
@@ -326,7 +326,7 @@ export default function Watchlist() {
 
                 {/* Buy Price */}
                 <span
-                  className="font-mono text-right text-[13px] font-medium"
+                  className="font-mono text-right text-[12px] font-medium"
                   style={{
                     color: flash === 'up' ? '#5dffa0' : '#00C27A',
                     transition: 'color 0.15s',
