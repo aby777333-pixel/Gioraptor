@@ -82,6 +82,9 @@ body {
 .flash-up { animation: flash-green 150ms ease-out; }
 .flash-down { animation: flash-red 150ms ease-out; }
 
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 .mono {
   font-family: 'DM Mono', 'IBM Plex Mono', 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;

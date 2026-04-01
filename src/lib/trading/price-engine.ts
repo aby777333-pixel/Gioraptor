@@ -7,7 +7,6 @@
 import type { PriceTick, InstrumentType } from '@/types/trading';
 import {
   fetchMultipleQuotes,
-  isApiKeyConfigured,
   type TwelveDataQuote,
 } from './twelve-data';
 
@@ -113,8 +112,6 @@ export class PriceEngine {
    * Only fetches symbols that Twelve Data supports.
    */
   async fetchRealPrices(): Promise<boolean> {
-    if (!isApiKeyConfigured()) return false;
-
     try {
       const quotes = await fetchMultipleQuotes(LIVE_CAPABLE_SYMBOLS);
       let updatedCount = 0;
@@ -170,16 +167,14 @@ export class PriceEngine {
       callback(ticks);
     }, intervalMs);
 
-    // Start a slower live data fetch interval (every 10 seconds)
-    // to stay well within the 8 calls/min free tier limit
-    if (isApiKeyConfigured()) {
-      // Initial fetch
-      this.fetchRealPrices();
-
-      this.liveIntervalId = setInterval(() => {
-        this.fetchRealPrices();
-      }, 10_000);
-    }
+    // Try live data regardless of key check - if fetch succeeds, use live data
+    this.fetchRealPrices().then(success => {
+      if (success) {
+        this.liveIntervalId = setInterval(() => {
+          this.fetchRealPrices();
+        }, 10_000);
+      }
+    });
   }
 
   stop(): void {

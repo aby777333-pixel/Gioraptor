@@ -263,7 +263,7 @@ export default function Watchlist() {
       {/* Column Headers */}
       <div
         className="grid gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wider opacity-40 border-b font-semibold"
-        style={{ borderColor: 'var(--border)', gridTemplateColumns: '1fr 75px 75px' }}
+        style={{ borderColor: 'var(--border)', gridTemplateColumns: '1fr 70px 70px' }}
       >
         <span>Symbol</span>
         <span className="text-right">Sell</span>
@@ -271,7 +271,7 @@ export default function Watchlist() {
       </div>
 
       {/* Symbol List */}
-      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+      <div className="flex-1 overflow-y-auto hide-scrollbar" style={{ scrollbarWidth: 'none' }}>
         {items.map((item) => {
           const isActive = activeSymbol === item.symbol;
           const isExpanded = expandedSymbol === item.symbol;
@@ -286,7 +286,7 @@ export default function Watchlist() {
                 onClick={() => handleSymbolClick(item.symbol)}
                 className="w-full grid gap-1 items-center px-3 text-xs transition-all border-l-2"
                 style={{
-                  gridTemplateColumns: '1fr 75px 75px',
+                  gridTemplateColumns: '1fr 70px 70px',
                   minHeight: 36,
                   borderLeftColor: isActive ? '#29ABE2' : 'transparent',
                   backgroundColor: flash === 'up'
@@ -301,7 +301,7 @@ export default function Watchlist() {
               >
                 {/* Symbol Name + Direction */}
                 <div className="text-left min-w-0 py-1.5">
-                  <div className="font-bold text-[13px] flex items-center gap-1 leading-tight" style={{ color: '#FFFFFF' }}>
+                  <div className="font-bold text-[12px] flex items-center gap-1 leading-tight" style={{ color: '#FFFFFF' }}>
                     <span className="truncate">{item.symbol}</span>
                     {item.direction === 'up' && (
                       <ArrowUp size={10} className="shrink-0" style={{ color: '#00C27A' }} />
@@ -310,12 +310,12 @@ export default function Watchlist() {
                       <ArrowDown size={10} className="shrink-0" style={{ color: '#C1121F' }} />
                     )}
                   </div>
-                  <div className="text-[10px] opacity-30 truncate leading-tight mt-0.5">{item.description}</div>
+                  <div className="text-[9px] opacity-30 truncate leading-tight mt-0.5">{item.description}</div>
                 </div>
 
                 {/* Sell Price */}
                 <span
-                  className="font-mono text-right text-[12px] font-medium"
+                  className="font-mono text-right text-[11px] font-medium"
                   style={{
                     color: flash === 'down' ? '#ff6b6b' : '#C1121F',
                     transition: 'color 0.15s',
@@ -326,7 +326,7 @@ export default function Watchlist() {
 
                 {/* Buy Price */}
                 <span
-                  className="font-mono text-right text-[12px] font-medium"
+                  className="font-mono text-right text-[11px] font-medium"
                   style={{
                     color: flash === 'up' ? '#5dffa0' : '#00C27A',
                     transition: 'color 0.15s',
@@ -413,7 +413,7 @@ export default function Watchlist() {
                         <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#C1121F' }}>
                           Sell
                         </span>
-                        <span className="font-mono text-[16px] font-bold leading-none mt-0.5" style={{ color: '#C1121F' }}>
+                        <span className="font-mono text-[14px] font-bold leading-none mt-0.5" style={{ color: '#C1121F' }}>
                           {isPlacing ? <Loader2 size={14} className="animate-spin" /> : formatPrice(item.bid, decimals)}
                         </span>
                       </button>
@@ -487,7 +487,7 @@ export default function Watchlist() {
                         <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#00C27A' }}>
                           Buy
                         </span>
-                        <span className="font-mono text-[16px] font-bold leading-none mt-0.5" style={{ color: '#00C27A' }}>
+                        <span className="font-mono text-[14px] font-bold leading-none mt-0.5" style={{ color: '#00C27A' }}>
                           {isPlacing ? <Loader2 size={14} className="animate-spin" /> : formatPrice(item.ask, decimals)}
                         </span>
                       </button>

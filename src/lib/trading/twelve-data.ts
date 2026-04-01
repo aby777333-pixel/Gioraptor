@@ -39,7 +39,8 @@ export function getInternalSymbol(tdSymbol: string): string {
 }
 
 export function isApiKeyConfigured(): boolean {
-  return API_KEY !== 'demo' && API_KEY.length > 0;
+  const key = process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY || '';
+  return key.length > 10; // Real keys are 32 chars, 'demo' is 4
 }
 
 export interface TwelveDataQuote {

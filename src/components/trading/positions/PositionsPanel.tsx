@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Pencil, ArrowUpDown, Mail, FileText, ArrowLeftRight, Clock } from 'lucide-react';
+import { X, Pencil, ArrowUpDown, Mail, FileText, ArrowLeftRight, Clock, Settings } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { formatPrice, formatPnL, formatLot, cn } from '@/lib/utils/format';
 import type { Position, Order } from '@/types/trading';
+import EditOrderModal from './EditOrderModal';
 
 type TabKey = 'positions' | 'pending' | 'history' | 'inbox' | 'logs';
 
@@ -66,8 +67,37 @@ const S = {
   textMuted: 'rgba(255,255,255,0.50)',
 } as const;
 
-const colTemplate =
-  '42px 62px 52px 78px 58px 82px 88px 72px 72px 82px 88px 72px 82px 62px 58px 1fr';
+// Base columns always shown
+const BASE_COLS = '42px 62px 52px 78px 58px 82px';
+// Optional columns with keys
+const OPT_COLS: { key: string; width: string }[] = [
+  { key: 'entryValue', width: '88px' },
+];
+const MID_COLS = '72px 72px 82px';
+const OPT_COLS2: { key: string; width: string }[] = [
+  { key: 'marketValue', width: '88px' },
+  { key: 'commission', width: '72px' },
+];
+const PNL_COL = '82px';
+const OPT_COLS3: { key: string; width: string }[] = [
+  { key: 'pnlPct', width: '62px' },
+];
+const ACTIONS_COL = '58px';
+const OPT_COLS4: { key: string; width: string }[] = [
+  { key: 'remark', width: '1fr' },
+];
+
+function buildColTemplate(visible: Set<string>): string {
+  const parts = [BASE_COLS];
+  for (const c of OPT_COLS) { if (visible.has(c.key)) parts.push(c.width); }
+  parts.push(MID_COLS);
+  for (const c of OPT_COLS2) { if (visible.has(c.key)) parts.push(c.width); }
+  parts.push(PNL_COL);
+  for (const c of OPT_COLS3) { if (visible.has(c.key)) parts.push(c.width); }
+  parts.push(ACTIONS_COL);
+  for (const c of OPT_COLS4) { if (visible.has(c.key)) parts.push(c.width); }
+  return parts.join(' ');
+}
 const histColTemplate =
   '42px 62px 52px 78px 58px 82px 82px 72px 72px 72px 82px 62px 80px';
 
@@ -93,6 +123,39 @@ export default function PositionsPanel() {
   const [livePnl, setLivePnl] = useState<Record<string, number>>({});
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [editingPosition, setEditingPosition] = useState<Position | null>(null);
+  const [showTableSettings, setShowTableSettings] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
+    () => new Set(['entryValue', 'marketValue', 'pnlPct', 'commission', 'remark'])
+  );
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  // Close settings dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowTableSettings(false);
+      }
+    }
+    if (showTableSettings) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showTableSettings]);
+
+  function toggleColumn(col: string) {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(col)) {
+        next.delete(col);
+      } else {
+        next.add(col);
+      }
+      return next;
+    });
+  }
+
+  const colTemplate = buildColTemplate(visibleColumns);
 
   const loadData = useCallback(async () => {
     if (!activeAccountId) {
@@ -359,8 +422,66 @@ export default function PositionsPanel() {
           </span>
         </div>
 
-        {/* Spacer for symmetry */}
-        <div style={{ width: 120 }} />
+        {/* Table Settings */}
+        <div className="flex items-center pr-3 relative" ref={settingsRef} style={{ width: 120, justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => setShowTableSettings((p) => !p)}
+            className="flex items-center justify-center rounded transition-colors"
+            style={{
+              width: 28,
+              height: 28,
+              color: showTableSettings ? '#29ABE2' : 'rgba(255,255,255,0.4)',
+              backgroundColor: showTableSettings ? 'rgba(41,171,226,0.1)' : 'transparent',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#29ABE2'; }}
+            onMouseLeave={(e) => { if (!showTableSettings) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+            title="Table Settings"
+          >
+            <Settings size={14} />
+          </button>
+
+          {showTableSettings && (
+            <div
+              className="absolute right-0 rounded-lg shadow-2xl py-3 px-4 z-50"
+              style={{
+                top: 36,
+                backgroundColor: '#111118',
+                border: '1px solid rgba(255,255,255,0.08)',
+                minWidth: 220,
+              }}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#29ABE2' }}>
+                Table Settings
+              </div>
+              <div className="text-[10px] mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Customize your table display
+              </div>
+              {[
+                { key: 'entryValue', label: 'Entry Value' },
+                { key: 'marketValue', label: 'Market Value' },
+                { key: 'pnlPct', label: 'P/L in %' },
+                { key: 'swap', label: 'Swap' },
+                { key: 'commission', label: 'Commission' },
+                { key: 'remark', label: 'Remark' },
+              ].map((opt) => (
+                <label
+                  key={opt.key}
+                  className="flex items-center gap-2 py-1.5 cursor-pointer text-[12px] transition-colors hover:opacity-80"
+                  style={{ color: 'rgba(255,255,255,0.7)' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.has(opt.key)}
+                    onChange={() => toggleColumn(opt.key)}
+                    className="rounded"
+                    style={{ accentColor: '#29ABE2', width: 14, height: 14 }}
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ===== FEEDBACK ===== */}
@@ -418,16 +539,16 @@ export default function PositionsPanel() {
                   <ColHeader label="Symbol" field="symbol" />
                   <ColHeader label="Lot Size" field="size" align="right" />
                   <ColHeader label="Entry Price" field="entry" align="right" />
-                  <ColHeader label="Entry Value" align="right" />
+                  {visibleColumns.has('entryValue') && <ColHeader label="Entry Value" align="right" />}
                   <ColHeader label="S/L" field="sl" align="right" />
                   <ColHeader label="T/P" field="tp" align="right" />
                   <ColHeader label="Market Price" align="right" />
-                  <ColHeader label="Market Value" align="right" />
-                  <ColHeader label="Commission" field="commission" align="right" />
+                  {visibleColumns.has('marketValue') && <ColHeader label="Market Value" align="right" />}
+                  {visibleColumns.has('commission') && <ColHeader label="Commission" field="commission" align="right" />}
                   <ColHeader label="Profit/Loss" field="pnl" align="right" />
-                  <ColHeader label="P/L in %" align="right" />
+                  {visibleColumns.has('pnlPct') && <ColHeader label="P/L in %" align="right" />}
                   <ColHeader label="Actions" align="center" />
-                  <ColHeader label="Remark" />
+                  {visibleColumns.has('remark') && <ColHeader label="Remark" />}
                 </div>
 
                 {/* Position rows */}
@@ -492,9 +613,11 @@ export default function PositionsPanel() {
                       </span>
 
                       {/* ENTRY VALUE */}
-                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
-                        {entryValue.toFixed(2)}
-                      </span>
+                      {visibleColumns.has('entryValue') && (
+                        <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
+                          {entryValue.toFixed(2)}
+                        </span>
+                      )}
 
                       {/* S/L */}
                       <span className="text-right flex items-center justify-end gap-0.5" style={{ fontFamily: 'monospace', color: S.textMuted }}>
@@ -514,14 +637,18 @@ export default function PositionsPanel() {
                       </span>
 
                       {/* MARKET VALUE */}
-                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
-                        {marketValue.toFixed(2)}
-                      </span>
+                      {visibleColumns.has('marketValue') && (
+                        <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted, fontSize: 10 }}>
+                          {marketValue.toFixed(2)}
+                        </span>
+                      )}
 
                       {/* COMMISSION */}
-                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
-                        {(pos.commission ?? 0).toFixed(2)}
-                      </span>
+                      {visibleColumns.has('commission') && (
+                        <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                          {(pos.commission ?? 0).toFixed(2)}
+                        </span>
+                      )}
 
                       {/* PROFIT/LOSS */}
                       <span
@@ -532,12 +659,14 @@ export default function PositionsPanel() {
                       </span>
 
                       {/* P/L IN % */}
-                      <span
-                        className="text-right font-bold text-[11px]"
-                        style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
-                      >
-                        {isProfitable ? '+' : ''}{pnlPct}%
-                      </span>
+                      {visibleColumns.has('pnlPct') && (
+                        <span
+                          className="text-right font-bold text-[11px]"
+                          style={{ fontFamily: 'monospace', color: isProfitable ? S.green : S.red }}
+                        >
+                          {isProfitable ? '+' : ''}{pnlPct}%
+                        </span>
+                      )}
 
                       {/* ACTIONS */}
                       <span className="flex items-center justify-center gap-1">
@@ -560,6 +689,7 @@ export default function PositionsPanel() {
                           <X size={12} />
                         </button>
                         <button
+                          onClick={() => setEditingPosition(pos)}
                           className="flex items-center justify-center transition-colors"
                           style={{
                             width: 18,
@@ -578,9 +708,11 @@ export default function PositionsPanel() {
                       </span>
 
                       {/* REMARK */}
-                      <span style={{ color: S.textDim, fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        --
-                      </span>
+                      {visibleColumns.has('remark') && (
+                        <span style={{ color: S.textDim, fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          --
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -603,23 +735,25 @@ export default function PositionsPanel() {
                     <span />
                     <span />
                     <span />
+                    {visibleColumns.has('entryValue') && <span />}
                     <span />
                     <span />
                     <span />
-                    <span />
-                    <span />
-                    <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
-                      {totalCommission.toFixed(2)}
-                    </span>
+                    {visibleColumns.has('marketValue') && <span />}
+                    {visibleColumns.has('commission') && (
+                      <span className="text-right" style={{ fontFamily: 'monospace', color: S.textMuted }}>
+                        {totalCommission.toFixed(2)}
+                      </span>
+                    )}
                     <span
                       className="text-right"
                       style={{ fontFamily: 'monospace', color: totalProfit >= 0 ? S.green : S.red }}
                     >
                       {formatPnL(totalProfit)}
                     </span>
+                    {visibleColumns.has('pnlPct') && <span />}
                     <span />
-                    <span />
-                    <span style={{ color: S.textDim, fontSize: 9 }}>TOTAL</span>
+                    {visibleColumns.has('remark') && <span style={{ color: S.textDim, fontSize: 9 }}>TOTAL</span>}
                   </div>
                 )}
               </>
@@ -868,6 +1002,17 @@ export default function PositionsPanel() {
           </div>
         )}
       </div>
+
+      {/* Edit Order Modal */}
+      {editingPosition && (
+        <EditOrderModal
+          position={editingPosition}
+          onClose={() => setEditingPosition(null)}
+          onSuccess={() => {
+            triggerRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
