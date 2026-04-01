@@ -23,11 +23,12 @@ export default function AccountBar() {
       className="flex items-center justify-center gap-4 px-4 select-none"
       style={{
         height: 28,
-        backgroundColor: 'var(--bg-surface)',
+        backgroundColor: '#0A0A0F',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
         fontSize: 11,
       }}
     >
-      <Item label="Currency" value="USD" />
+      <Item label="Account Currency" value="USD" />
       <Sep />
       <Item label="Balance" value={formatCurrency(balance)} />
       <Sep />
@@ -62,10 +63,10 @@ function Item({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span style={{ opacity: 0.4 }}>{label}:</span>
+      <span style={{ color: '#29ABE2', opacity: 0.85 }}>{label}:</span>
       <span
         className="font-mono font-medium"
-        style={valueColor ? { color: valueColor } : undefined}
+        style={{ color: valueColor ?? '#fff' }}
       >
         {value}
       </span>
@@ -75,6 +76,6 @@ function Item({
 
 function Sep() {
   return (
-    <span style={{ opacity: 0.15 }}>|</span>
+    <span style={{ opacity: 0.15, color: '#fff' }}>|</span>
   );
 }

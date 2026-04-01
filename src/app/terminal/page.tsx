@@ -16,7 +16,7 @@ export default function TerminalPage() {
       style={{
         display: 'grid',
         gridTemplateRows: '42px 1fr 200px 28px',
-        gridTemplateColumns: '260px 1fr',
+        gridTemplateColumns: '240px 1fr',
       }}
     >
       {/* TopBar - spans full width */}

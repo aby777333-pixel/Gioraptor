@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Pencil, ArrowUpDown, Mail, FileText } from 'lucide-react';
+import { X, Pencil, ArrowUpDown, Mail, FileText, ArrowLeftRight, Clock } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { formatPrice, formatPnL, formatLot, cn } from '@/lib/utils/format';
@@ -298,9 +298,9 @@ export default function PositionsPanel() {
 
   /* ---------- tab config ---------- */
   const tabItems: { key: TabKey; label: string; count?: number; icon?: React.ReactNode }[] = [
-    { key: 'positions', label: '+ Order', count: openPositions.length },
-    { key: 'pending', label: 'Pending', count: pendingOrders.length },
-    { key: 'history', label: 'History' },
+    { key: 'positions', label: 'Order', count: openPositions.length, icon: <ArrowLeftRight size={10} /> },
+    { key: 'pending', label: 'Pending', count: pendingOrders.length, icon: <Clock size={10} /> },
+    { key: 'history', label: 'History', icon: <FileText size={10} /> },
     { key: 'inbox', label: 'Inbox', icon: <Mail size={10} /> },
     { key: 'logs', label: 'Logs', icon: <FileText size={10} /> },
   ];

@@ -9,14 +9,17 @@ import {
   Settings,
   RefreshCw,
   BarChart3,
-  Wallet,
+  Mic,
+  MoreHorizontal,
   Bot,
   Brain,
-  Mic,
   Calendar,
   Newspaper,
   Users,
   PieChart,
+  ShoppingCart,
+  HelpCircle,
+  Activity,
 } from 'lucide-react';
 import Link from 'next/link';
 import VoiceTrading from '@/components/trading/VoiceTrading';
@@ -24,8 +27,6 @@ import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 import { createClient } from '@/lib/supabase/client';
 import type { TradingAccount } from '@/types/trading';
-
-type TopBarTab = 'market' | 'accounts';
 
 export default function TopBar() {
   const {
@@ -38,14 +39,13 @@ export default function TopBar() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<TradingAccount | null>(null);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TopBarTab>('market');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [latency, setLatency] = useState(18);
   const [speed] = useState(13.3);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
 
   const accountRef = useRef<HTMLDivElement>(null);
-  const userRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -53,8 +53,8 @@ export default function TopBar() {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setAccountDropdownOpen(false);
       }
-      if (userRef.current && !userRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -140,7 +140,7 @@ export default function TopBar() {
     };
   }, [setActiveAccountId]);
 
-  // Simulated latency ticker (5-50ms, updates every 3s)
+  // Simulated latency ticker
   useEffect(() => {
     const iv = setInterval(() => {
       setLatency(Math.floor(Math.random() * 46) + 5);
@@ -159,6 +159,15 @@ export default function TopBar() {
 
   const userName = 'Trader';
   const accountNum = selectedAccount?.account_number ?? '---';
+
+  const moreMenuItems = [
+    { href: '/terminal/ea-builder', icon: <Bot size={13} />, label: 'EA Builder' },
+    { href: '/terminal/signals', icon: <Brain size={13} />, label: 'AI Signals' },
+    { href: '/terminal/calendar', icon: <Calendar size={13} />, label: 'Calendar' },
+    { href: '/terminal/news', icon: <Newspaper size={13} />, label: 'News' },
+    { href: '/terminal/copy-trading', icon: <Users size={13} />, label: 'Copy Trading' },
+    { href: '/terminal/pamm', icon: <PieChart size={13} />, label: 'PAMM' },
+  ];
 
   return (
     <div
@@ -194,76 +203,47 @@ export default function TopBar() {
         </div>
       </div>
 
-      {/* ── Separator ── */}
       <Separator />
 
-      {/* ── Nav tabs ── */}
-      <NavTab
-        active={activeTab === 'market'}
-        onClick={() => setActiveTab('market')}
-        icon={<BarChart3 size={13} />}
-        label="Market View"
-      />
-      <NavTab
-        active={activeTab === 'accounts'}
-        onClick={() => setActiveTab('accounts')}
-        icon={<Wallet size={13} />}
-        label="Accounts"
-      />
+      {/* ── Main nav: only 3 items ── */}
+      <NavTab icon={<BarChart3 size={13} />} label="Market View" active />
+      <NavTab icon={<ShoppingCart size={13} />} label="New Order" />
+      <NavTab icon={<HelpCircle size={13} />} label="Help" />
 
-      <Link
-        href="/terminal/ea-builder"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="EA Strategy Builder"
-      >
-        <Bot size={13} />
-        EA Builder
-      </Link>
+      {/* ── More menu (three dots) ── */}
+      <div className="relative" ref={moreRef}>
+        <button
+          onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-opacity hover:opacity-80"
+          style={moreMenuOpen ? { backgroundColor: 'var(--bg-elevated)', opacity: 1 } : { opacity: 0.5 }}
+          title="More tools"
+        >
+          <MoreHorizontal size={15} />
+        </button>
 
-      <Link
-        href="/terminal/signals"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="AI Signal Scanner"
-      >
-        <Brain size={13} />
-        AI Signals
-      </Link>
-
-      <Link
-        href="/terminal/calendar"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="Economic Calendar"
-      >
-        <Calendar size={13} />
-        Calendar
-      </Link>
-
-      <Link
-        href="/terminal/news"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="Market News"
-      >
-        <Newspaper size={13} />
-        News
-      </Link>
-
-      <Link
-        href="/terminal/copy-trading"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="Copy Trading"
-      >
-        <Users size={13} />
-        Copy Trade
-      </Link>
-
-      <Link
-        href="/terminal/pamm"
-        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] opacity-50 hover:opacity-70 transition-opacity"
-        title="PAMM Funds"
-      >
-        <PieChart size={13} />
-        PAMM
-      </Link>
+        {moreMenuOpen && (
+          <div
+            className="absolute top-full left-0 mt-1 w-48 rounded shadow-lg z-50 border py-1"
+            style={{
+              backgroundColor: 'var(--bg-elevated)',
+              borderColor: 'var(--border)',
+            }}
+          >
+            {moreMenuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMoreMenuOpen(false)}
+                className="flex items-center gap-2.5 px-3 py-1.5 text-[11px] hover:opacity-80 transition-opacity"
+                style={{ color: 'rgba(255,255,255,0.7)' }}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Separator />
 
@@ -296,6 +276,16 @@ export default function TopBar() {
         </span>
       </div>
 
+      {/* ── Indicators button ── */}
+      <button
+        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] opacity-50 hover:opacity-80 transition-opacity"
+        style={{ backgroundColor: 'var(--bg-elevated)' }}
+        title="Indicators"
+      >
+        <Activity size={12} />
+        Indicators
+      </button>
+
       {/* ── Spacer ── */}
       <div className="flex-1" />
 
@@ -319,6 +309,15 @@ export default function TopBar() {
         <RefreshCw size={13} className="opacity-50" />
       </button>
 
+      {/* ── Theme toggle ── */}
+      <button
+        onClick={toggleTheme}
+        className="p-1 rounded hover:opacity-70 transition-opacity"
+        title="Toggle theme"
+      >
+        {theme === 'dark' ? <Sun size={14} className="opacity-50" /> : <Moon size={14} className="opacity-50" />}
+      </button>
+
       {/* ── Voice Trading ── */}
       <div className="relative">
         <button
@@ -339,17 +338,6 @@ export default function TopBar() {
           </div>
         )}
       </div>
-
-      <Separator />
-
-      {/* ── Theme toggle ── */}
-      <button
-        onClick={toggleTheme}
-        className="p-1 rounded hover:opacity-70 transition-opacity"
-        title="Toggle theme"
-      >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-      </button>
 
       <Separator />
 
@@ -413,7 +401,6 @@ export default function TopBar() {
               style={{ backgroundColor: 'var(--border)' }}
             />
 
-            {/* Settings / sign out */}
             <button
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:opacity-70 transition-opacity"
               onClick={() => setAccountDropdownOpen(false)}
@@ -448,18 +435,16 @@ function Separator() {
 
 function NavTab({
   active,
-  onClick,
   icon,
   label,
 }: {
-  active: boolean;
-  onClick: () => void;
+  active?: boolean;
+  onClick?: () => void;
   icon: React.ReactNode;
   label: string;
 }) {
   return (
     <button
-      onClick={onClick}
       className={cn(
         'flex items-center gap-1 px-2.5 py-1 rounded text-[11px] transition-opacity',
         active ? 'opacity-100' : 'opacity-50 hover:opacity-70'

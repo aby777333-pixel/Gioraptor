@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, DM_Mono } from 'next/font/google';
 import './globals.css';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const dmMono = DM_Mono({ weight: ['400', '500'], subsets: ['latin'], variable: '--font-mono' });
@@ -17,7 +18,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-theme="dark" className={`${inter.variable} ${dmMono.variable} h-full`}>
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }
