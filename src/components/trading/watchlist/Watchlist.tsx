@@ -213,7 +213,7 @@ export default function Watchlist() {
         <button
           onClick={() => setActiveTab('favourites')}
           className={cn(
-            'flex-1 py-2.5 text-[12px] font-medium uppercase tracking-wider transition-colors',
+            'flex-1 py-2.5 text-[11px] font-medium uppercase tracking-wide transition-colors truncate px-2',
             activeTab === 'favourites'
               ? 'opacity-100'
               : 'opacity-40 hover:opacity-60'
@@ -228,7 +228,7 @@ export default function Watchlist() {
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
-            'flex-1 py-2.5 text-[12px] font-medium uppercase tracking-wider transition-colors',
+            'flex-1 py-2.5 text-[11px] font-medium uppercase tracking-wide transition-colors truncate px-2',
             activeTab === 'all'
               ? 'opacity-100'
               : 'opacity-40 hover:opacity-60'
@@ -238,7 +238,7 @@ export default function Watchlist() {
             color: activeTab === 'all' ? '#29ABE2' : 'var(--text-primary)',
           }}
         >
-          All Symbols ({allCount})
+          All ({allCount})
         </button>
       </div>
 
@@ -262,12 +262,12 @@ export default function Watchlist() {
 
       {/* Column Headers */}
       <div
-        className="grid grid-cols-[1fr_auto_auto] gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wider opacity-40 border-b font-semibold"
-        style={{ borderColor: 'var(--border)' }}
+        className="grid gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wider opacity-40 border-b font-semibold"
+        style={{ borderColor: 'var(--border)', gridTemplateColumns: '1fr 68px 68px' }}
       >
         <span>Symbol</span>
-        <span className="text-right" style={{ width: 64 }}>Sell</span>
-        <span className="text-right" style={{ width: 64 }}>Buy</span>
+        <span className="text-right">Sell</span>
+        <span className="text-right">Buy</span>
       </div>
 
       {/* Symbol List */}
@@ -284,8 +284,10 @@ export default function Watchlist() {
               {/* Symbol Row */}
               <button
                 onClick={() => handleSymbolClick(item.symbol)}
-                className="w-full grid grid-cols-[1fr_auto_auto] gap-1 items-center px-3 py-2.5 text-xs transition-all border-l-2"
+                className="w-full grid gap-1 items-center px-3 text-xs transition-all border-l-2"
                 style={{
+                  gridTemplateColumns: '1fr 68px 68px',
+                  minHeight: 36,
                   borderLeftColor: isActive ? '#29ABE2' : 'transparent',
                   backgroundColor: flash === 'up'
                     ? 'rgba(0,194,122,0.08)'
@@ -298,25 +300,23 @@ export default function Watchlist() {
                 }}
               >
                 {/* Symbol Name + Direction */}
-                <div className="text-left flex items-center gap-1.5 min-w-0">
-                  <div className="min-w-0">
-                    <div className="font-medium text-[13px] flex items-center gap-1" style={{ color: 'var(--text-primary)' }}>
-                      <span className="truncate">{item.symbol}</span>
-                      {item.direction === 'up' && (
-                        <ArrowUp size={10} style={{ color: '#00C27A' }} />
-                      )}
-                      {item.direction === 'down' && (
-                        <ArrowDown size={10} style={{ color: '#C1121F' }} />
-                      )}
-                    </div>
+                <div className="text-left min-w-0 py-1.5">
+                  <div className="font-bold text-[13px] flex items-center gap-1 leading-tight" style={{ color: '#FFFFFF' }}>
+                    <span className="truncate">{item.symbol}</span>
+                    {item.direction === 'up' && (
+                      <ArrowUp size={10} className="shrink-0" style={{ color: '#00C27A' }} />
+                    )}
+                    {item.direction === 'down' && (
+                      <ArrowDown size={10} className="shrink-0" style={{ color: '#C1121F' }} />
+                    )}
                   </div>
+                  <div className="text-[10px] opacity-30 truncate leading-tight mt-0.5">{item.description}</div>
                 </div>
 
                 {/* Sell Price */}
                 <span
                   className="font-mono text-right text-[13px] font-medium"
                   style={{
-                    width: 64,
                     color: flash === 'down' ? '#ff6b6b' : '#C1121F',
                     transition: 'color 0.15s',
                   }}
@@ -328,7 +328,6 @@ export default function Watchlist() {
                 <span
                   className="font-mono text-right text-[13px] font-medium"
                   style={{
-                    width: 64,
                     color: flash === 'up' ? '#5dffa0' : '#00C27A',
                     transition: 'color 0.15s',
                   }}

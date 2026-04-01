@@ -5,6 +5,14 @@ import { Mic, MicOff, X, Check, AlertCircle, Volume2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 
+/* ── Global type augmentation for Web Speech API ── */
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 /* ── Web Speech API type declarations ── */
 interface SpeechRecognitionEvent {
   resultIndex: number;
@@ -58,14 +66,12 @@ interface ParsedCommand {
   displayText: string;
 }
 
-// Check for Web Speech API support
+// Check for Web Speech API support (Chrome uses webkitSpeechRecognition)
 function getSpeechRecognition(): SpeechRecognitionConstructor | null {
   if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
   const SR: SpeechRecognitionConstructor | undefined =
-    w.SpeechRecognition || w.webkitSpeechRecognition;
-  return SR || null;
+    window.SpeechRecognition ?? window.webkitSpeechRecognition;
+  return SR ?? null;
 }
 
 const KNOWN_SYMBOLS = [
@@ -480,7 +486,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
         <div className="text-center mb-3">
           {state === 'idle' && !feedback && (
             <p className="text-[10px] opacity-40">
-              Tap the mic and say a command
+              Click the mic to start listening
             </p>
           )}
           {state === 'listening' && (
@@ -592,16 +598,12 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
       </div>
 
       {/* CSS for waveform animation */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes voiceWave {
-          from {
-            height: 4px;
-          }
-          to {
-            height: ${16 + Math.random() * 8}px;
-          }
+          from { height: 4px; }
+          to { height: 20px; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

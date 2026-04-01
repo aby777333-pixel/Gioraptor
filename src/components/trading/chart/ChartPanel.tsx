@@ -107,7 +107,11 @@ interface DrawingTool {
   icon: React.ReactNode;
   group: number; // for separator grouping
   toggle?: boolean; // if true, it's a toggle button not a single-select
+  disabled?: boolean; // if true, tool is not functional (requires Pro license)
 }
+
+// Tools that require TradingView Pro license (not available in Lightweight Charts)
+const PRO_ONLY_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'measure'];
 
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
@@ -119,23 +123,23 @@ function getDecimals(symbol: string): number {
 }
 
 // Tooltip component for drawing tools
-function ToolTooltip({ label, visible }: { label: string; visible: boolean }) {
+function ToolTooltip({ label, visible, disabled }: { label: string; visible: boolean; disabled?: boolean }) {
   if (!visible) return null;
   return (
     <div
       className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none whitespace-nowrap"
       style={{
         backgroundColor: '#1a1a28',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: `1px solid ${disabled ? 'rgba(255,165,0,0.2)' : 'rgba(255,255,255,0.1)'}`,
         borderRadius: 4,
         padding: '4px 8px',
         fontSize: 11,
-        color: 'rgba(255,255,255,0.85)',
+        color: disabled ? 'rgba(255,165,0,0.8)' : 'rgba(255,255,255,0.85)',
         fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
       }}
     >
-      {label}
+      {disabled ? `${label} - Requires Pro license` : label}
     </div>
   );
 }
@@ -172,25 +176,26 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
   // Drawing tools configuration
   const drawingTools: DrawingTool[] = [
-    { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={20} />, group: 1 },
-    { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={20} />, group: 1 },
-    { id: 'trendline', label: 'Trend Line', icon: <TrendingUp size={20} />, group: 2 },
-    { id: 'horizontal', label: 'Horizontal Line', icon: <Minus size={20} />, group: 2 },
-    { id: 'vertical', label: 'Vertical Line', icon: <MoveVertical size={20} />, group: 2 },
-    { id: 'fibonacci', label: 'Fibonacci Retracement', icon: <GitCommitHorizontal size={20} />, group: 3 },
-    { id: 'text', label: 'Text Annotation', icon: <Type size={20} />, group: 3 },
-    { id: 'rectangle', label: 'Rectangle', icon: <Square size={20} />, group: 3 },
-    { id: 'measure', label: 'Measure Tool', icon: <Ruler size={20} />, group: 4 },
-    { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={20} />, group: 4 },
-    { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={20} />, group: 4 },
-    { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={20} />, group: 5, toggle: true },
-    { id: 'lock', label: 'Lock Drawings', icon: <Lock size={20} />, group: 5, toggle: true },
-    { id: 'visibility', label: showDrawings ? 'Hide Drawings' : 'Show Drawings', icon: showDrawings ? <Eye size={20} /> : <EyeOff size={20} />, group: 5, toggle: true },
-    { id: 'deleteall', label: 'Delete All Drawings', icon: <Trash2 size={20} />, group: 6, toggle: true },
+    { id: 'cursor', label: 'Pointer', icon: <MousePointer2 size={18} />, group: 1 },
+    { id: 'crosshair', label: 'Crosshair', icon: <Crosshair size={18} />, group: 1 },
+    { id: 'trendline', label: 'Trend Line (Pro)', icon: <TrendingUp size={18} />, group: 2, disabled: true },
+    { id: 'horizontal', label: 'Horizontal Line (Pro)', icon: <Minus size={18} />, group: 2, disabled: true },
+    { id: 'vertical', label: 'Vertical Line (Pro)', icon: <MoveVertical size={18} />, group: 2, disabled: true },
+    { id: 'fibonacci', label: 'Fibonacci (Pro)', icon: <GitCommitHorizontal size={18} />, group: 3, disabled: true },
+    { id: 'text', label: 'Text (Pro)', icon: <Type size={18} />, group: 3, disabled: true },
+    { id: 'rectangle', label: 'Rectangle (Pro)', icon: <Square size={18} />, group: 3, disabled: true },
+    { id: 'measure', label: 'Measure (Pro)', icon: <Ruler size={18} />, group: 4, disabled: true },
+    { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={18} />, group: 4 },
+    { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={18} />, group: 4 },
+    { id: 'magnet', label: 'Magnet Mode', icon: <Magnet size={18} />, group: 5, toggle: true },
+    { id: 'lock', label: 'Lock Drawings', icon: <Lock size={18} />, group: 5, toggle: true },
+    { id: 'visibility', label: showDrawings ? 'Hide Drawings' : 'Show Drawings', icon: showDrawings ? <Eye size={18} /> : <EyeOff size={18} />, group: 5, toggle: true },
+    { id: 'deleteall', label: 'Delete All Drawings', icon: <Trash2 size={18} />, group: 6, toggle: true },
   ];
 
   // Handle drawing tool click
   const handleToolClick = (tool: DrawingTool) => {
+    if (tool.disabled) return; // Pro-only tools are not functional
     if (tool.id === 'magnet') {
       setMagnetMode(!magnetMode);
     } else if (tool.id === 'lock') {
@@ -520,37 +525,42 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
       const active = isToolActive(tool);
 
+      const isDisabled = tool.disabled === true;
+
       elements.push(
         <div key={tool.id} className="relative flex items-center justify-center">
           <button
             onClick={() => handleToolClick(tool)}
             onMouseEnter={() => setHoveredTool(tool.id)}
             onMouseLeave={() => setHoveredTool(null)}
-            className="flex items-center justify-center transition-all duration-150"
+            className="flex items-center justify-center transition-all duration-150 relative"
             style={{
-              width: 32,
-              height: 32,
+              width: 30,
+              height: 30,
               borderRadius: 4,
               backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'transparent',
-              color: active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
-              opacity: active ? 1 : undefined,
+              color: isDisabled ? 'rgba(255,255,255,0.15)' : active ? '#29ABE2' : 'rgba(255,255,255,0.5)',
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
             }}
             onMouseOver={(e) => {
-              if (!active) {
+              if (!active && !isDisabled) {
                 e.currentTarget.style.color = 'rgba(255,255,255,1)';
                 e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
               }
             }}
             onMouseOut={(e) => {
-              if (!active) {
+              if (!active && !isDisabled) {
                 e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }
             }}
           >
             {tool.icon}
+            {isDisabled && (
+              <Lock size={7} style={{ position: 'absolute', bottom: 2, right: 2, color: 'rgba(255,165,0,0.5)' }} />
+            )}
           </button>
-          <ToolTooltip label={tool.label} visible={hoveredTool === tool.id} />
+          <ToolTooltip label={tool.label} visible={hoveredTool === tool.id} disabled={isDisabled} />
         </div>
       );
     });
@@ -560,17 +570,21 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Chart toolbar - spans full width */}
+      {/* Chart toolbar - single 40px row */}
       <div
-        className="flex items-center gap-1.5 px-4 py-2 border-b shrink-0"
+        className="flex items-center gap-1 px-3 border-b shrink-0 overflow-x-auto"
         style={{
+          height: 40,
+          minHeight: 40,
+          maxHeight: 40,
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border)',
+          scrollbarWidth: 'none',
         }}
       >
         {/* Connection indicator */}
         <div
-          className="w-2 h-2 rounded-full mr-2 shrink-0"
+          className="w-2 h-2 rounded-full mr-1 shrink-0"
           style={{
             backgroundColor: currentTick ? '#00C27A' : '#C1121F',
             boxShadow: currentTick ? '0 0 6px rgba(0,194,122,0.5)' : '0 0 6px rgba(193,18,31,0.5)',
@@ -579,34 +593,29 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Symbol label */}
         <span
-          className="text-[14px] font-bold mr-1.5 font-mono shrink-0"
+          className="text-[13px] font-bold mr-1 font-mono shrink-0"
           style={{ color: '#29ABE2' }}
         >
           {activeSymbol}
         </span>
 
-        {/* Symbol description, timeframe, chart type */}
-        <span className="text-[12px] font-mono opacity-30 mr-3 shrink-0 hidden md:inline">
-          {symbolDesc} &middot; {tfLabel} &middot; {chartTypeLabel}
-        </span>
-
-        {/* OHLC values */}
+        {/* OHLC values inline */}
         {displayOhlc && (
-          <div className="flex items-center gap-3 mr-3 shrink-0 hidden lg:flex">
-            <span className="text-[12px] font-mono">
-              <span className="opacity-30">O </span>
+          <div className="flex items-center gap-2 mr-1 shrink-0">
+            <span className="text-[11px] font-mono">
+              <span className="opacity-30">O</span>
               <span style={{ color: 'var(--text-secondary)' }}>{formatPrice(displayOhlc.open, decimals)}</span>
             </span>
-            <span className="text-[12px] font-mono">
-              <span className="opacity-30">H </span>
+            <span className="text-[11px] font-mono">
+              <span className="opacity-30">H</span>
               <span style={{ color: '#00C27A' }}>{formatPrice(displayOhlc.high, decimals)}</span>
             </span>
-            <span className="text-[12px] font-mono">
-              <span className="opacity-30">L </span>
+            <span className="text-[11px] font-mono">
+              <span className="opacity-30">L</span>
               <span style={{ color: '#C1121F' }}>{formatPrice(displayOhlc.low, decimals)}</span>
             </span>
-            <span className="text-[12px] font-mono">
-              <span className="opacity-30">C </span>
+            <span className="text-[11px] font-mono">
+              <span className="opacity-30">C</span>
               <span style={{ color: 'var(--text-secondary)' }}>{formatPrice(displayOhlc.close, decimals)}</span>
             </span>
           </div>
@@ -614,7 +623,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Divider */}
         <div
-          className="w-px h-4 mx-1 shrink-0"
+          className="w-px h-4 mx-0.5 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
         />
 
@@ -624,7 +633,7 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
             key={tf}
             onClick={() => setSelectedTf(tf)}
             className={cn(
-              'px-3 py-1.5 text-[12px] font-mono rounded transition-all shrink-0',
+              'px-2 py-1 text-[11px] font-mono rounded transition-all shrink-0',
               selectedTf === tf
                 ? 'font-bold opacity-100'
                 : 'opacity-40 hover:opacity-70'
@@ -640,75 +649,51 @@ export default function ChartPanel({ ohlcvBuilder }: ChartPanelProps) {
 
         {/* Divider */}
         <div
-          className="w-px h-4 mx-1 shrink-0"
+          className="w-px h-4 mx-0.5 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
         />
 
         {/* Chart type toggle */}
         <button
           onClick={() => setChartType(chartType === 'candlestick' ? 'line' : 'candlestick')}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity shrink-0',
-            'opacity-60 hover:opacity-90'
-          )}
+          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity opacity-60 hover:opacity-90 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
           title={chartType === 'candlestick' ? 'Switch to line' : 'Switch to candlestick'}
         >
           {chartType === 'candlestick' ? (
-            <CandlestickChart size={14} />
+            <CandlestickChart size={13} />
           ) : (
-            <TrendingUp size={14} />
+            <TrendingUp size={13} />
           )}
-          <span className="hidden sm:inline">
-            {chartType === 'candlestick' ? 'Candles' : 'Line'}
-          </span>
-        </button>
-
-        {/* Crosshair toggle */}
-        <button
-          onClick={() => setCrosshairEnabled(!crosshairEnabled)}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity shrink-0',
-            crosshairEnabled ? 'opacity-90' : 'opacity-40'
-          )}
-          style={{
-            backgroundColor: crosshairEnabled ? 'rgba(41,171,226,0.15)' : 'rgba(255,255,255,0.04)',
-          }}
-          title="Toggle crosshair"
-        >
-          <Crosshair size={14} />
         </button>
 
         {/* Indicators button */}
         <button
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity opacity-50 hover:opacity-80 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
           title="Indicators"
         >
-          <Filter size={14} />
-          <span className="hidden sm:inline">Indicators</span>
+          <Filter size={13} />
         </button>
 
         {/* Divider */}
         <div
-          className="w-px h-4 mx-1 shrink-0"
+          className="w-px h-4 mx-0.5 shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
         />
 
         {/* Undo / Redo */}
         <button
           className="flex items-center justify-center p-1 rounded transition-opacity opacity-30 hover:opacity-60 shrink-0"
-          style={{ backgroundColor: 'transparent' }}
           title="Undo"
         >
-          <Undo2 size={13} />
+          <Undo2 size={12} />
         </button>
         <button
           className="flex items-center justify-center p-1 rounded transition-opacity opacity-30 hover:opacity-60 shrink-0"
-          style={{ backgroundColor: 'transparent' }}
           title="Redo"
         >
-          <Redo2 size={13} />
+          <Redo2 size={12} />
         </button>
       </div>
 
