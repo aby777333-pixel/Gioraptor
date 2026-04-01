@@ -292,6 +292,18 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [crosshairEnabled, setCrosshairEnabled] = useState(true);
 
+  // Listen for timeframe change events from keyboard shortcuts
+  useEffect(() => {
+    function handleTfChange(e: Event) {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail && timeframes.includes(detail as typeof timeframes[number])) {
+        setSelectedTf(detail);
+      }
+    }
+    window.addEventListener('raptor-timeframe-change', handleTfChange);
+    return () => window.removeEventListener('raptor-timeframe-change', handleTfChange);
+  }, []);
+
   // Indicator state
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(new Set());

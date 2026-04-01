@@ -17,9 +17,13 @@ import {
   PieChart,
   Activity,
   Search,
+  Bell,
+  BarChart3,
+  Grid3X3,
 } from 'lucide-react';
 import Link from 'next/link';
 import VoiceTrading from '@/components/trading/VoiceTrading';
+import AlertsPanel from '@/components/trading/alerts/AlertsPanel';
 import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 import { createClient } from '@/lib/supabase/client';
@@ -39,6 +43,8 @@ export default function TopBar() {
   const [latency, setLatency] = useState(18);
   const [speed] = useState(13.3);
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
+  const [alertCount] = useState(0);
 
   const accountRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +161,8 @@ export default function TopBar() {
   const helpMenuItems = [
     { href: '/terminal/ea-builder', icon: <Bot size={14} />, label: 'EA Builder' },
     { href: '/terminal/signals', icon: <Brain size={14} />, label: 'AI Signals' },
+    { href: '/terminal/analytics', icon: <BarChart3 size={14} />, label: 'Analytics' },
+    { href: '/terminal/heatmap', icon: <Grid3X3 size={14} />, label: 'Heatmap' },
     { href: '/terminal/calendar', icon: <Calendar size={14} />, label: 'Calendar' },
     { href: '/terminal/news', icon: <Newspaper size={14} />, label: 'News' },
     { href: '/terminal/copy-trading', icon: <Users size={14} />, label: 'Copy Trading' },
@@ -278,6 +286,27 @@ export default function TopBar() {
         >
           {theme === 'dark' ? <Sun size={16} className="opacity-60" /> : <Moon size={16} className="opacity-60" />}
         </button>
+
+        {/* Price Alerts */}
+        <div className="relative">
+          <button
+            onClick={() => setAlertsPanelOpen(!alertsPanelOpen)}
+            className="p-2 rounded hover:opacity-70 transition-opacity"
+            title="Price Alerts"
+            style={alertsPanelOpen ? { color: '#29ABE2' } : undefined}
+          >
+            <Bell size={16} className={alertsPanelOpen ? '' : 'opacity-50'} />
+            {alertCount > 0 && (
+              <span
+                className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[9px] font-bold rounded-full"
+                style={{ width: 16, height: 16, backgroundColor: '#29ABE2', color: '#000' }}
+              >
+                {alertCount}
+              </span>
+            )}
+          </button>
+          <AlertsPanel isOpen={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} />
+        </div>
 
         {/* Voice Trading */}
         <button

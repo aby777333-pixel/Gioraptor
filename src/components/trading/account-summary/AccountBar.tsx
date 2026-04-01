@@ -1,7 +1,72 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTradingStore } from '@/stores/trading';
 import { formatCurrency } from '@/lib/utils/format';
+
+/* ─── Session definitions (UTC hours) ─── */
+
+interface Session {
+  label: string;
+  code: string;
+  color: string;
+  startUtc: number;
+  endUtc: number;
+}
+
+const SESSIONS: Session[] = [
+  { label: 'Sydney', code: 'SYD', color: '#00C853', startUtc: 22, endUtc: 7 },
+  { label: 'Tokyo', code: 'TYO', color: '#FFC107', startUtc: 0, endUtc: 9 },
+  { label: 'London', code: 'LON', color: '#29ABE2', startUtc: 8, endUtc: 17 },
+  { label: 'New York', code: 'NYC', color: '#FF9800', startUtc: 13, endUtc: 22 },
+];
+
+function isSessionActive(session: Session, utcHour: number): boolean {
+  if (session.startUtc < session.endUtc) {
+    return utcHour >= session.startUtc && utcHour < session.endUtc;
+  }
+  // Wraps midnight (e.g. Sydney 22-07)
+  return utcHour >= session.startUtc || utcHour < session.endUtc;
+}
+
+function SessionIndicators() {
+  const [utcHour, setUtcHour] = useState(() => new Date().getUTCHours());
+
+  useEffect(() => {
+    const iv = setInterval(() => setUtcHour(new Date().getUTCHours()), 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {SESSIONS.map((s) => {
+        const active = isSessionActive(s, utcHour);
+        return (
+          <div
+            key={s.code}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+            style={{
+              backgroundColor: active ? `${s.color}15` : 'transparent',
+              opacity: active ? 1 : 0.3,
+            }}
+            title={`${s.label} (${s.startUtc}:00-${s.endUtc}:00 UTC)`}
+          >
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: s.color, opacity: active ? 1 : 0.3 }}
+            />
+            <span
+              className="text-[10px] font-bold"
+              style={{ color: active ? s.color : 'rgba(255,255,255,0.3)' }}
+            >
+              {s.code}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AccountBar() {
   const { accountSummary } = useTradingStore();
@@ -20,7 +85,7 @@ export default function AccountBar() {
 
   return (
     <div
-      className="flex items-center justify-center gap-6 px-4 select-none"
+      className="flex items-center justify-between px-4 select-none"
       style={{
         height: 32,
         backgroundColor: 'var(--bg-primary)',
@@ -28,26 +93,35 @@ export default function AccountBar() {
         fontSize: 12,
       }}
     >
-      <Item label="Account Currency" value="USD" />
-      <Sep />
-      <Item label="Balance" value={formatCurrency(balance)} />
-      <Sep />
-      <Item label="Equity" value={formatCurrency(equity)} />
-      <Sep />
-      <Item label="Margin" value={formatCurrency(margin_used)} />
-      <Sep />
-      <Item label="Free Margin" value={formatCurrency(free_margin)} />
-      <Sep />
-      <Item
-        label="Margin Level"
-        value={margin_level_pct > 0 ? `${margin_level_pct.toFixed(2)}%` : '--'}
-      />
-      <Sep />
-      <Item
-        label="Net P&L"
-        value={`${pnlSign}${formatCurrency(floating_pnl)}`}
-        valueColor={pnlColor}
-      />
+      {/* Left: Session indicators */}
+      <SessionIndicators />
+
+      {/* Center: Account stats */}
+      <div className="flex items-center gap-6">
+        <Item label="Balance" value={formatCurrency(balance)} />
+        <Sep />
+        <Item label="Equity" value={formatCurrency(equity)} />
+        <Sep />
+        <Item label="Margin" value={formatCurrency(margin_used)} />
+        <Sep />
+        <Item label="Free Margin" value={formatCurrency(free_margin)} />
+        <Sep />
+        <Item
+          label="Margin Level"
+          value={margin_level_pct > 0 ? `${margin_level_pct.toFixed(2)}%` : '--'}
+        />
+        <Sep />
+        <Item
+          label="Net P&L"
+          value={`${pnlSign}${formatCurrency(floating_pnl)}`}
+          valueColor={pnlColor}
+        />
+      </div>
+
+      {/* Right: Currency label */}
+      <div className="flex items-center gap-1 opacity-40 text-[11px]">
+        <span>USD</span>
+      </div>
     </div>
   );
 }
