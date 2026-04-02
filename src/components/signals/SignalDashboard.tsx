@@ -20,6 +20,7 @@ import {
   type TradingSignal,
 } from '@/lib/trading/signal-engine';
 import { useTradingStore } from '@/stores/trading';
+import { orderService } from '@/lib/trading/order-service';
 import { cn } from '@/lib/utils/format';
 
 type AssetFilter = 'all' | 'forex' | 'metal' | 'crypto' | 'index';
@@ -81,18 +82,32 @@ export default function SignalDashboard() {
   }, [lastScan]);
 
   const handleExecute = useCallback(
-    (signal: TradingSignal) => {
-      // In a real implementation this would call orderService
-      console.log('[Signal Execute]', {
-        accountId: activeAccountId,
-        symbol: signal.symbol,
-        direction: signal.direction,
-        entry: signal.entry,
-        sl: signal.sl,
-        tp: signal.tp,
-      });
+    async (signal: TradingSignal) => {
+      if (!activeAccountId) {
+        alert('No active account selected');
+        return;
+      }
+      const tick = prices[signal.symbol];
+      const fillPrice = tick
+        ? (signal.direction === 'BUY' ? tick.ask : tick.bid)
+        : signal.entry;
+
+      try {
+        await orderService.placeMarketOrder({
+          accountId: activeAccountId,
+          symbol: signal.symbol,
+          direction: signal.direction,
+          size: 0.01,
+          sl: signal.sl,
+          tp: signal.tp,
+          fillPrice,
+          comment: `AI Signal: ${signal.reasoning?.slice(0, 50)}`,
+        });
+      } catch (err) {
+        console.error('[Signal Execute Error]', err);
+      }
     },
-    [activeAccountId]
+    [activeAccountId, prices]
   );
 
   // Apply filters and sort

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import TopBar from '@/components/layout/TopBar';
 import CalendarEventComponent from '@/components/calendar/CalendarEvent';
 import { generateCalendarEvents, CURRENCY_COLORS } from '@/lib/trading/calendar-data';
 import type { CalendarImpact } from '@/lib/trading/calendar-data';
@@ -65,34 +65,8 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      {/* Header */}
-      <div
-        className="flex items-center gap-3 px-4 shrink-0"
-        style={{
-          height: 48,
-          backgroundColor: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        <Link
-          href="/terminal"
-          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-opacity hover:opacity-70"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <ArrowLeft size={14} />
-          Terminal
-        </Link>
-        <div style={{ width: 1, height: 20, backgroundColor: 'var(--border)' }} />
-        <Calendar size={16} style={{ color: '#0091D5' }} />
-        <h1 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-          Economic Calendar
-        </h1>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1 text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-          {filteredEvents.length} events
-        </div>
-      </div>
+    <div className="h-screen w-screen overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <TopBar />
 
       {/* Date navigation */}
       <div

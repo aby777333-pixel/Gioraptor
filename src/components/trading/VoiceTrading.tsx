@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, X, Check, AlertCircle, Volume2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
+import { orderService } from '@/lib/trading/order-service';
 import { cn } from '@/lib/utils/format';
 
 /* ── Global type augmentation for Web Speech API ── */
@@ -314,37 +315,73 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     recognition.start();
   }, []);
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     if (!parsed) return;
 
-    if (parsed.action === 'buy' || parsed.action === 'sell') {
-      const tick = parsed.symbol ? prices[parsed.symbol] : null;
-      const fillPrice =
-        tick ? (parsed.action === 'buy' ? tick.ask : tick.bid) : 0;
+    try {
+      if (parsed.action === 'buy' || parsed.action === 'sell') {
+        const tick = parsed.symbol ? prices[parsed.symbol] : null;
+        const fillPrice = tick ? (parsed.action === 'buy' ? tick.ask : tick.bid) : 0;
 
-      console.log('[Voice Trade]', {
-        accountId: activeAccountId,
-        symbol: parsed.symbol,
-        direction: parsed.action.toUpperCase(),
-        size: parsed.size,
-        fillPrice,
-      });
-      setFeedback(`Order placed: ${parsed.displayText}`);
-    } else if (parsed.action === 'close') {
-      console.log('[Voice Close]', { symbol: parsed.symbol });
-      setFeedback(`Closing position: ${parsed.symbol}`);
-    } else if (parsed.action === 'close_all') {
-      console.log('[Voice Close All]');
-      setFeedback('Closing all positions');
-    } else if (parsed.action === 'price') {
-      const tick = parsed.symbol ? prices[parsed.symbol] : null;
-      if (tick) {
-        setFeedback(`${parsed.symbol}: Bid ${tick.bid} / Ask ${tick.ask}`);
-      } else {
-        setFeedback(`Price not available for ${parsed.symbol}`);
+        if (!activeAccountId) {
+          setFeedback('No active account selected');
+          setState('idle');
+          setParsed(null);
+          return;
+        }
+
+        if (!fillPrice) {
+          setFeedback(`No price available for ${parsed.symbol}`);
+          setState('idle');
+          setParsed(null);
+          return;
+        }
+
+        await orderService.placeMarketOrder({
+          accountId: activeAccountId,
+          symbol: parsed.symbol!,
+          direction: parsed.action.toUpperCase() as 'BUY' | 'SELL',
+          size: parsed.size!,
+          fillPrice,
+          comment: 'Voice order',
+        });
+        setFeedback(`Order executed: ${parsed.displayText}`);
+      } else if (parsed.action === 'close') {
+        // Find the open position for this symbol and close it
+        const positions = await orderService.getOpenPositions(activeAccountId!);
+        const pos = positions?.find((p: Record<string, unknown>) => p.symbol === parsed.symbol);
+        if (pos) {
+          const tick = prices[parsed.symbol!];
+          const closePrice = tick ? (pos.direction === 'BUY' ? tick.bid : tick.ask) : 0;
+          await orderService.closePosition(pos.id as string, closePrice);
+          setFeedback(`Closed ${parsed.symbol} position`);
+        } else {
+          setFeedback(`No open position found for ${parsed.symbol}`);
+        }
+      } else if (parsed.action === 'close_all') {
+        const positions = await orderService.getOpenPositions(activeAccountId!);
+        if (positions && positions.length > 0) {
+          for (const pos of positions) {
+            const tick = prices[(pos as Record<string, unknown>).symbol as string];
+            const closePrice = tick ? ((pos as Record<string, unknown>).direction === 'BUY' ? tick.bid : tick.ask) : 0;
+            await orderService.closePosition((pos as Record<string, unknown>).id as string, closePrice);
+          }
+          setFeedback(`Closed ${positions.length} positions`);
+        } else {
+          setFeedback('No open positions to close');
+        }
+      } else if (parsed.action === 'price') {
+        const tick = parsed.symbol ? prices[parsed.symbol] : null;
+        if (tick) {
+          setFeedback(`${parsed.symbol}: Bid ${tick.bid.toFixed(5)} / Ask ${tick.ask.toFixed(5)}`);
+        } else {
+          setFeedback(`Price not available for ${parsed.symbol}`);
+        }
+      } else if (parsed.action === 'positions') {
+        setFeedback('Showing open positions panel');
       }
-    } else if (parsed.action === 'positions') {
-      setFeedback('Showing open positions panel');
+    } catch (err) {
+      setFeedback(`Error: ${err instanceof Error ? err.message : 'Order failed'}`);
     }
 
     setState('idle');

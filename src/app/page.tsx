@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import HeroShaderBg from '@/components/HeroShaderBg';
 
 const features = [
   {
@@ -110,11 +113,12 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pt-16">
-        {/* Gradient background */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,145,213,0.08)_0%,_transparent_60%)]" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#0091D5]/[0.04] blur-[120px] rounded-full" />
+        {/* WebGL Shader Background */}
+        <HeroShaderBg />
+        {/* Overlay gradient for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#060D16]/60 via-transparent to-[#060D16]/90" style={{ zIndex: 1 }} />
 
-        <div className="relative z-10 mx-auto max-w-5xl text-center">
+        <div className="relative mx-auto max-w-5xl text-center" style={{ zIndex: 2 }}>
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#0091D5]/20 bg-[#0091D5]/[0.06] px-5 py-2 text-sm text-[#0091D5]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#0091D5] animate-pulse" />
             Raptor Trading System v2.0
@@ -152,7 +156,7 @@ export default function Home() {
         </div>
 
         {/* Stats bar */}
-        <div className="relative z-10 mt-20 w-full max-w-4xl">
+        <div className="relative mt-20 w-full max-w-4xl" style={{ zIndex: 2 }}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col items-center gap-1 py-6 px-4">

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Users, Search, SlidersHorizontal, ArrowUpDown, Clock, UserPlus } from 'lucide-react';
+import TopBar from '@/components/layout/TopBar';
 import ProviderCard from '@/components/copy-trading/ProviderCard';
 import CopySettings from '@/components/copy-trading/CopySettings';
 import MySubscriptions from '@/components/copy-trading/MySubscriptions';
@@ -60,10 +61,11 @@ export default function CopyTradingPage() {
   }, [search, sortBy, timeframe]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#060D16' }}>
+    <div className="h-screen w-screen overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <TopBar />
       {/* Header */}
       <div
-        className="border-b px-6 py-5"
+        className="border-b px-6 py-5 shrink-0"
         style={{ borderColor: 'rgba(255,255,255,0.06)' }}
       >
         <div className="flex items-center gap-3 mb-1">

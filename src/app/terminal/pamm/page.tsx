@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { PieChart, Search, ArrowUpDown, Briefcase, BarChart3 } from 'lucide-react';
+import TopBar from '@/components/layout/TopBar';
 import FundCard from '@/components/pamm/FundCard';
 import InvestModal from '@/components/pamm/InvestModal';
 import MyInvestments from '@/components/pamm/MyInvestments';
@@ -52,10 +53,11 @@ export default function PAMMPage() {
   }, [search, sortBy]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#060D16' }}>
+    <div className="h-screen w-screen overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <TopBar />
       {/* Header */}
       <div
-        className="border-b px-6 py-5"
+        className="border-b px-6 py-5 shrink-0"
         style={{ borderColor: 'rgba(255,255,255,0.06)' }}
       >
         <div className="flex items-center gap-3 mb-1">

@@ -27,6 +27,34 @@ export default function EABuilderPage() {
   const [hasResults, setHasResults] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deployed, setDeployed] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+
+  const handleDeploy = useCallback(async () => {
+    setDeploying(true);
+    try {
+      // Save EA config to Supabase ea_instances table
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('ea_instances').upsert({
+          user_id: user.id,
+          name: strategyName,
+          code: code,
+          status: 'running',
+          config: { editorTab },
+          created_at: new Date().toISOString(),
+        });
+      }
+      setDeployed(true);
+      setTimeout(() => setDeployed(false), 3000);
+    } catch (err) {
+      console.error('Deploy error:', err);
+    } finally {
+      setDeploying(false);
+    }
+  }, [strategyName, code, editorTab]);
 
   const handleRunBacktest = useCallback(() => {
     setIsRunning(true);
@@ -141,15 +169,18 @@ export default function EABuilderPage() {
           </button>
 
           <button
+            onClick={handleDeploy}
+            disabled={deploying}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-semibold transition-all hover:brightness-125"
             style={{
-              backgroundColor: '#00C85320',
+              backgroundColor: deployed ? '#00C85340' : '#00C85320',
               color: '#00C853',
-              border: '1px solid #00C85340',
+              border: `1px solid ${deployed ? '#00C85360' : '#00C85340'}`,
+              cursor: deploying ? 'not-allowed' : 'pointer',
             }}
           >
             <Rocket size={12} />
-            Deploy to Live
+            {deploying ? 'Deploying...' : deployed ? 'Deployed!' : 'Deploy to Live'}
           </button>
         </div>
       </div>

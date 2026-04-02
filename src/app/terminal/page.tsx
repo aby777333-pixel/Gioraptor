@@ -89,52 +89,60 @@ export default function TerminalPage() {
   }, [handleKeyDown]);
 
   return (
-    <div
-      className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)]"
-      style={{
-        display: 'grid',
-        gridTemplateRows: '44px 1fr 200px 30px',
-        gridTemplateColumns: '240px 1fr 280px',
-      }}
-    >
-      {/* TopBar - spans full width */}
-      <div
-        className="border-b border-[var(--border)]"
-        style={{ gridColumn: '1 / -1' }}
-      >
+    <div className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)] flex flex-col">
+      {/* TopBar */}
+      <div className="border-b border-[var(--border)] shrink-0">
         <TopBar />
       </div>
 
-      {/* Watchlist - left sidebar */}
-      <div className="border-r border-[var(--border)] overflow-hidden">
-        <Watchlist />
-      </div>
-
-      {/* ChartPanel - center, fills remaining space */}
-      <div className="overflow-hidden">
-        <ChartPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
-      </div>
-
-      {/* Right Panel - Order Ticket + Account + Tools */}
-      <div className="border-l border-[var(--border)] overflow-hidden">
-        <RightPanel />
-      </div>
-
-      {/* PositionsPanel - spans full width */}
+      {/* Main content - responsive grid */}
       <div
-        className="border-t border-[var(--border)] overflow-hidden"
-        style={{ gridColumn: '1 / -1' }}
+        className="flex-1 overflow-hidden"
+        style={{
+          display: 'grid',
+          gridTemplateRows: '1fr 200px 30px',
+          gridTemplateColumns: '240px 1fr 280px',
+        }}
       >
-        <PositionsPanel />
+        {/* Watchlist - left sidebar (hidden on mobile) */}
+        <div className="border-r border-[var(--border)] overflow-hidden hidden lg:block">
+          <Watchlist />
+        </div>
+
+        {/* ChartPanel - center */}
+        <div className="overflow-hidden" style={{ gridColumn: 'span 1' }}>
+          <ChartPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
+        </div>
+
+        {/* Right Panel (hidden on mobile) */}
+        <div className="border-l border-[var(--border)] overflow-hidden hidden xl:block">
+          <RightPanel />
+        </div>
+
+        {/* PositionsPanel - spans full width */}
+        <div className="border-t border-[var(--border)] overflow-hidden" style={{ gridColumn: '1 / -1' }}>
+          <PositionsPanel />
+        </div>
+
+        {/* AccountBar - spans full width */}
+        <div className="border-t border-[var(--border)] overflow-hidden" style={{ gridColumn: '1 / -1' }}>
+          <AccountBar />
+        </div>
       </div>
 
-      {/* AccountBar - spans full width */}
-      <div
-        className="border-t border-[var(--border)] overflow-hidden"
-        style={{ gridColumn: '1 / -1' }}
-      >
-        <AccountBar />
-      </div>
+      {/* Mobile-only: make chart take full width */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 1023px) {
+          [style*="grid-template-columns: 240px"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (min-width: 1024px) and (max-width: 1279px) {
+          [style*="grid-template-columns: 240px"] {
+            grid-template-columns: 200px 1fr !important;
+          }
+        }
+      `}} />
 
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
