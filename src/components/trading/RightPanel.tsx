@@ -41,8 +41,8 @@ export default function RightPanel() {
         {activeTab === 'tools' && (
           <div className="flex flex-col h-full">
             <TradingTools />
-            {/* Market Overview Widget */}
-            <MarketOverviewWidget />
+            {/* Bloomberg TV Live */}
+            <LiveTVPanel />
           </div>
         )}
       </div>
@@ -144,81 +144,34 @@ function AccountSummaryPanel() {
   );
 }
 
-function MarketOverviewWidget() {
-  const containerId = 'tv-market-overview';
-
-  useState(() => {
-    if (typeof window === 'undefined') return;
-    const timer = setTimeout(() => {
-      const container = document.getElementById(containerId);
-      if (!container || container.querySelector('script')) return;
-      const script = document.createElement('script');
-      script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js';
-      script.async = true;
-      script.textContent = JSON.stringify({
-        colorTheme: 'dark',
-        dateRange: '1D',
-        showChart: false,
-        locale: 'en',
-        largeChartUrl: '',
-        isTransparent: true,
-        showSymbolLogo: true,
-        showFloatingTooltip: false,
-        width: '100%',
-        height: '100%',
-        tabs: [
-          {
-            title: 'Forex',
-            symbols: [
-              { s: 'FX:EURUSD', d: 'EUR/USD' },
-              { s: 'FX:GBPUSD', d: 'GBP/USD' },
-              { s: 'FX:USDJPY', d: 'USD/JPY' },
-              { s: 'FX:AUDUSD', d: 'AUD/USD' },
-            ],
-            originalTitle: 'Forex',
-          },
-          {
-            title: 'Indices',
-            symbols: [
-              { s: 'FOREXCOM:SPXUSD', d: 'S&P 500' },
-              { s: 'FOREXCOM:NSXUSD', d: 'Nasdaq' },
-              { s: 'INDEX:DXY', d: 'Dollar Index' },
-            ],
-            originalTitle: 'Indices',
-          },
-          {
-            title: 'Crypto',
-            symbols: [
-              { s: 'COINBASE:BTCUSD', d: 'BTC/USD' },
-              { s: 'COINBASE:ETHUSD', d: 'ETH/USD' },
-              { s: 'BINANCE:SOLUSDT', d: 'SOL/USDT' },
-            ],
-            originalTitle: 'Crypto',
-          },
-        ],
-      });
-      container.appendChild(script);
-    }, 100);
-    return () => clearTimeout(timer);
-  });
-
+function LiveTVPanel() {
   return (
     <div className="p-3 flex flex-col gap-2">
       <div
         className="flex items-center gap-1.5 py-1 px-2 text-[10px] uppercase tracking-wider font-semibold"
         style={{ color: 'var(--text-muted)' }}
       >
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00C896]" />
-        Market Overview
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: '#FF0000' }}
+        />
+        Bloomberg TV Live
       </div>
       <div
-        className="tradingview-widget-container rounded-lg overflow-hidden"
-        id={containerId}
+        className="rounded-lg overflow-hidden"
         style={{
-          height: 220,
           border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         }}
-      />
+      >
+        <iframe
+          src="https://www.bloomberg.com/media/embed/video/live/us"
+          title="Bloomberg TV Live"
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+          style={{ width: '100%', height: 180, border: 'none', backgroundColor: '#000' }}
+        />
+      </div>
     </div>
   );
 }
