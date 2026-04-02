@@ -145,46 +145,28 @@ function AccountSummaryPanel() {
 }
 
 function LiveTVPanel() {
-  const [channel, setChannel] = useState<'bloomberg' | 'aljazeera' | 'france24'>('bloomberg');
-
-  const channels = {
-    bloomberg: {
-      label: 'Bloomberg TV',
-      src: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1',
-    },
-    aljazeera: {
-      label: 'Al Jazeera',
-      src: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1',
-    },
-    france24: {
-      label: 'France 24',
-      src: 'https://www.youtube.com/embed/u9rlYS2oSTk?autoplay=1&mute=1',
-    },
-  };
-
-  type ChannelKey = keyof typeof channels;
-  const active = channels[channel];
+  const [channel, setChannel] = useState<'cnbc' | 'bloomberg'>('cnbc');
 
   return (
     <div className="p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between py-1 px-2">
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
           <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
-          {active.label} Live
+          {channel === 'cnbc' ? 'CNBC' : 'Bloomberg'} Live
         </div>
         <div className="flex gap-1">
-          {(Object.keys(channels) as ChannelKey[]).map((ch) => (
+          {(['cnbc', 'bloomberg'] as const).map((ch) => (
             <button
               key={ch}
               onClick={() => setChannel(ch)}
-              className="text-[9px] px-1.5 py-0.5 rounded transition-all"
+              className="text-[9px] px-1.5 py-0.5 rounded transition-all uppercase"
               style={{
                 backgroundColor: channel === ch ? 'var(--accent)' : 'var(--bg-elevated)',
                 color: channel === ch ? '#000' : 'var(--text-muted)',
                 fontWeight: channel === ch ? 700 : 400,
               }}
             >
-              {channels[ch].label}
+              {ch}
             </button>
           ))}
         </div>
@@ -193,14 +175,25 @@ function LiveTVPanel() {
         className="rounded-lg overflow-hidden"
         style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
       >
-        <iframe
-          key={channel}
-          src={active.src}
-          title={`${active.label} Live`}
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
-        />
+        {channel === 'cnbc' ? (
+          <iframe
+            key="cnbc"
+            src="https://player.cnbc.com/p/gZWlPC/cnbc_global?playertype=synd&byGuid=7000484316"
+            title="CNBC Live"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
+          />
+        ) : (
+          <iframe
+            key="bloomberg"
+            src="https://www.bloomberg.com/media-manifest/embed/stream"
+            title="Bloomberg Live"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
+          />
+        )}
       </div>
     </div>
   );

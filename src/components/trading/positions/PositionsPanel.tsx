@@ -444,7 +444,7 @@ export default function PositionsPanel() {
             <div
               className="fixed rounded-lg shadow-2xl py-3 px-4"
               style={{
-                top: (settingsRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                bottom: window.innerHeight - (settingsRef.current?.getBoundingClientRect().top ?? 0) + 4,
                 right: window.innerWidth - (settingsRef.current?.getBoundingClientRect().right ?? 0),
                 zIndex: 9999,
                 backgroundColor: '#111118',
