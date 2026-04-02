@@ -145,19 +145,53 @@ function AccountSummaryPanel() {
 }
 
 function LiveTVPanel() {
+  const [channel, setChannel] = useState<'bloomberg' | 'yahoo'>('bloomberg');
+
+  const channels = {
+    bloomberg: {
+      label: 'Bloomberg TV',
+      src: 'https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ68-rmLjb5A&autoplay=1&mute=1',
+    },
+    yahoo: {
+      label: 'Yahoo Finance',
+      src: 'https://www.youtube.com/embed/live_stream?channel=UCEAZeUIeJs0IjQiqTCdVSIg&autoplay=1&mute=1',
+    },
+  };
+
+  const active = channels[channel];
+
   return (
     <div className="p-3 flex flex-col gap-2">
-      <div className="flex items-center gap-1.5 py-1 px-2 text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
-        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
-        Bloomberg TV Live
+      <div className="flex items-center justify-between py-1 px-2">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
+          <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
+          {active.label} Live
+        </div>
+        <div className="flex gap-1">
+          {(Object.keys(channels) as Array<'bloomberg' | 'yahoo'>).map((ch) => (
+            <button
+              key={ch}
+              onClick={() => setChannel(ch)}
+              className="text-[9px] px-1.5 py-0.5 rounded transition-all"
+              style={{
+                backgroundColor: channel === ch ? 'var(--accent)' : 'var(--bg-elevated)',
+                color: channel === ch ? '#000' : 'var(--text-muted)',
+                fontWeight: channel === ch ? 700 : 400,
+              }}
+            >
+              {channels[ch].label}
+            </button>
+          ))}
+        </div>
       </div>
       <div
         className="rounded-lg overflow-hidden"
         style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
       >
         <iframe
-          src="https://www.bloomberg.com/media/embed/video/live/us"
-          title="Bloomberg TV Live"
+          key={channel}
+          src={active.src}
+          title={`${active.label} Live`}
           allow="autoplay; encrypted-media"
           allowFullScreen
           style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
