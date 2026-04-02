@@ -155,7 +155,7 @@ function LiveTVPanel() {
           className="inline-block w-1.5 h-1.5 rounded-full"
           style={{ backgroundColor: '#FF0000' }}
         />
-        Bloomberg TV Live
+        Al Jazeera Business Live
       </div>
       <div
         className="rounded-lg overflow-hidden"
@@ -165,8 +165,8 @@ function LiveTVPanel() {
         }}
       >
         <iframe
-          src="https://www.bloomberg.com/media/embed/video/live/us"
-          title="Bloomberg TV Live"
+          src="https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1"
+          title="Al Jazeera English Live"
           allow="autoplay; encrypted-media"
           allowFullScreen
           style={{ width: '100%', height: 180, border: 'none', backgroundColor: '#000' }}
