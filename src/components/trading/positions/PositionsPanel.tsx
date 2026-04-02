@@ -442,9 +442,11 @@ export default function PositionsPanel() {
 
           {showTableSettings && (
             <div
-              className="absolute right-0 rounded-lg shadow-2xl py-3 px-4 z-50"
+              className="fixed rounded-lg shadow-2xl py-3 px-4"
               style={{
-                top: 36,
+                top: (settingsRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                right: window.innerWidth - (settingsRef.current?.getBoundingClientRect().right ?? 0),
+                zIndex: 9999,
                 backgroundColor: '#111118',
                 border: '1px solid rgba(255,255,255,0.08)',
                 minWidth: 220,

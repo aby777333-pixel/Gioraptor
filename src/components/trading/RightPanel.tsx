@@ -145,19 +145,24 @@ function AccountSummaryPanel() {
 }
 
 function LiveTVPanel() {
-  const [channel, setChannel] = useState<'bloomberg' | 'yahoo'>('bloomberg');
+  const [channel, setChannel] = useState<'bloomberg' | 'aljazeera' | 'france24'>('bloomberg');
 
   const channels = {
     bloomberg: {
       label: 'Bloomberg TV',
-      src: 'https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ68-rmLjb5A&autoplay=1&mute=1',
+      src: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1',
     },
-    yahoo: {
-      label: 'Yahoo Finance',
-      src: 'https://www.youtube.com/embed/live_stream?channel=UCEAZeUIeJs0IjQiqTCdVSIg&autoplay=1&mute=1',
+    aljazeera: {
+      label: 'Al Jazeera',
+      src: 'https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1',
+    },
+    france24: {
+      label: 'France 24',
+      src: 'https://www.youtube.com/embed/u9rlYS2oSTk?autoplay=1&mute=1',
     },
   };
 
+  type ChannelKey = keyof typeof channels;
   const active = channels[channel];
 
   return (
@@ -168,7 +173,7 @@ function LiveTVPanel() {
           {active.label} Live
         </div>
         <div className="flex gap-1">
-          {(Object.keys(channels) as Array<'bloomberg' | 'yahoo'>).map((ch) => (
+          {(Object.keys(channels) as ChannelKey[]).map((ch) => (
             <button
               key={ch}
               onClick={() => setChannel(ch)}

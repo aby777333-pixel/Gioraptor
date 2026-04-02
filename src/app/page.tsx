@@ -89,10 +89,11 @@ export default function Home() {
             <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 36 }} />
             <span className="text-sm font-semibold tracking-wide text-[#7A8BA8]">RAPTOR</span>
           </div>
-          <div className="hidden sm:flex items-center gap-8 text-sm text-[#7A8BA8]">
+          <div className="hidden md:flex items-center gap-6 text-sm text-[#7A8BA8]">
             <a href="#features" className="transition-colors hover:text-white">Platform</a>
-            <a href="#modules" className="transition-colors hover:text-white">Modules</a>
-            <a href="#technology" className="transition-colors hover:text-white">Technology</a>
+            <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
+            <Link href="/developer" className="transition-colors hover:text-white">Developers</Link>
+            <Link href="/blog" className="transition-colors hover:text-white">Blog</Link>
             <Link href="/about" className="transition-colors hover:text-white">About</Link>
             <Link href="/contact" className="transition-colors hover:text-white">Contact</Link>
           </div>
@@ -638,33 +639,30 @@ export default function Home() {
                 {[
                   { label: 'White Label', href: '/features/white-label' },
                   { label: 'Risk Management', href: '/features/risk-management' },
-                  { label: 'About Us', href: '/about' },
-                  { label: 'Contact', href: '/contact' },
+                  { label: 'Sandbox', href: '/sandbox' },
+                  { label: 'Partners', href: '/partners' },
+                  { label: 'Contact Sales', href: '/contact?type=broker' },
                 ].map((l) => (
                   <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>
 
-            {/* Contact */}
+            {/* Resources */}
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Contact</div>
-              <div className="space-y-3 text-xs text-[#4A5568]">
-                <div>
-                  <div className="text-[#7A8BA8] font-semibold mb-1">Head Office</div>
-                  <div>Lorem ipsum dolor sit amet</div>
-                  <div>Consectetur adipiscing elit</div>
-                  <div>Sed do eiusmod tempor</div>
-                  <div className="mt-1 text-[#0091D5]">+1 111 111 1111</div>
-                </div>
-                <div>
-                  <div className="text-[#7A8BA8] font-semibold mb-1">Regional Office</div>
-                  <div>Ut enim ad minim veniam</div>
-                  <div>Quis nostrud exercitation</div>
-                  <div>Ullamco laboris nisi</div>
-                  <div className="mt-1 text-[#0091D5]">+1 111 111 1111</div>
-                </div>
-                <div className="text-[#0091D5]">support@gio4xraptor.com</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Resources</div>
+              <div className="space-y-2.5 text-xs text-[#4A5568]">
+                {[
+                  { label: 'Pricing', href: '/pricing' },
+                  { label: 'Developer Portal', href: '/developer' },
+                  { label: 'Blog', href: '/blog' },
+                  { label: 'Changelog', href: '/changelog' },
+                  { label: 'System Status', href: '/status' },
+                  { label: 'About Us', href: '/about' },
+                  { label: 'Contact', href: '/contact' },
+                ].map((l) => (
+                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
+                ))}
               </div>
             </div>
           </div>
