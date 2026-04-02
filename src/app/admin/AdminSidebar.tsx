@@ -2,31 +2,58 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import {
   LayoutDashboard,
-  Users,
-  Wallet,
-  TrendingUp,
-  FileText,
-  Settings,
-  Shield,
-  BarChart3,
+  Building2,
+  Activity,
+  DollarSign,
+  Receipt,
+  Waves,
+  ToggleLeft,
+  Database,
+  Rocket,
+  FlaskConical,
+  ShieldCheck,
+  Fingerprint,
+  Lock,
+  ScrollText,
+  PanelLeftClose,
+  PanelLeft,
   LogOut,
+  Bell,
 } from 'lucide-react';
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+}
+
+const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/accounts', label: 'Accounts', icon: Wallet },
-  { href: '/admin/positions', label: 'Positions', icon: TrendingUp },
-  { href: '/admin/orders', label: 'Orders', icon: FileText },
-  { href: '/admin/instruments', label: 'Instruments', icon: BarChart3 },
-  { href: '/admin/risk', label: 'Risk Management', icon: Shield },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/brokers', label: 'Brokers', icon: Building2 },
+  { href: '/admin/health', label: 'System Health', icon: Activity },
+  { href: '/admin/revenue', label: 'Revenue', icon: DollarSign },
+  { href: '/admin/billing', label: 'Billing', icon: Receipt },
+  { href: '/admin/liquidity', label: 'Liquidity', icon: Waves },
+  { href: '/admin/features', label: 'Features', icon: ToggleLeft },
+  { href: '/admin/warehouse', label: 'Warehouse', icon: Database },
+  { href: '/admin/releases', label: 'Releases', icon: Rocket },
+  { href: '/admin/sandbox', label: 'Sandbox', icon: FlaskConical },
+  { href: '/admin/dr', label: 'DR', icon: ShieldCheck },
+  { href: '/admin/identity', label: 'Identity', icon: Fingerprint },
+  { href: '/admin/privacy', label: 'Privacy', icon: Lock },
+  { href: '/admin/logs', label: 'Logs', icon: ScrollText },
 ];
 
-export function AdminSidebar({ userEmail }: { userEmail: string }) {
+interface AdminSidebarProps {
+  userEmail: string;
+}
+
+export function AdminSidebar({ userEmail }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin';
@@ -34,18 +61,47 @@ export function AdminSidebar({ userEmail }: { userEmail: string }) {
   };
 
   return (
-    <aside className="w-60 h-full bg-[#060D16] border-r border-white/[0.06] flex flex-col shrink-0">
-      <div className="h-14 flex items-center px-5 border-b border-white/[0.06] gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0091D5] to-[#0091D5]/60 flex items-center justify-center">
+    <aside
+      className={`hidden md:flex h-full flex-col shrink-0 border-r transition-all duration-200 ${
+        collapsed ? 'w-16' : 'w-60'
+      }`}
+      style={{
+        backgroundColor: 'var(--bg-primary)',
+        borderColor: 'var(--border)',
+      }}
+    >
+      {/* Logo header */}
+      <div
+        className="h-14 flex items-center px-4 shrink-0 gap-2.5"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0091D5] to-[#0091D5]/60 flex items-center justify-center shrink-0">
           <span className="text-white text-sm font-bold">G</span>
         </div>
-        <div>
-          <div className="text-sm font-semibold text-white tracking-tight">GIO4X Raptor</div>
-          <div className="text-[10px] text-white/30 uppercase tracking-widest">Admin Panel</div>
-        </div>
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              GIO4X
+            </div>
+            <div
+              className="text-[10px] uppercase tracking-widest"
+              style={{ color: 'var(--gold)' }}
+            >
+              Super Admin
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-1 rounded hover:bg-white/[0.04] transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
 
-      <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 hide-scrollbar">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -53,27 +109,36 @@ export function AdminSidebar({ userEmail }: { userEmail: string }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
-                active
-                  ? 'bg-[#0091D5]/10 text-[#0091D5]'
-                  : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+              title={collapsed ? item.label : undefined}
+              className={`flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors ${
+                collapsed ? 'justify-center px-2 py-2' : 'px-2.5 py-1.5'
               }`}
+              style={{
+                color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                backgroundColor: active ? 'var(--accent-glow)' : undefined,
+              }}
             >
               <Icon size={16} strokeWidth={active ? 2 : 1.5} />
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-3 border-t border-white/[0.06]">
-        <div className="px-3 py-2 text-xs text-white/30 truncate">{userEmail}</div>
+      {/* User footer */}
+      <div className="shrink-0 p-2" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="px-2.5 py-2">
+          <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+            {collapsed ? '' : userEmail}
+          </div>
+        </div>
         <Link
           href="/auth/login"
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] transition-colors"
+          className="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/[0.04] transition-colors"
+          style={{ color: 'var(--text-muted)' }}
         >
           <LogOut size={14} />
-          Sign Out
+          {!collapsed && <span className="text-[13px]">Sign Out</span>}
         </Link>
       </div>
     </aside>

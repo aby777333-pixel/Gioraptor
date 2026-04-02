@@ -1,6 +1,99 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Public paths that don't require authentication
+const PUBLIC_PATHS = [
+  '/',
+  '/auth/login',
+  '/auth/register',
+  '/auth/callback',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify',
+  '/features',
+  '/about',
+  '/contact',
+  '/terms',
+  '/privacy',
+  '/risk-disclosure',
+  '/status',
+  '/pricing',
+  '/blog',
+  '/developer',
+  '/changelog',
+  '/sandbox',
+  '/partners',
+  '/education',
+];
+
+// Prefixes that are always public (e.g. /auth/*, /features/*, /blog/*)
+const PUBLIC_PREFIXES = ['/auth/', '/features/', '/blog/', '/developer/', '/education/'];
+
+// Protected route prefixes that require authentication
+const PROTECTED_PREFIXES = ['/dashboard', '/broker', '/admin', '/onboarding'];
+
+type UserRole = 'trader' | 'broker_admin' | 'gio4x_admin';
+
+/**
+ * Check if a path is public (no auth required)
+ */
+function isPublicPath(pathname: string): boolean {
+  // Exact match
+  if (PUBLIC_PATHS.includes(pathname)) return true;
+  // Prefix match
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  return false;
+}
+
+/**
+ * Check if a path requires authentication
+ */
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/**
+ * Get the default redirect path for a given role
+ */
+function getDefaultPathForRole(role: UserRole): string {
+  switch (role) {
+    case 'gio4x_admin':
+      return '/admin';
+    case 'broker_admin':
+      return '/broker/overview';
+    case 'trader':
+    default:
+      return '/dashboard';
+  }
+}
+
+/**
+ * Check if a role is allowed to access a given path.
+ * Returns the redirect path if denied, or null if allowed.
+ */
+function getRoleRedirect(role: UserRole, pathname: string): string | null {
+  // gio4x_admin can access everything
+  if (role === 'gio4x_admin') return null;
+
+  // broker_admin: can access /broker/* and /dashboard/*, but NOT /admin/*
+  if (role === 'broker_admin') {
+    if (pathname.startsWith('/admin')) {
+      return '/broker/overview';
+    }
+    return null;
+  }
+
+  // trader: can access /dashboard/* and /onboarding, but NOT /broker/* or /admin/*
+  if (role === 'trader') {
+    if (pathname.startsWith('/broker') || pathname.startsWith('/admin')) {
+      return '/dashboard';
+    }
+    return null;
+  }
+
+  return null;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -13,7 +106,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
@@ -25,16 +118,73 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const pathname = request.nextUrl.pathname;
 
-  // Redirect unauthenticated users to login (except public pages)
-  const publicPaths = ['/', '/auth/login', '/auth/register', '/auth/callback'];
-  const isPublic = publicPaths.some(p => request.nextUrl.pathname === p);
+  // Allow public paths through without auth check
+  if (isPublicPath(pathname)) {
+    return supabaseResponse;
+  }
 
-  if (!user && !isPublic && request.nextUrl.pathname.startsWith('/terminal')) {
+  // Get the authenticated user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // If no user and path is protected, redirect to login with redirect param
+  if (!user && isProtectedPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
+  }
+
+  // If no user and path is not explicitly protected or public, allow through
+  // (catch-all for any routes not in either list)
+  if (!user) {
+    return supabaseResponse;
+  }
+
+  // --- User is authenticated beyond this point ---
+
+  // If user is on /auth/login or /auth/register, redirect them to their default page
+  // (they are already logged in)
+  if (pathname === '/auth/login' || pathname === '/auth/register') {
+    // Check for redirect param first
+    const redirectTo = request.nextUrl.searchParams.get('redirect');
+
+    // Fetch user role to determine default path
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const role = (profile?.role as UserRole) || 'trader';
+    const defaultPath = redirectTo || getDefaultPathForRole(role);
+
+    const url = request.nextUrl.clone();
+    url.pathname = defaultPath;
+    url.searchParams.delete('redirect');
+    return NextResponse.redirect(url);
+  }
+
+  // For protected paths, enforce role-based access
+  if (isProtectedPath(pathname)) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const role = (profile?.role as UserRole) || 'trader';
+
+    // Check role-based access
+    const redirect = getRoleRedirect(role, pathname);
+    if (redirect) {
+      const url = request.nextUrl.clone();
+      url.pathname = redirect;
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

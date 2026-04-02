@@ -178,6 +178,116 @@ export default function Home() {
         </div>
       </section>
 
+      {/* System Status Ticker */}
+      <section className="border-b border-white/[0.06] bg-[#0B1422]/50">
+        <div className="mx-auto flex max-w-7xl items-center justify-center gap-3 px-6 py-3">
+          <span className="flex h-2 w-2 items-center justify-center">
+            <span className="absolute h-2 w-2 rounded-full bg-[#00C896] animate-ping opacity-40" />
+            <span className="relative h-2 w-2 rounded-full bg-[#00C896]" />
+          </span>
+          <span className="text-xs text-[#7A8BA8]">
+            500+ Instruments &middot; {'<'}1ms Execution &middot; 99.99% Uptime &middot;{' '}
+            <Link href="/status" className="text-[#00C896] hover:underline">All Systems Operational</Link>
+          </span>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="relative px-6 py-24 border-b border-white/[0.06]">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center">
+            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00A5A8]">Get Started in Minutes</span>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How It Works</h2>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-3">
+            {[
+              { step: '01', title: 'Register & Verify', desc: 'Create your account in 30 seconds. Fast KYC verification — or start with a demo account instantly.', icon: '👤' },
+              { step: '02', title: 'Fund Your Account', desc: '15+ payment methods including wire, card, crypto, and e-wallets. Funds credited in minutes.', icon: '💰' },
+              { step: '03', title: 'Trade with Confidence', desc: 'Access 500+ instruments with real-time execution, full analytics, and institutional-grade infrastructure.', icon: '📈' },
+            ].map((s) => (
+              <div key={s.step} className="relative rounded-2xl border border-white/[0.06] bg-[#0B1422] p-8 text-center">
+                <div className="mb-4 text-4xl">{s.icon}</div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-[#00A5A8]">Step {s.step}</div>
+                <h3 className="mb-2 text-lg font-bold">{s.title}</h3>
+                <p className="text-sm text-[#7A8BA8] leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Link href="/auth/register" className="rounded-xl bg-[#0091D5] px-8 py-3 text-sm font-semibold transition-all hover:bg-[#007AB8] hover:shadow-lg hover:shadow-[#0091D5]/20">
+              Start Your Journey
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Layer */}
+      <section className="relative px-6 py-20 border-b border-white/[0.06]">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid gap-4 sm:grid-cols-4">
+            {[
+              { icon: '🔒', title: 'AES-256 Encryption', desc: 'Bank-grade encryption for all data at rest and in transit' },
+              { icon: '✅', title: 'Trade Verification', desc: 'Every execution logged and verifiable in real-time' },
+              { icon: '📋', title: 'Full Audit Trail', desc: 'Complete compliance-ready audit log for every action' },
+              { icon: '🌐', title: '99.99% Uptime SLA', desc: 'Enterprise infrastructure with global redundancy' },
+            ].map((t) => (
+              <div key={t.title} className="rounded-xl border border-white/[0.06] bg-[#111D2E] p-5 text-center">
+                <div className="mb-2 text-2xl">{t.icon}</div>
+                <div className="text-sm font-bold mb-1">{t.title}</div>
+                <p className="text-xs text-[#7A8BA8]">{t.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-sm text-[#7A8BA8]">
+            Every execution logged. Every transaction auditable.{' '}
+            <Link href="/status" className="text-[#0091D5] hover:underline">View our public status page →</Link>
+          </p>
+        </div>
+      </section>
+
+      {/* For Brokers CTA */}
+      <section className="relative px-6 py-24 border-b border-white/[0.06] bg-gradient-to-b from-[#060D16] to-[#0B1422]">
+        <div className="mx-auto max-w-5xl text-center">
+          <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#F0A500]">For Brokers</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+            Launch Your Brokerage in Days, Not Months
+          </h2>
+          <p className="mx-auto mb-10 max-w-2xl text-[#7A8BA8]">
+            Full white-label infrastructure with risk engine, IB network, compliance suite, and everything you need to go live.
+          </p>
+          <div className="grid gap-6 sm:grid-cols-4 mb-10">
+            {[
+              { title: 'White Label', desc: 'Your brand, our technology' },
+              { title: 'Risk Engine', desc: 'A/B-book with real-time controls' },
+              { title: 'IB Network', desc: 'Multi-tier affiliate management' },
+              { title: 'Compliance Suite', desc: 'KYC/AML out of the box' },
+            ].map((f) => (
+              <div key={f.title} className="rounded-xl border border-[#F0A500]/20 bg-[#F0A500]/[0.04] p-5">
+                <div className="text-sm font-bold text-[#F0A500] mb-1">{f.title}</div>
+                <p className="text-xs text-[#7A8BA8]">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+          <Link href="/contact?type=broker" className="inline-flex rounded-xl bg-[#F0A500] px-8 py-3 text-sm font-bold text-[#060D16] transition-all hover:bg-[#D49000] hover:shadow-lg hover:shadow-[#F0A500]/20">
+            Book a Demo
+          </Link>
+        </div>
+      </section>
+
+      {/* Trusted By */}
+      <section className="border-b border-white/[0.06] px-6 py-12">
+        <div className="mx-auto max-w-5xl">
+          <p className="mb-6 text-center text-xs uppercase tracking-[0.2em] text-[#4A5568]">Trusted By Leading Brokers</p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {['AlphaFX Pro', 'NovaTrade', 'PrimeBridge', 'AxisMarkets', 'VortexCFD', 'SummitFX'].map((name) => (
+              <div key={name} className="rounded-lg border border-white/[0.06] bg-[#111D2E] px-6 py-3">
+                <span className="text-sm font-bold text-[#4A5568]">{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section id="features" className="relative px-6 py-32">
         <div className="mx-auto max-w-7xl">
