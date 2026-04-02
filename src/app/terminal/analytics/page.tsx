@@ -156,7 +156,7 @@ export default function AnalyticsPage() {
     });
     chartRef.current = chart;
     const series = chart.addSeries(LineSeries, {
-      color: '#29ABE2',
+      color: '#C8102E',
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
@@ -262,7 +262,7 @@ export default function AnalyticsPage() {
           <ArrowLeft size={14} /> Terminal
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--border)' }} />
-        <BarChart3 size={16} style={{ color: '#29ABE2' }} />
+        <BarChart3 size={16} style={{ color: '#C8102E' }} />
         <h1 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>Trading Analytics</h1>
       </div>
 
@@ -275,7 +275,7 @@ export default function AnalyticsPage() {
             <StatCard icon={<Activity size={16} />} label="Profit Factor" value={stats.profitFactor === Infinity ? 'INF' : stats.profitFactor.toFixed(2)} color={stats.profitFactor >= 1.5 ? '#00C27A' : stats.profitFactor >= 1 ? '#F5A623' : '#C1121F'} />
             <StatCard icon={<BarChart3 size={16} />} label="Sharpe Ratio" value={stats.sharpe.toFixed(2)} color={stats.sharpe >= 1 ? '#00C27A' : stats.sharpe >= 0 ? '#F5A623' : '#C1121F'} />
             <StatCard icon={<AlertTriangle size={16} />} label="Max Drawdown" value={`${stats.maxDDPct.toFixed(1)}%`} color="#C1121F" />
-            <StatCard icon={<Hash size={16} />} label="Total Trades" value={String(stats.totalTrades)} color="#29ABE2" />
+            <StatCard icon={<Hash size={16} />} label="Total Trades" value={String(stats.totalTrades)} color="#C8102E" />
           </div>
         )}
 
@@ -350,7 +350,7 @@ export default function AnalyticsPage() {
         <div className="panel">
           <div className="panel-header flex items-center justify-between">
             <span>Trade History</span>
-            <button onClick={exportCSV} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-opacity hover:opacity-70" style={{ color: '#29ABE2', backgroundColor: 'rgba(41,171,226,0.1)' }}>
+            <button onClick={exportCSV} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-opacity hover:opacity-70" style={{ color: '#C8102E', backgroundColor: 'rgba(41,171,226,0.1)' }}>
               <Download size={12} /> Export CSV
             </button>
           </div>
@@ -371,7 +371,7 @@ export default function AnalyticsPage() {
                     >
                       <span className="flex items-center gap-1">
                         {label}
-                        {sortKey === key && <ArrowUpDown size={10} style={{ color: '#29ABE2' }} />}
+                        {sortKey === key && <ArrowUpDown size={10} style={{ color: '#C8102E' }} />}
                       </span>
                     </th>
                   ))}

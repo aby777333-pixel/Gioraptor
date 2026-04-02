@@ -52,7 +52,7 @@ export default function PAMMPage() {
   }, [search, sortBy]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0A0A0F' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#080C14' }}>
       {/* Header */}
       <div
         className="border-b px-6 py-5"
@@ -61,7 +61,7 @@ export default function PAMMPage() {
         <div className="flex items-center gap-3 mb-1">
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: '#29ABE2' }}
+            style={{ backgroundColor: '#C8102E' }}
           >
             <PieChart size={18} color="#000" />
           </div>
@@ -91,8 +91,8 @@ export default function PAMMPage() {
             onClick={() => setActiveTab(tab.key)}
             className="flex items-center gap-1.5 px-4 py-3 text-xs font-medium transition-all border-b-2"
             style={{
-              borderColor: activeTab === tab.key ? '#29ABE2' : 'transparent',
-              color: activeTab === tab.key ? '#29ABE2' : 'rgba(255,255,255,0.4)',
+              borderColor: activeTab === tab.key ? '#C8102E' : 'transparent',
+              color: activeTab === tab.key ? '#C8102E' : 'rgba(255,255,255,0.4)',
             }}
           >
             {tab.icon}
@@ -117,7 +117,7 @@ export default function PAMMPage() {
                   placeholder="Search funds or managers..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg text-xs text-white border outline-none focus:border-[#29ABE2]/50 transition-colors"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg text-xs text-white border outline-none focus:border-[#C8102E]/50 transition-colors"
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.03)',
                     borderColor: 'rgba(255,255,255,0.06)',
@@ -143,10 +143,10 @@ export default function PAMMPage() {
                     className="px-2.5 py-1 rounded text-[10px] font-medium transition-all border"
                     style={{
                       backgroundColor:
-                        sortBy === s.key ? '#29ABE2' : 'rgba(255,255,255,0.03)',
+                        sortBy === s.key ? '#C8102E' : 'rgba(255,255,255,0.03)',
                       color: sortBy === s.key ? '#000' : 'rgba(255,255,255,0.5)',
                       borderColor:
-                        sortBy === s.key ? '#29ABE2' : 'rgba(255,255,255,0.06)',
+                        sortBy === s.key ? '#C8102E' : 'rgba(255,255,255,0.06)',
                     }}
                   >
                     {s.label}

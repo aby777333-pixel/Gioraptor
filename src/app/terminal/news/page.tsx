@@ -25,7 +25,7 @@ export default function NewsPage() {
           Terminal
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--border)' }} />
-        <Newspaper size={16} style={{ color: '#29ABE2' }} />
+        <Newspaper size={16} style={{ color: '#C8102E' }} />
         <h1 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           Market News
         </h1>

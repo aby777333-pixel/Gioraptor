@@ -179,8 +179,8 @@ export default function BacktestResults({ hasResults }: BacktestResultsProps) {
           timeVisible: false,
         },
         crosshair: {
-          horzLine: { color: '#29ABE244' },
-          vertLine: { color: '#29ABE244' },
+          horzLine: { color: '#C8102E44' },
+          vertLine: { color: '#C8102E44' },
         },
       });
 
@@ -249,7 +249,7 @@ export default function BacktestResults({ hasResults }: BacktestResultsProps) {
           icon={<BarChart3 size={13} />}
           label="Total Trades"
           value={stats.totalTrades.toString()}
-          color="#29ABE2"
+          color="#C8102E"
         />
         <StatCard
           icon={<Target size={13} />}

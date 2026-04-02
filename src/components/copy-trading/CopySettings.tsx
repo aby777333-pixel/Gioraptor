@@ -48,7 +48,7 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
           <div>
             <h2 className="text-base font-semibold text-white">Copy Settings</h2>
             <p className="text-xs text-white/40 mt-0.5">
-              Configure how to copy <span className="text-[#29ABE2]">{provider.name}</span>
+              Configure how to copy <span className="text-[#C8102E]">{provider.name}</span>
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-white/5 transition-colors">
@@ -75,10 +75,10 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
                   className="px-3 py-2 rounded text-xs font-medium transition-all border"
                   style={{
                     backgroundColor:
-                      copyMode === mode.value ? '#29ABE2' : 'rgba(255,255,255,0.03)',
+                      copyMode === mode.value ? '#C8102E' : 'rgba(255,255,255,0.03)',
                     color: copyMode === mode.value ? '#000' : 'rgba(255,255,255,0.6)',
                     borderColor:
-                      copyMode === mode.value ? '#29ABE2' : 'rgba(255,255,255,0.06)',
+                      copyMode === mode.value ? '#C8102E' : 'rgba(255,255,255,0.06)',
                   }}
                 >
                   {mode.label}
@@ -135,7 +135,7 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
                   onClick={() => setFilterMode('whitelist')}
                   className="px-3 py-1 text-[10px] font-medium transition-colors"
                   style={{
-                    backgroundColor: filterMode === 'whitelist' ? '#29ABE2' : 'transparent',
+                    backgroundColor: filterMode === 'whitelist' ? '#C8102E' : 'transparent',
                     color: filterMode === 'whitelist' ? '#000' : 'rgba(255,255,255,0.5)',
                   }}
                 >
@@ -164,7 +164,7 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
                     style={{
                       backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'rgba(255,255,255,0.03)',
                       borderColor: active ? 'rgba(41,171,226,0.3)' : 'rgba(255,255,255,0.06)',
-                      color: active ? '#29ABE2' : 'rgba(255,255,255,0.4)',
+                      color: active ? '#C8102E' : 'rgba(255,255,255,0.4)',
                     }}
                   >
                     {sym}
@@ -183,7 +183,7 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
             <button
               onClick={() => setReverseCopy(!reverseCopy)}
               className="relative w-10 h-5 rounded-full transition-colors"
-              style={{ backgroundColor: reverseCopy ? '#29ABE2' : 'rgba(255,255,255,0.1)' }}
+              style={{ backgroundColor: reverseCopy ? '#C8102E' : 'rgba(255,255,255,0.1)' }}
             >
               <div
                 className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
@@ -215,7 +215,7 @@ export default function CopySettings({ provider, onClose, onStart }: CopySetting
           <button
             onClick={onStart}
             className="px-5 py-2 rounded text-xs font-semibold transition-all hover:opacity-90"
-            style={{ backgroundColor: '#29ABE2', color: '#000' }}
+            style={{ backgroundColor: '#C8102E', color: '#000' }}
           >
             Start Copying
           </button>
@@ -244,7 +244,7 @@ function InputField({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-1.5 rounded text-xs font-mono text-white border outline-none focus:border-[#29ABE2]/50 transition-colors"
+          className="w-full px-3 py-1.5 rounded text-xs font-mono text-white border outline-none focus:border-[#C8102E]/50 transition-colors"
           style={{
             backgroundColor: 'rgba(255,255,255,0.03)',
             borderColor: 'rgba(255,255,255,0.06)',

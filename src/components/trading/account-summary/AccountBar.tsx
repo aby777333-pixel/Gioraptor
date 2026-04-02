@@ -17,7 +17,7 @@ interface Session {
 const SESSIONS: Session[] = [
   { label: 'Sydney', code: 'SYD', color: '#00C853', startUtc: 22, endUtc: 7 },
   { label: 'Tokyo', code: 'TYO', color: '#FFC107', startUtc: 0, endUtc: 9 },
-  { label: 'London', code: 'LON', color: '#29ABE2', startUtc: 8, endUtc: 17 },
+  { label: 'London', code: 'LON', color: '#C8102E', startUtc: 8, endUtc: 17 },
   { label: 'New York', code: 'NYC', color: '#FF9800', startUtc: 13, endUtc: 22 },
 ];
 
@@ -137,7 +137,7 @@ function Item({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span style={{ color: '#29ABE2', opacity: 0.85, fontSize: 12 }}>{label}:</span>
+      <span style={{ color: '#C8102E', opacity: 0.85, fontSize: 12 }}>{label}:</span>
       <span
         className="font-mono font-medium"
         style={{ color: valueColor ?? 'var(--text-primary)', fontSize: 13 }}

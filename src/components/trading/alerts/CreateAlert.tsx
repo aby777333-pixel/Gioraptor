@@ -101,7 +101,7 @@ export default function CreateAlert({ onClose, onCreated }: CreateAlertProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2">
-            <Bell size={16} style={{ color: '#29ABE2' }} />
+            <Bell size={16} style={{ color: '#C8102E' }} />
             <span className="text-[14px] font-semibold">Create Price Alert</span>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:opacity-70"><X size={16} className="opacity-50" /></button>
@@ -164,11 +164,11 @@ export default function CreateAlert({ onClose, onCreated }: CreateAlertProps) {
           {/* Notification options */}
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={notifyInapp} onChange={e => setNotifyInapp(e.target.checked)} className="accent-[#29ABE2]" />
+              <input type="checkbox" checked={notifyInapp} onChange={e => setNotifyInapp(e.target.checked)} className="accent-[#C8102E]" />
               <span className="text-[12px]">In-app</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} className="accent-[#29ABE2]" />
+              <input type="checkbox" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} className="accent-[#C8102E]" />
               <span className="text-[12px]">Email</span>
             </label>
           </div>
@@ -182,7 +182,7 @@ export default function CreateAlert({ onClose, onCreated }: CreateAlertProps) {
             onClick={handleCreate}
             disabled={saving}
             className="w-full py-2.5 rounded text-[13px] font-semibold transition-opacity hover:opacity-80"
-            style={{ backgroundColor: '#29ABE2', color: '#000' }}
+            style={{ backgroundColor: '#C8102E', color: '#000' }}
           >
             {saving ? 'Creating...' : 'Create Alert'}
           </button>

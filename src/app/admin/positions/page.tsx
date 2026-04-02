@@ -66,7 +66,7 @@ export default function AdminPositionsPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
-              tab === t ? 'bg-[#29ABE2]/15 text-[#29ABE2]' : 'text-white/40 hover:text-white/60'
+              tab === t ? 'bg-[#C8102E]/15 text-[#C8102E]' : 'text-white/40 hover:text-white/60'
             }`}
           >
             {t} Positions
@@ -97,7 +97,7 @@ export default function AdminPositionsPage() {
             {loading ? (
               <tr>
                 <td colSpan={12} className="px-4 py-12 text-center">
-                  <div className="w-5 h-5 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin mx-auto" />
                 </td>
               </tr>
             ) : positions.length === 0 ? (

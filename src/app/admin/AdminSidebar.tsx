@@ -34,9 +34,9 @@ export function AdminSidebar({ userEmail }: { userEmail: string }) {
   };
 
   return (
-    <aside className="w-60 h-full bg-[#0A0A0F] border-r border-white/[0.06] flex flex-col shrink-0">
+    <aside className="w-60 h-full bg-[#080C14] border-r border-white/[0.06] flex flex-col shrink-0">
       <div className="h-14 flex items-center px-5 border-b border-white/[0.06] gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#29ABE2] to-[#29ABE2]/60 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C8102E] to-[#C8102E]/60 flex items-center justify-center">
           <span className="text-white text-sm font-bold">G</span>
         </div>
         <div>
@@ -55,7 +55,7 @@ export function AdminSidebar({ userEmail }: { userEmail: string }) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
                 active
-                  ? 'bg-[#29ABE2]/10 text-[#29ABE2]'
+                  ? 'bg-[#C8102E]/10 text-[#C8102E]'
                   : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
               }`}
             >

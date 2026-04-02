@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0A0F] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#080C14] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-8">
@@ -63,7 +63,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#29ABE2]/50 focus:ring-1 focus:ring-[#29ABE2]/50"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#C8102E]/50 focus:ring-1 focus:ring-[#C8102E]/50"
             />
           </div>
 
@@ -78,14 +78,14 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#29ABE2]/50 focus:ring-1 focus:ring-[#29ABE2]/50"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#C8102E]/50 focus:ring-1 focus:ring-[#C8102E]/50"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-[#29ABE2] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#29ABE2]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-[#C8102E] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#C8102E]/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -93,7 +93,7 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-500">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/register" className="text-[#29ABE2] hover:text-[#29ABE2]/80 transition-colors">
+          <Link href="/auth/register" className="text-[#C8102E] hover:text-[#C8102E]/80 transition-colors">
             Create one
           </Link>
         </p>

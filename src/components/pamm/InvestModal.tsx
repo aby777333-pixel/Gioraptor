@@ -35,7 +35,7 @@ export default function InvestModal({ fund, onClose, onConfirm }: InvestModalPro
           <div>
             <h2 className="text-base font-semibold text-white">Invest in Fund</h2>
             <p className="text-xs text-white/40 mt-0.5">
-              <span className="text-[#29ABE2]">{fund.name}</span> by {fund.manager}
+              <span className="text-[#C8102E]">{fund.name}</span> by {fund.manager}
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-white/5 transition-colors">
@@ -56,7 +56,7 @@ export default function InvestModal({ fund, onClose, onConfirm }: InvestModalPro
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={`Min $${fund.minInvestment.toLocaleString()}`}
-                className="w-full pl-8 pr-3 py-2.5 rounded-lg text-sm font-mono text-white border outline-none focus:border-[#29ABE2]/50 transition-colors"
+                className="w-full pl-8 pr-3 py-2.5 rounded-lg text-sm font-mono text-white border outline-none focus:border-[#C8102E]/50 transition-colors"
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.03)',
                   borderColor: 'rgba(255,255,255,0.06)',
@@ -84,7 +84,7 @@ export default function InvestModal({ fund, onClose, onConfirm }: InvestModalPro
             </div>
             <div>
               <div className="text-[10px] text-white/40">Estimated Shares</div>
-              <div className="text-sm font-mono font-semibold text-[#29ABE2]">
+              <div className="text-sm font-mono font-semibold text-[#C8102E]">
                 {investAmount > 0 ? estimatedShares.toFixed(2) : '0.00'}
               </div>
             </div>
@@ -138,7 +138,7 @@ export default function InvestModal({ fund, onClose, onConfirm }: InvestModalPro
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
               className="mt-0.5 rounded"
-              style={{ accentColor: '#29ABE2' }}
+              style={{ accentColor: '#C8102E' }}
             />
             <span className="text-[11px] text-white/40 leading-relaxed">
               I acknowledge the risks involved, understand the fee structure, and agree
@@ -163,7 +163,7 @@ export default function InvestModal({ fund, onClose, onConfirm }: InvestModalPro
             onClick={onConfirm}
             disabled={!meetsMinimum || !termsAccepted}
             className="px-5 py-2 rounded text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90"
-            style={{ backgroundColor: '#29ABE2', color: '#000' }}
+            style={{ backgroundColor: '#C8102E', color: '#000' }}
           >
             Confirm Investment
           </button>

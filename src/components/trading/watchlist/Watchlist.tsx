@@ -219,8 +219,8 @@ export default function Watchlist() {
               : 'opacity-40 hover:opacity-60'
           )}
           style={{
-            borderBottom: activeTab === 'favourites' ? '2px solid #29ABE2' : '2px solid transparent',
-            color: activeTab === 'favourites' ? '#29ABE2' : 'var(--text-primary)',
+            borderBottom: activeTab === 'favourites' ? '2px solid #C8102E' : '2px solid transparent',
+            color: activeTab === 'favourites' ? '#C8102E' : 'var(--text-primary)',
           }}
         >
           Favourites ({favCount})
@@ -234,8 +234,8 @@ export default function Watchlist() {
               : 'opacity-40 hover:opacity-60'
           )}
           style={{
-            borderBottom: activeTab === 'all' ? '2px solid #29ABE2' : '2px solid transparent',
-            color: activeTab === 'all' ? '#29ABE2' : 'var(--text-primary)',
+            borderBottom: activeTab === 'all' ? '2px solid #C8102E' : '2px solid transparent',
+            color: activeTab === 'all' ? '#C8102E' : 'var(--text-primary)',
           }}
         >
           All ({allCount})
@@ -288,7 +288,7 @@ export default function Watchlist() {
                 style={{
                   gridTemplateColumns: '1fr 70px 70px',
                   minHeight: 36,
-                  borderLeftColor: isActive ? '#29ABE2' : 'transparent',
+                  borderLeftColor: isActive ? '#C8102E' : 'transparent',
                   backgroundColor: flash === 'up'
                     ? 'rgba(0,194,122,0.08)'
                     : flash === 'down'
@@ -343,7 +343,7 @@ export default function Watchlist() {
                   style={{
                     backgroundColor: '#111118',
                     borderColor: 'rgba(255,255,255,0.06)',
-                    borderLeft: '2px solid #29ABE2',
+                    borderLeft: '2px solid #C8102E',
                   }}
                 >
                   {/* Widget Header */}
@@ -365,7 +365,7 @@ export default function Watchlist() {
                         className="p-0.5 rounded hover:opacity-80 transition-opacity"
                         title={isFav ? 'Remove from favourites' : 'Add to favourites'}
                       >
-                        <Plus size={11} style={{ color: isFav ? '#29ABE2' : 'rgba(255,255,255,0.3)' }} />
+                        <Plus size={11} style={{ color: isFav ? '#C8102E' : 'rgba(255,255,255,0.3)' }} />
                       </button>
                       <button
                         className="p-0.5 rounded hover:opacity-80 transition-opacity"
@@ -505,7 +505,7 @@ export default function Watchlist() {
                           style={{
                             backgroundColor: lotSize === lot ? 'rgba(41,171,226,0.15)' : '#1A1A24',
                             border: lotSize === lot ? '1px solid rgba(41,171,226,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                            color: lotSize === lot ? '#29ABE2' : 'rgba(255,255,255,0.5)',
+                            color: lotSize === lot ? '#C8102E' : 'rgba(255,255,255,0.5)',
                           }}
                           onMouseEnter={(e) => {
                             if (lotSize !== lot) e.currentTarget.style.backgroundColor = '#252530';

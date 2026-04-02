@@ -55,7 +55,7 @@ export default function AdminDashboardPage() {
 
   const statCards = stats
     ? [
-        { label: 'Total Users', value: stats.total_users.toLocaleString(), icon: Users, color: '#29ABE2' },
+        { label: 'Total Users', value: stats.total_users.toLocaleString(), icon: Users, color: '#C8102E' },
         { label: 'Active Accounts', value: stats.active_accounts.toLocaleString(), icon: Wallet, color: '#00C27A' },
         { label: 'Open Positions', value: stats.open_positions.toLocaleString(), icon: TrendingUp, color: '#C9A84C' },
         { label: 'Floating P&L', value: `$${stats.total_floating_pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: DollarSign, color: stats.total_floating_pnl >= 0 ? '#00C27A' : '#C1121F' },
@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -167,7 +167,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: 'bg-[#E2A229]/15 text-[#E2A229]',
     cancelled: 'bg-white/10 text-white/40',
     rejected: 'bg-[#C1121F]/15 text-[#C1121F]',
-    partial: 'bg-[#29ABE2]/15 text-[#29ABE2]',
+    partial: 'bg-[#C8102E]/15 text-[#C8102E]',
   };
   const cls = colors[status] ?? 'bg-white/10 text-white/50';
   return (

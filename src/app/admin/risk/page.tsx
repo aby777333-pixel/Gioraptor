@@ -35,7 +35,7 @@ export default function AdminRiskPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -46,7 +46,7 @@ export default function AdminRiskPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <SummaryCard label="Symbols Exposed" value={exposures.length.toString()} color="#29ABE2" />
+        <SummaryCard label="Symbols Exposed" value={exposures.length.toString()} color="#C8102E" />
         <SummaryCard label="Total Buy Lots" value={totalBuyLots.toFixed(2)} color="#00C27A" />
         <SummaryCard label="Total Sell Lots" value={totalSellLots.toFixed(2)} color="#C1121F" />
         <SummaryCard

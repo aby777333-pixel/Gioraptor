@@ -116,7 +116,7 @@ export default function CurrencyStrength() {
           <div className="text-[10px] uppercase tracking-wider opacity-50 mb-1">Strongest Pair</div>
           <div className="flex items-center gap-2">
             <TrendingUp size={14} style={{ color: '#00C27A' }} />
-            <span className="text-[13px] font-mono font-bold" style={{ color: '#29ABE2' }}>
+            <span className="text-[13px] font-mono font-bold" style={{ color: '#C8102E' }}>
               Buy {strongest.currency}/{weakest.currency}
             </span>
             <TrendingDown size={14} style={{ color: '#C1121F' }} />

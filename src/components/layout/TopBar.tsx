@@ -293,13 +293,13 @@ export default function TopBar() {
             onClick={() => setAlertsPanelOpen(!alertsPanelOpen)}
             className="p-2 rounded hover:opacity-70 transition-opacity"
             title="Price Alerts"
-            style={alertsPanelOpen ? { color: '#29ABE2' } : undefined}
+            style={alertsPanelOpen ? { color: '#C8102E' } : undefined}
           >
             <Bell size={16} className={alertsPanelOpen ? '' : 'opacity-50'} />
             {alertCount > 0 && (
               <span
                 className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[9px] font-bold rounded-full"
-                style={{ width: 16, height: 16, backgroundColor: '#29ABE2', color: '#000' }}
+                style={{ width: 16, height: 16, backgroundColor: '#C8102E', color: '#000' }}
               >
                 {alertCount}
               </span>
@@ -313,7 +313,7 @@ export default function TopBar() {
           onClick={() => setVoicePanelOpen(!voicePanelOpen)}
           className="p-2 rounded hover:opacity-70 transition-opacity"
           title="Voice Trading"
-          style={voicePanelOpen ? { color: '#29ABE2' } : undefined}
+          style={voicePanelOpen ? { color: '#C8102E' } : undefined}
         >
           <Mic size={16} className={voicePanelOpen ? '' : 'opacity-50'} />
         </button>
@@ -348,7 +348,7 @@ export default function TopBar() {
           {selectedAccount?.is_demo && (
             <span
               className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-              style={{ backgroundColor: '#29ABE2', color: '#000' }}
+              style={{ backgroundColor: '#C8102E', color: '#000' }}
             >
               DEMO
             </span>
@@ -381,7 +381,7 @@ export default function TopBar() {
                   {acc.is_demo && (
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: '#29ABE2', color: '#000' }}
+                      style={{ backgroundColor: '#C8102E', color: '#000' }}
                     >
                       DEMO
                     </span>
@@ -451,7 +451,7 @@ function NavItem({
     >
       <span
         className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ backgroundColor: active ? '#29ABE2' : 'var(--text-muted)' }}
+        style={{ backgroundColor: active ? '#C8102E' : 'var(--text-muted)' }}
       />
       {label}
     </button>

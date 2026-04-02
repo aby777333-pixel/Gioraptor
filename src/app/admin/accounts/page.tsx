@@ -60,7 +60,7 @@ export default function AdminAccountsPage() {
         <select
           value={typeFilter}
           onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
-          className="bg-[#111118] border border-white/[0.06] rounded-md px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-[#29ABE2]/40"
+          className="bg-[#111118] border border-white/[0.06] rounded-md px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-[#C8102E]/40"
         >
           <option value="">All Types</option>
           <option value="standard">Standard</option>
@@ -92,7 +92,7 @@ export default function AdminAccountsPage() {
             {loading ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center">
-                  <div className="w-5 h-5 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin mx-auto" />
                 </td>
               </tr>
             ) : accounts.length === 0 ? (
@@ -105,7 +105,7 @@ export default function AdminAccountsPage() {
                   <td className="px-4 py-2.5 mono text-white/70 font-medium">{acct.account_number}</td>
                   <td className="px-4 py-2.5 mono text-white/50 text-[11px]">{acct.user_email}</td>
                   <td className="px-4 py-2.5">
-                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase bg-[#29ABE2]/10 text-[#29ABE2]">
+                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase bg-[#C8102E]/10 text-[#C8102E]">
                       {acct.account_type}
                     </span>
                   </td>

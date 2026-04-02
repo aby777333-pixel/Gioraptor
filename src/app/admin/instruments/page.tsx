@@ -17,7 +17,7 @@ interface Instrument {
 }
 
 const typeColors: Record<string, string> = {
-  forex: 'bg-[#29ABE2]/15 text-[#29ABE2]',
+  forex: 'bg-[#C8102E]/15 text-[#C8102E]',
   metal: 'bg-[#C9A84C]/15 text-[#C9A84C]',
   crypto: 'bg-[#A855F7]/15 text-[#A855F7]',
   index: 'bg-[#14B8A6]/15 text-[#14B8A6]',
@@ -72,7 +72,7 @@ export default function AdminInstrumentsPage() {
             {loading ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center">
-                  <div className="w-5 h-5 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin mx-auto" />
                 </td>
               </tr>
             ) : instruments.length === 0 ? (

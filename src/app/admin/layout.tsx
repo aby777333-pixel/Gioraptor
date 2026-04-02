@@ -15,14 +15,14 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0A0A0F]">
+    <div className="flex h-screen overflow-hidden bg-[#080C14]">
       <AdminSidebar userEmail={user.email ?? ''} />
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 flex items-center justify-between px-6 border-b border-white/[0.06] bg-[#0A0A0F] shrink-0">
+        <header className="h-14 flex items-center justify-between px-6 border-b border-white/[0.06] bg-[#080C14] shrink-0">
           <h1 className="text-sm font-semibold text-white/80 tracking-wide uppercase">Broker Admin</h1>
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/40 mono">{user.email}</span>
-            <div className="w-7 h-7 rounded-full bg-[#29ABE2]/20 flex items-center justify-center text-[#29ABE2] text-xs font-bold">
+            <div className="w-7 h-7 rounded-full bg-[#C8102E]/20 flex items-center justify-center text-[#C8102E] text-xs font-bold">
               {(user.email ?? 'A')[0].toUpperCase()}
             </div>
           </div>

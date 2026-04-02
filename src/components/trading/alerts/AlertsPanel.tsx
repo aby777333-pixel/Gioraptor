@@ -32,7 +32,7 @@ function showToast(message: string) {
   toast.style.cssText = `
     position: fixed; bottom: 80px; right: 24px; z-index: 9999;
     padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
-    background: #29ABE2; color: #000; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    background: #C8102E; color: #000; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     animation: slideIn 0.3s ease-out;
   `;
   document.body.appendChild(toast);
@@ -176,10 +176,10 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2">
-            <Bell size={16} style={{ color: '#29ABE2' }} />
+            <Bell size={16} style={{ color: '#C8102E' }} />
             <span className="text-[13px] font-semibold">Price Alerts</span>
             {activeCount > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#29ABE2', color: '#000' }}>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#C8102E', color: '#000' }}>
                 {activeCount}
               </span>
             )}
@@ -187,7 +187,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
           <button
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-1 text-[11px] px-2 py-1 rounded transition-opacity hover:opacity-70"
-            style={{ backgroundColor: 'rgba(41,171,226,0.15)', color: '#29ABE2' }}
+            style={{ backgroundColor: 'rgba(41,171,226,0.15)', color: '#C8102E' }}
           >
             <Plus size={12} /> New Alert
           </button>

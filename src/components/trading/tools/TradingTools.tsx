@@ -51,7 +51,7 @@ function CalcCard({ title, children, defaultOpen = false }: { title: string; chi
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider"
-        style={{ color: '#29ABE2' }}
+        style={{ color: '#C8102E' }}
       >
         {title}
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -70,7 +70,7 @@ function ResultRow({ label, value, color }: { label: string; value: string; colo
   return (
     <div className="flex items-center justify-between px-2 py-1.5 rounded text-xs" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <span className="opacity-50">{label}</span>
-      <span className="font-mono font-medium" style={{ color: color ?? '#29ABE2' }}>{value}</span>
+      <span className="font-mono font-medium" style={{ color: color ?? '#C8102E' }}>{value}</span>
     </div>
   );
 }
@@ -294,7 +294,7 @@ function RiskRewardCalculator() {
       </div>
       {result !== null && (
         <>
-          <ResultRow label="R:R Ratio" value={`1:${result.rr.toFixed(1)}`} color="#29ABE2" />
+          <ResultRow label="R:R Ratio" value={`1:${result.rr.toFixed(1)}`} color="#C8102E" />
           <ResultRow label="Min Win Rate" value={`${result.reqWinRate.toFixed(1)}%`} />
         </>
       )}

@@ -276,7 +276,7 @@ export default function OrderTicket() {
 
       {/* Symbol display */}
       <div className="text-center">
-        <span className="text-base font-bold" style={{ color: '#29ABE2' }}>
+        <span className="text-base font-bold" style={{ color: '#C8102E' }}>
           {activeSymbol}
         </span>
       </div>
@@ -389,7 +389,7 @@ export default function OrderTicket() {
           style={{
             backgroundColor: 'var(--bg-elevated)',
             border: '1px solid var(--border)',
-            color: '#29ABE2',
+            color: '#C8102E',
           }}
         >
           {slTpMode === 'price' ? 'PRICE' : 'PIPS'}
@@ -442,7 +442,7 @@ export default function OrderTicket() {
           style={{ backgroundColor: 'var(--bg-elevated)' }}
         >
           <span className="opacity-50">Pip Value</span>
-          <span className="font-mono" style={{ color: '#29ABE2' }}>
+          <span className="font-mono" style={{ color: '#C8102E' }}>
             1 pip = ${pipValue.toFixed(2)}
           </span>
         </div>

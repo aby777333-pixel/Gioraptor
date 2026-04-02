@@ -38,7 +38,7 @@ function getTypeLabel(type: string): string {
 
 function getTypeColor(type: string): string {
   const map: Record<string, string> = {
-    forex: '#29ABE2',
+    forex: '#C8102E',
     metal: '#FFD700',
     crypto: '#F7931A',
     index: '#8B5CF6',

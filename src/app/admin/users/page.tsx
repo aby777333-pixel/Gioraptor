@@ -73,12 +73,12 @@ export default function AdminUsersPage() {
             placeholder="Search by email or name..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full bg-[#111118] border border-white/[0.06] rounded-md pl-9 pr-3 py-2 text-sm text-white/80 placeholder:text-white/20 focus:outline-none focus:border-[#29ABE2]/40"
+            className="w-full bg-[#111118] border border-white/[0.06] rounded-md pl-9 pr-3 py-2 text-sm text-white/80 placeholder:text-white/20 focus:outline-none focus:border-[#C8102E]/40"
           />
         </div>
         <button
           type="submit"
-          className="px-4 py-2 bg-[#29ABE2]/10 text-[#29ABE2] text-xs font-medium rounded-md hover:bg-[#29ABE2]/20 transition-colors"
+          className="px-4 py-2 bg-[#C8102E]/10 text-[#C8102E] text-xs font-medium rounded-md hover:bg-[#C8102E]/20 transition-colors"
         >
           Search
         </button>
@@ -103,7 +103,7 @@ export default function AdminUsersPage() {
             {loading ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center">
-                  <div className="w-5 h-5 border-2 border-[#29ABE2] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin mx-auto" />
                 </td>
               </tr>
             ) : users.length === 0 ? (
