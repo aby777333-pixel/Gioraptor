@@ -145,16 +145,16 @@ function AccountSummaryPanel() {
 }
 
 function LiveTVPanel() {
-  const [activeChannel, setActiveChannel] = useState<'cnbc' | 'yahoo'>('cnbc');
+  const [activeChannel, setActiveChannel] = useState<'cnbc' | 'bloomberg'>('cnbc');
 
   const channels = {
     cnbc: {
       label: 'CNBC Live',
-      src: 'https://www.youtube.com/embed/9NyxcX3rhQs?autoplay=1&mute=1',
+      src: 'https://www.youtube.com/embed/live_stream?channel=UCrp_UI8XtuYfpiqluWLD7Lw&autoplay=1&mute=1',
     },
-    yahoo: {
-      label: 'Yahoo Finance',
-      src: 'https://www.youtube.com/embed/dp_oeY5Zhpk?autoplay=1&mute=1',
+    bloomberg: {
+      label: 'Bloomberg TV',
+      src: 'https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg&autoplay=1&mute=1',
     },
   };
 
@@ -169,9 +169,9 @@ function LiveTVPanel() {
             onClick={() => setActiveChannel(key)}
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-semibold transition-all"
             style={{
-              backgroundColor: activeChannel === key ? 'rgba(41,171,226,0.15)' : 'var(--bg-elevated)',
+              backgroundColor: activeChannel === key ? 'rgba(0,145,213,0.15)' : 'var(--bg-elevated)',
               color: activeChannel === key ? '#0091D5' : 'rgba(255,255,255,0.4)',
-              border: activeChannel === key ? '1px solid rgba(41,171,226,0.3)' : '1px solid var(--border)',
+              border: activeChannel === key ? '1px solid rgba(0,145,213,0.3)' : '1px solid var(--border)',
             }}
           >
             <span
