@@ -41,8 +41,8 @@ export default function RightPanel() {
         {activeTab === 'tools' && (
           <div className="flex flex-col h-full">
             <TradingTools />
-            {/* Live TV Streams */}
-            <LiveTVPanel />
+            {/* Market Overview Widget */}
+            <MarketOverviewWidget />
           </div>
         )}
       </div>
@@ -144,62 +144,81 @@ function AccountSummaryPanel() {
   );
 }
 
-function LiveTVPanel() {
-  const [activeChannel, setActiveChannel] = useState<'cnbc' | 'bloomberg'>('cnbc');
+function MarketOverviewWidget() {
+  const containerId = 'tv-market-overview';
 
-  const channels = {
-    cnbc: {
-      label: 'CNBC Live',
-      src: 'https://www.youtube.com/embed/live_stream?channel=UCrp_UI8XtuYfpiqluWLD7Lw&autoplay=1&mute=1',
-    },
-    bloomberg: {
-      label: 'Bloomberg TV',
-      src: 'https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg&autoplay=1&mute=1',
-    },
-  };
-
-  const current = channels[activeChannel];
+  useState(() => {
+    if (typeof window === 'undefined') return;
+    const timer = setTimeout(() => {
+      const container = document.getElementById(containerId);
+      if (!container || container.querySelector('script')) return;
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js';
+      script.async = true;
+      script.textContent = JSON.stringify({
+        colorTheme: 'dark',
+        dateRange: '1D',
+        showChart: false,
+        locale: 'en',
+        largeChartUrl: '',
+        isTransparent: true,
+        showSymbolLogo: true,
+        showFloatingTooltip: false,
+        width: '100%',
+        height: '100%',
+        tabs: [
+          {
+            title: 'Forex',
+            symbols: [
+              { s: 'FX:EURUSD', d: 'EUR/USD' },
+              { s: 'FX:GBPUSD', d: 'GBP/USD' },
+              { s: 'FX:USDJPY', d: 'USD/JPY' },
+              { s: 'FX:AUDUSD', d: 'AUD/USD' },
+            ],
+            originalTitle: 'Forex',
+          },
+          {
+            title: 'Indices',
+            symbols: [
+              { s: 'FOREXCOM:SPXUSD', d: 'S&P 500' },
+              { s: 'FOREXCOM:NSXUSD', d: 'Nasdaq' },
+              { s: 'INDEX:DXY', d: 'Dollar Index' },
+            ],
+            originalTitle: 'Indices',
+          },
+          {
+            title: 'Crypto',
+            symbols: [
+              { s: 'COINBASE:BTCUSD', d: 'BTC/USD' },
+              { s: 'COINBASE:ETHUSD', d: 'ETH/USD' },
+              { s: 'BINANCE:SOLUSDT', d: 'SOL/USDT' },
+            ],
+            originalTitle: 'Crypto',
+          },
+        ],
+      });
+      container.appendChild(script);
+    }, 100);
+    return () => clearTimeout(timer);
+  });
 
   return (
     <div className="p-3 flex flex-col gap-2">
-      <div className="flex gap-1">
-        {(Object.keys(channels) as Array<keyof typeof channels>).map((key) => (
-          <button
-            key={key}
-            onClick={() => setActiveChannel(key)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-semibold transition-all"
-            style={{
-              backgroundColor: activeChannel === key ? 'rgba(0,145,213,0.15)' : 'var(--bg-elevated)',
-              color: activeChannel === key ? '#0091D5' : 'rgba(255,255,255,0.4)',
-              border: activeChannel === key ? '1px solid rgba(0,145,213,0.3)' : '1px solid var(--border)',
-            }}
-          >
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor: activeChannel === key ? '#FF0000' : 'rgba(255,255,255,0.15)',
-              }}
-            />
-            {channels[key].label}
-          </button>
-        ))}
+      <div
+        className="flex items-center gap-1.5 py-1 px-2 text-[10px] uppercase tracking-wider font-semibold"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00C896]" />
+        Market Overview
       </div>
       <div
-        className="rounded-lg overflow-hidden"
+        className="tradingview-widget-container rounded-lg overflow-hidden"
+        id={containerId}
         style={{
+          height: 220,
           border: '1px solid rgba(255,255,255,0.06)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         }}
-      >
-        <iframe
-          key={activeChannel}
-          src={current.src}
-          title={current.label}
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          style={{ width: '100%', height: 155, border: 'none', backgroundColor: '#000' }}
-        />
-      </div>
+      />
     </div>
   );
 }
