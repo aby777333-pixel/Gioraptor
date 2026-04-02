@@ -60,17 +60,12 @@
   --gold: #D49000;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Tailwind v4 preflight handles reset — no manual * reset needed */
 
 body {
   font-family: var(--font-inter, 'Inter'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
