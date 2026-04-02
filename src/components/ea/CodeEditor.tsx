@@ -181,7 +181,7 @@ export default function CodeEditor({ code, onChange }: CodeEditorProps) {
   }, [onChange]);
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: '#080C14' }}>
+    <div className="flex flex-col h-full" style={{ backgroundColor: '#060D16' }}>
       {/* File tab bar */}
       <div
         className="flex items-center justify-between px-2 border-b shrink-0"
@@ -195,12 +195,12 @@ export default function CodeEditor({ code, onChange }: CodeEditorProps) {
           <div
             className="flex items-center gap-1.5 px-3 py-1 text-[11px] rounded-t"
             style={{
-              backgroundColor: '#080C14',
-              color: '#C8102E',
-              borderTop: '2px solid #C8102E',
+              backgroundColor: '#060D16',
+              color: '#0091D5',
+              borderTop: '2px solid #0091D5',
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C8102E" strokeWidth="2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0091D5" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
@@ -315,7 +315,7 @@ export default function CodeEditor({ code, onChange }: CodeEditorProps) {
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             backgroundColor: 'transparent',
             color: 'transparent',
-            caretColor: '#C8102E',
+            caretColor: '#0091D5',
             whiteSpace: 'pre',
             overflowWrap: 'normal',
             tabSize: 2,

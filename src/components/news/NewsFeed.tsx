@@ -60,7 +60,7 @@ export default function NewsFeed() {
               )}
               style={{
                 backgroundColor: category === cat.key ? 'var(--bg-elevated)' : 'transparent',
-                color: category === cat.key ? '#C8102E' : 'var(--text-secondary)',
+                color: category === cat.key ? '#0091D5' : 'var(--text-secondary)',
               }}
             >
               {cat.label}

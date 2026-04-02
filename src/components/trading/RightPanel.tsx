@@ -25,8 +25,8 @@ export default function RightPanel() {
             className="flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-all"
             style={{
               backgroundColor: activeTab === tab ? 'var(--bg-elevated)' : 'transparent',
-              color: activeTab === tab ? '#C8102E' : 'rgba(255,255,255,0.45)',
-              borderBottom: activeTab === tab ? '2px solid #C8102E' : '2px solid transparent',
+              color: activeTab === tab ? '#0091D5' : 'rgba(255,255,255,0.45)',
+              borderBottom: activeTab === tab ? '2px solid #0091D5' : '2px solid transparent',
             }}
           >
             {tab === 'order' ? 'Order' : tab === 'account' ? 'Account' : 'Tools'}
@@ -170,7 +170,7 @@ function LiveTVPanel() {
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-semibold transition-all"
             style={{
               backgroundColor: activeChannel === key ? 'rgba(41,171,226,0.15)' : 'var(--bg-elevated)',
-              color: activeChannel === key ? '#C8102E' : 'rgba(255,255,255,0.4)',
+              color: activeChannel === key ? '#0091D5' : 'rgba(255,255,255,0.4)',
               border: activeChannel === key ? '1px solid rgba(41,171,226,0.3)' : '1px solid var(--border)',
             }}
           >

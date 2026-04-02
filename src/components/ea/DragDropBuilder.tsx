@@ -108,7 +108,7 @@ const ACTION_BLOCKS: Block[] = [
     label: 'Set SL/TP',
     category: 'action',
     icon: <ShieldCheck size={14} />,
-    color: '#C8102E',
+    color: '#0091D5',
     params: [
       { name: 'Stop Loss', value: '20' },
       { name: 'Take Profit', value: '40' },
@@ -145,7 +145,7 @@ export default function DragDropBuilder() {
   };
 
   return (
-    <div className="flex h-full" style={{ backgroundColor: '#080C14' }}>
+    <div className="flex h-full" style={{ backgroundColor: '#060D16' }}>
       {/* Block Palette - Left sidebar */}
       <div
         className="flex flex-col shrink-0 border-r overflow-y-auto"

@@ -149,7 +149,7 @@ export default function IndicatorPanel({
 
       {/* Active indicator count */}
       {activeIndicators.size > 0 && (
-        <div className="px-3 py-1.5 text-[10px] shrink-0" style={{ color: '#C8102E', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="px-3 py-1.5 text-[10px] shrink-0" style={{ color: '#0091D5', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           {activeIndicators.size} indicator{activeIndicators.size !== 1 ? 's' : ''} active
         </div>
       )}
@@ -192,7 +192,7 @@ export default function IndicatorPanel({
                         style={{
                           width: 28,
                           height: 14,
-                          backgroundColor: isActive ? '#C8102E' : 'rgba(255,255,255,0.1)',
+                          backgroundColor: isActive ? '#0091D5' : 'rgba(255,255,255,0.1)',
                         }}
                       >
                         <div
@@ -206,7 +206,7 @@ export default function IndicatorPanel({
                         />
                       </div>
                       <div>
-                        <div className="text-[11px]" style={{ color: isActive ? '#C8102E' : 'rgba(255,255,255,0.7)' }}>
+                        <div className="text-[11px]" style={{ color: isActive ? '#0091D5' : 'rgba(255,255,255,0.7)' }}>
                           {ind.name}
                         </div>
                         <div className="text-[9px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
@@ -223,7 +223,7 @@ export default function IndicatorPanel({
                           setEditingId(isEditing ? null : ind.id);
                         }}
                         className="p-1 rounded hover:bg-white/10 transition-colors"
-                        style={{ color: isEditing ? '#C8102E' : 'rgba(255,255,255,0.3)' }}
+                        style={{ color: isEditing ? '#0091D5' : 'rgba(255,255,255,0.3)' }}
                       >
                         <Settings2 size={12} />
                       </button>

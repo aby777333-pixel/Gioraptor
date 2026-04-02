@@ -84,7 +84,7 @@ export default function CalendarPage() {
           Terminal
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--border)' }} />
-        <Calendar size={16} style={{ color: '#C8102E' }} />
+        <Calendar size={16} style={{ color: '#0091D5' }} />
         <h1 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           Economic Calendar
         </h1>
@@ -114,7 +114,7 @@ export default function CalendarPage() {
               )}
               style={{
                 backgroundColor: dateRange === r ? 'var(--bg-elevated)' : 'transparent',
-                color: dateRange === r ? '#C8102E' : 'var(--text-secondary)',
+                color: dateRange === r ? '#0091D5' : 'var(--text-secondary)',
               }}
             >
               {r === 'today' ? 'Today' : r === 'week' ? 'This Week' : 'This Month'}

@@ -51,7 +51,7 @@ export default function AdminOrdersPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[#111118] border border-white/[0.06] rounded-md px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-[#C8102E]/40"
+          className="bg-[#111118] border border-white/[0.06] rounded-md px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-[#0091D5]/40"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -84,7 +84,7 @@ export default function AdminOrdersPage() {
             {loading ? (
               <tr>
                 <td colSpan={11} className="px-4 py-12 text-center">
-                  <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-5 h-5 border-2 border-[#0091D5] border-t-transparent rounded-full animate-spin mx-auto" />
                 </td>
               </tr>
             ) : orders.length === 0 ? (
@@ -127,8 +127,8 @@ function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     filled: 'bg-[#00C27A]/15 text-[#00C27A]',
     pending: 'bg-[#E2A229]/15 text-[#E2A229]',
-    new: 'bg-[#C8102E]/15 text-[#C8102E]',
-    partial: 'bg-[#C8102E]/15 text-[#C8102E]',
+    new: 'bg-[#0091D5]/15 text-[#0091D5]',
+    partial: 'bg-[#0091D5]/15 text-[#0091D5]',
     cancelled: 'bg-white/10 text-white/40',
     rejected: 'bg-[#C1121F]/15 text-[#C1121F]',
     expired: 'bg-white/10 text-white/30',

@@ -56,11 +56,11 @@ function calcPnlPercent(pnl: number, entryValue: number): string {
 /* ---------- inline styles ---------- */
 const S = {
   headerBg: '#111118',
-  tableBg: '#080C14',
+  tableBg: '#060D16',
   rowHover: 'rgba(255,255,255,0.02)',
   rowAltBg: 'rgba(255,255,255,0.015)',
   border: 'rgba(255,255,255,0.06)',
-  accentBlue: '#C8102E',
+  accentBlue: '#0091D5',
   green: '#22c55e',
   red: '#ef4444',
   textDim: 'rgba(255,255,255,0.35)',
@@ -430,10 +430,10 @@ export default function PositionsPanel() {
             style={{
               width: 28,
               height: 28,
-              color: showTableSettings ? '#C8102E' : 'rgba(255,255,255,0.4)',
+              color: showTableSettings ? '#0091D5' : 'rgba(255,255,255,0.4)',
               backgroundColor: showTableSettings ? 'rgba(41,171,226,0.1)' : 'transparent',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#C8102E'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#0091D5'; }}
             onMouseLeave={(e) => { if (!showTableSettings) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
             title="Table Settings"
           >
@@ -450,7 +450,7 @@ export default function PositionsPanel() {
                 minWidth: 220,
               }}
             >
-              <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#C8102E' }}>
+              <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#0091D5' }}>
                 Table Settings
               </div>
               <div className="text-[10px] mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -474,7 +474,7 @@ export default function PositionsPanel() {
                     checked={visibleColumns.has(opt.key)}
                     onChange={() => toggleColumn(opt.key)}
                     className="rounded"
-                    style={{ accentColor: '#C8102E', width: 14, height: 14 }}
+                    style={{ accentColor: '#0091D5', width: 14, height: 14 }}
                   />
                   {opt.label}
                 </label>

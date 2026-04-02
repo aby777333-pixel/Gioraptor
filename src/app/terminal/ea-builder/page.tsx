@@ -46,7 +46,7 @@ export default function EABuilderPage() {
   return (
     <div
       className="h-screen w-screen overflow-hidden flex flex-col"
-      style={{ backgroundColor: '#080C14', color: '#E0E0E0' }}
+      style={{ backgroundColor: '#060D16', color: '#E0E0E0' }}
     >
       {/* Top Toolbar */}
       <div
@@ -73,10 +73,10 @@ export default function EABuilderPage() {
           />
 
           <div className="flex items-center gap-2">
-            <Bot size={16} style={{ color: '#C8102E' }} />
+            <Bot size={16} style={{ color: '#0091D5' }} />
             <span
               className="text-[13px] font-bold"
-              style={{ color: '#C8102E' }}
+              style={{ color: '#0091D5' }}
             >
               EA Strategy Builder
             </span>
@@ -91,7 +91,7 @@ export default function EABuilderPage() {
             type="text"
             value={strategyName}
             onChange={(e) => setStrategyName(e.target.value)}
-            className="px-2 py-1 rounded text-[12px] font-mono outline-none bg-transparent border border-transparent hover:border-[#1E1E2E] focus:border-[#C8102E] transition-colors"
+            className="px-2 py-1 rounded text-[12px] font-mono outline-none bg-transparent border border-transparent hover:border-[#1E1E2E] focus:border-[#0091D5] transition-colors"
             style={{ color: '#CCC', width: 200 }}
           />
         </div>
@@ -116,7 +116,7 @@ export default function EABuilderPage() {
             disabled={isRunning}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-semibold transition-all"
             style={{
-              backgroundColor: isRunning ? '#1A5A72' : '#C8102E',
+              backgroundColor: isRunning ? '#1A5A72' : '#0091D5',
               color: isRunning ? '#888' : '#000',
               cursor: isRunning ? 'not-allowed' : 'pointer',
             }}
@@ -127,7 +127,7 @@ export default function EABuilderPage() {
                   className="w-3 h-3 border-2 rounded-full animate-spin"
                   style={{
                     borderColor: '#666',
-                    borderTopColor: '#C8102E',
+                    borderTopColor: '#0091D5',
                   }}
                 />
                 Running...
@@ -260,7 +260,7 @@ function EditorTabButton({
       style={{
         color: active ? '#E0E0E0' : '#555',
         backgroundColor: active ? '#111118' : 'transparent',
-        borderBottom: active ? '2px solid #C8102E' : '2px solid transparent',
+        borderBottom: active ? '2px solid #0091D5' : '2px solid transparent',
       }}
     >
       {icon}

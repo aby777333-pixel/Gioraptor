@@ -78,9 +78,9 @@ const modules = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#080C14] text-[#F0F4FF] overflow-y-auto overflow-x-hidden">
+    <div className="min-h-screen bg-[#060D16] text-[#EAF0FA] overflow-y-auto overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#080C14]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#060D16]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 36 }} />
@@ -100,7 +100,7 @@ export default function Home() {
             </Link>
             <Link
               href="/auth/register"
-              className="rounded-lg bg-[#C8102E] px-5 py-2 text-sm font-semibold transition-all hover:bg-[#A00D24] hover:shadow-lg hover:shadow-[#C8102E]/20"
+              className="rounded-lg bg-[#0091D5] px-5 py-2 text-sm font-semibold transition-all hover:bg-[#007AB8] hover:shadow-lg hover:shadow-[#0091D5]/20"
             >
               Get Started
             </Link>
@@ -111,18 +111,18 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pt-16">
         {/* Gradient background */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(200,16,46,0.08)_0%,_transparent_60%)]" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#C8102E]/[0.04] blur-[120px] rounded-full" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,145,213,0.08)_0%,_transparent_60%)]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#0091D5]/[0.04] blur-[120px] rounded-full" />
 
         <div className="relative z-10 mx-auto max-w-5xl text-center">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#C8102E]/20 bg-[#C8102E]/[0.06] px-5 py-2 text-sm text-[#C8102E]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C8102E] animate-pulse" />
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#0091D5]/20 bg-[#0091D5]/[0.06] px-5 py-2 text-sm text-[#0091D5]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#0091D5] animate-pulse" />
             Raptor Trading System v2.0
           </div>
           <h1 className="mb-6 text-5xl font-bold tracking-tight leading-[1.1] sm:text-7xl lg:text-8xl">
             The Operating System
             <br />
-            <span className="bg-gradient-to-r from-[#C8102E] via-[#F0A500] to-[#C8102E] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#0082C8] via-[#00A5A8] to-[#009B4D] bg-clip-text text-transparent">
               for Modern Brokerages
             </span>
           </h1>
@@ -132,7 +132,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/auth/register"
-              className="group flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#C8102E] px-10 text-base font-semibold transition-all hover:bg-[#A00D24] hover:shadow-xl hover:shadow-[#C8102E]/25 sm:w-auto"
+              className="group flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto"
             >
               Start Trading
               <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -174,7 +174,7 @@ export default function Home() {
       <section id="features" className="relative px-6 py-32">
         <div className="mx-auto max-w-7xl">
           <div className="mb-16 text-center">
-            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#C8102E]">
+            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">
               Core Capabilities
             </span>
             <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">
@@ -188,12 +188,12 @@ export default function Home() {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="group relative rounded-2xl border border-white/[0.06] bg-[#0F1724]/60 p-8 transition-all duration-300 hover:border-[#C8102E]/20 hover:bg-[#0F1724]/80 backdrop-blur-sm"
+                className="group relative rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 transition-all duration-300 hover:border-[#0091D5]/20 hover:bg-[#0B1422]/80 backdrop-blur-sm"
               >
                 <div className="absolute top-8 right-8 text-xs font-bold text-[#F0A500]/60 mono">
                   {feature.stat}
                 </div>
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#C8102E]/10 text-[#C8102E] transition-colors group-hover:bg-[#C8102E]/15">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#0091D5]/10 text-[#0091D5] transition-colors group-hover:bg-[#0091D5]/15">
                   {feature.icon}
                 </div>
                 <h3 className="mb-2.5 text-lg font-semibold">{feature.title}</h3>
@@ -210,7 +210,7 @@ export default function Home() {
       <section id="modules" className="relative px-6 py-32 border-t border-white/[0.04]">
         <div className="mx-auto max-w-7xl">
           <div className="mb-16 text-center">
-            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#F0A500]">
+            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#009B4D]">
               Complete Ecosystem
             </span>
             <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">
@@ -224,9 +224,9 @@ export default function Home() {
             {modules.map((m) => (
               <div
                 key={m}
-                className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0F1724]/40 px-5 py-4 text-sm font-medium text-[#7A8BA8] transition-all hover:border-[#C8102E]/15 hover:text-white hover:bg-[#0F1724]/60"
+                className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B1422]/40 px-5 py-4 text-sm font-medium text-[#7A8BA8] transition-all hover:border-[#0091D5]/15 hover:text-white hover:bg-[#0B1422]/60"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-[#C8102E]/60" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[#009B4D]/60" />
                 {m}
               </div>
             ))}
@@ -239,7 +239,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#C8102E]">
+              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00A5A8]">
                 Technology Stack
               </span>
               <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -257,7 +257,7 @@ export default function Home() {
                   { label: 'Charts', tech: 'TradingView LW' },
                   { label: 'Security', tech: 'AES-256 + TLS 1.3' },
                 ].map((t) => (
-                  <div key={t.label} className="rounded-lg border border-white/[0.06] bg-[#0F1724]/40 px-4 py-3">
+                  <div key={t.label} className="rounded-lg border border-white/[0.06] bg-[#0B1422]/40 px-4 py-3">
                     <div className="text-[10px] uppercase tracking-wider text-[#4A5568] mb-0.5">{t.label}</div>
                     <div className="text-sm font-medium mono">{t.tech}</div>
                   </div>
@@ -265,7 +265,7 @@ export default function Home() {
               </div>
             </div>
             <div className="relative">
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0F1724]/60 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 backdrop-blur-sm">
                 <div className="mb-6 flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-[#FF4560]" />
                   <span className="h-3 w-3 rounded-full bg-[#F0A500]" />
@@ -300,12 +300,12 @@ export default function Home() {
 
       {/* CTA Section */}
       <section className="relative px-6 py-32 border-t border-white/[0.04]">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_rgba(200,16,46,0.06)_0%,_transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_rgba(0,155,77,0.06)_0%,_transparent_60%)]" />
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-5xl">
             Ready to Launch Your
             <br />
-            <span className="text-[#C8102E]">Trading Infrastructure?</span>
+            <span className="bg-gradient-to-r from-[#0082C8] to-[#009B4D] bg-clip-text text-transparent">Trading Infrastructure?</span>
           </h2>
           <p className="mb-10 text-[#7A8BA8] text-lg">
             Whether you&apos;re a trader, fund manager, or broker — Raptor scales with you.
@@ -313,7 +313,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/auth/register"
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#C8102E] px-10 text-base font-semibold transition-all hover:bg-[#A00D24] hover:shadow-xl hover:shadow-[#C8102E]/25 sm:w-auto"
+              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto"
             >
               Create Free Account
             </Link>

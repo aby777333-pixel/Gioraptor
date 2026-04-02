@@ -142,7 +142,7 @@ export default function SignalDashboard() {
         style={{ borderColor: 'var(--border)' }}
       >
         <div className="flex items-center gap-2">
-          <Brain size={18} style={{ color: '#C8102E' }} />
+          <Brain size={18} style={{ color: '#0091D5' }} />
           <div>
             <h1 className="text-sm font-bold">AI Market Scanner</h1>
             <p className="text-[10px] opacity-40">
@@ -170,9 +170,9 @@ export default function SignalDashboard() {
               autoScan ? 'opacity-100' : 'opacity-50'
             )}
             style={{
-              backgroundColor: autoScan ? '#C8102E20' : 'var(--bg-primary)',
-              color: autoScan ? '#C8102E' : undefined,
-              border: `1px solid ${autoScan ? '#C8102E40' : 'var(--border)'}`,
+              backgroundColor: autoScan ? '#0091D520' : 'var(--bg-primary)',
+              color: autoScan ? '#0091D5' : undefined,
+              border: `1px solid ${autoScan ? '#0091D540' : 'var(--border)'}`,
             }}
           >
             <Power size={10} />
@@ -187,7 +187,7 @@ export default function SignalDashboard() {
         style={{ borderColor: 'var(--border)' }}
       >
         <StatCard
-          icon={<Activity size={13} style={{ color: '#C8102E' }} />}
+          icon={<Activity size={13} style={{ color: '#0091D5' }} />}
           label="Active Signals"
           value={totalSignals.toString()}
         />
@@ -338,7 +338,7 @@ function FilterGroup<T extends string>({
           )}
           style={
             value === opt.value
-              ? { backgroundColor: '#C8102E20', color: '#C8102E' }
+              ? { backgroundColor: '#0091D520', color: '#0091D5' }
               : undefined
           }
         >

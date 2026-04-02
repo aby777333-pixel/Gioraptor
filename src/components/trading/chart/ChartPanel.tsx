@@ -444,29 +444,29 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     if (activeTool === 'text') {
       const text = prompt('Enter text:');
       if (text) {
-        setDrawings((prev) => [...prev, { type: 'text', startX: x, startY: y, endX: x, endY: y, color: '#C8102E', text }]);
+        setDrawings((prev) => [...prev, { type: 'text', startX: x, startY: y, endX: x, endY: y, color: '#0091D5', text }]);
       }
       return;
     }
 
     if (activeTool === 'vertical') {
-      setDrawings((prev) => [...prev, { type: 'vertical', startX: x, startY: y, endX: x, endY: y, color: '#C8102E' }]);
+      setDrawings((prev) => [...prev, { type: 'vertical', startX: x, startY: y, endX: x, endY: y, color: '#0091D5' }]);
       return;
     }
 
     if (activeTool === 'horizontal') {
       // For horizontal line via canvas, draw at click Y
-      setDrawings((prev) => [...prev, { type: 'horizontal', startX: x, startY: y, endX: x, endY: y, color: '#C8102E' }]);
+      setDrawings((prev) => [...prev, { type: 'horizontal', startX: x, startY: y, endX: x, endY: y, color: '#0091D5' }]);
       // Also create a real price line if we have crosshair price
       if (lastCrosshairPriceRef.current !== null && candleSeriesRef.current) {
         const pl = candleSeriesRef.current.createPriceLine({
           price: lastCrosshairPriceRef.current,
-          color: '#C8102E',
+          color: '#0091D5',
           lineWidth: 1 as const,
           lineStyle: LineStyle.Dotted,
           lineVisible: true,
           axisLabelVisible: true,
-          axisLabelColor: '#C8102E',
+          axisLabelColor: '#0091D5',
           axisLabelTextColor: '#ffffff',
         });
         customPriceLinesRef.current.push(pl);
@@ -505,7 +505,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         startY: drawStart.y,
         endX: x,
         endY: y,
-        color: '#C8102E',
+        color: '#0091D5',
       },
     ]);
 
@@ -611,7 +611,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
 
     const chartOptions: DeepPartial<ChartOptions> = {
       layout: {
-        background: { type: ColorType.Solid, color: '#080C14' },
+        background: { type: ColorType.Solid, color: '#060D16' },
         textColor: 'rgba(255,255,255,0.5)',
         fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
         fontSize: 11,
@@ -626,13 +626,13 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
           color: 'rgba(41,171,226,0.4)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#C8102E',
+          labelBackgroundColor: '#0091D5',
         },
         horzLine: {
           color: 'rgba(41,171,226,0.4)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#C8102E',
+          labelBackgroundColor: '#0091D5',
         },
       },
       rightPriceScale: {
@@ -690,7 +690,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
 
     // Line series (hidden by default)
     const lineSer = chart.addSeries(LineSeries, {
-      color: '#C8102E',
+      color: '#0091D5',
       lineWidth: 2,
       visible: false,
     });
@@ -1084,12 +1084,12 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const lastPrice = allBars[allBars.length - 1].close;
     const priceLineOptions = {
       price: lastPrice,
-      color: '#C8102E',
+      color: '#0091D5',
       lineWidth: 1 as const,
       lineStyle: LineStyle.Dotted,
       lineVisible: true,
       axisLabelVisible: true,
-      axisLabelColor: '#C8102E',
+      axisLabelColor: '#0091D5',
       axisLabelTextColor: '#ffffff',
     };
 
@@ -1220,7 +1220,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
               height: 30,
               borderRadius: 4,
               backgroundColor: active ? 'rgba(41,171,226,0.15)' : 'transparent',
-              color: active ? '#C8102E' : 'rgba(255,255,255,0.5)',
+              color: active ? '#0091D5' : 'rgba(255,255,255,0.5)',
               cursor: 'pointer',
             }}
             onMouseOver={(e) => {
@@ -1284,7 +1284,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         {/* Symbol label */}
         <span
           className="text-[13px] font-bold mr-1 font-mono shrink-0"
-          style={{ color: '#C8102E' }}
+          style={{ color: '#0091D5' }}
         >
           {activeSymbol}
         </span>
@@ -1329,7 +1329,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
                 : 'opacity-40 hover:opacity-70'
             )}
             style={{
-              backgroundColor: selectedTf === tf ? '#C8102E' : 'transparent',
+              backgroundColor: selectedTf === tf ? '#0091D5' : 'transparent',
               color: selectedTf === tf ? '#fff' : undefined,
             }}
           >
@@ -1363,7 +1363,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
           className="flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-opacity shrink-0"
           style={{
             backgroundColor: activeIndicators.size > 0 ? 'rgba(41,171,226,0.15)' : 'rgba(255,255,255,0.04)',
-            color: activeIndicators.size > 0 ? '#C8102E' : undefined,
+            color: activeIndicators.size > 0 ? '#0091D5' : undefined,
             opacity: activeIndicators.size > 0 ? 1 : 0.5,
           }}
           title="Indicators"
@@ -1410,7 +1410,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         </div>
 
         {/* Chart area */}
-        <div className="flex-1 relative" style={{ backgroundColor: '#080C14' }}>
+        <div className="flex-1 relative" style={{ backgroundColor: '#060D16' }}>
           <div ref={chartContainerRef} className="absolute inset-0" />
 
           {/* Drawing canvas overlay */}

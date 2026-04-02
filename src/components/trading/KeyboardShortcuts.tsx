@@ -40,7 +40,7 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
           className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#C8102E' }}>
+          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#0091D5' }}>
             Keyboard Shortcuts
           </h2>
           <button
@@ -65,7 +65,7 @@ export default function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.08)',
                   border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#C8102E',
+                  color: '#0091D5',
                 }}
               >
                 {s.key}

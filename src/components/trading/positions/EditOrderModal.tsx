@@ -142,7 +142,7 @@ export default function EditOrderModal({ position, onClose, onSuccess }: EditOrd
               className="flex items-center justify-center rounded-xl"
               style={{ width: 36, height: 36, backgroundColor: 'rgba(41,171,226,0.12)' }}
             >
-              <Pencil size={18} style={{ color: '#C8102E' }} />
+              <Pencil size={18} style={{ color: '#0091D5' }} />
             </div>
             <div>
               <span className="text-[16px] font-semibold block" style={{ color: '#F0F0F0' }}>
@@ -170,7 +170,7 @@ export default function EditOrderModal({ position, onClose, onSuccess }: EditOrd
               onClick={() => setActiveTab(tab)}
               className="flex-1 py-3 text-[12px] font-semibold uppercase tracking-wider transition-all"
               style={{
-                color: activeTab === tab ? '#C8102E' : 'rgba(255,255,255,0.3)',
+                color: activeTab === tab ? '#0091D5' : 'rgba(255,255,255,0.3)',
                 backgroundColor: activeTab === tab ? 'rgba(41,171,226,0.08)' : 'transparent',
               }}
             >
@@ -338,7 +338,7 @@ export default function EditOrderModal({ position, onClose, onSuccess }: EditOrd
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'rgba(41,171,226,0.12)';
                       e.currentTarget.style.borderColor = 'rgba(41,171,226,0.3)';
-                      e.currentTarget.style.color = '#C8102E';
+                      e.currentTarget.style.color = '#0091D5';
                       e.currentTarget.style.boxShadow = '0 0 10px rgba(41,171,226,0.1)';
                     }}
                     onMouseLeave={(e) => {
@@ -404,7 +404,7 @@ export default function EditOrderModal({ position, onClose, onSuccess }: EditOrd
               style={{
                 backgroundColor: isSubmitting ? 'rgba(41,171,226,0.08)' : 'rgba(41,171,226,0.15)',
                 border: '1px solid rgba(41,171,226,0.3)',
-                color: '#C8102E',
+                color: '#0091D5',
                 cursor: isSubmitting ? 'wait' : 'pointer',
                 boxShadow: '0 4px 16px rgba(41,171,226,0.1)',
               }}

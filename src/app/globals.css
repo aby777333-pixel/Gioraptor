@@ -1,19 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  /* GIO4X Raptor Design System v2.0 */
-  --bg-primary: #080C14;
-  --bg-surface: #0F1724;
-  --bg-elevated: #151D2E;
-  --bg-hover: #1A2438;
+  /* GIO4X Raptor Design System — derived from logo
+     Logo gradient: Blue #0082C8 → Teal #00A5A8 → Green #009B4D
+     "GIO" gray: #9CA0A8 | "4" blue | "X" green                */
+  --bg-primary: #060D16;
+  --bg-surface: #0B1422;
+  --bg-elevated: #111D2E;
+  --bg-hover: #162638;
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.12);
-  --text-primary: #F0F4FF;
+  --text-primary: #EAF0FA;
   --text-secondary: #7A8BA8;
   --text-muted: #4A5568;
-  --accent: #C8102E;
-  --accent-hover: #A00D24;
-  --accent-glow: rgba(200, 16, 46, 0.25);
+  --accent: #0091D5;
+  --accent-hover: #007AB8;
+  --accent-glow: rgba(0, 145, 213, 0.22);
+  --accent-green: #009B4D;
+  --accent-green-glow: rgba(0, 155, 77, 0.2);
+  --teal: #00A5A8;
+  --teal-glow: rgba(0, 165, 168, 0.2);
   --gold: #F0A500;
   --gold-glow: rgba(240, 165, 0, 0.2);
   --profit: #00C896;
@@ -24,7 +30,6 @@
   --sell-bg: rgba(255, 69, 96, 0.1);
   --buy-hover: rgba(0, 200, 150, 0.2);
   --sell-hover: rgba(255, 69, 96, 0.2);
-  --info: #29ABE2;
 }
 
 @theme inline {
@@ -38,25 +43,26 @@
   --color-buy: var(--buy);
   --color-sell: var(--sell);
   --color-gold: var(--gold);
+  --color-teal: var(--teal);
   --color-muted: var(--text-muted);
   --color-secondary: var(--text-secondary);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  --color-info: var(--info);
 }
 
 [data-theme="light"] {
-  --bg-primary: #F8F9FA;
+  --bg-primary: #F5F7FA;
   --bg-surface: #FFFFFF;
-  --bg-elevated: #F0F1F3;
-  --bg-hover: #E8E9EB;
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.2);
-  --text-primary: #1A1A2E;
-  --text-secondary: #444455;
-  --text-muted: #777788;
-  --accent: #C8102E;
-  --accent-hover: #A00D24;
+  --bg-elevated: #EEF1F5;
+  --bg-hover: #E2E6EC;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --text-primary: #0F1A2E;
+  --text-secondary: #3E4C66;
+  --text-muted: #7A8599;
+  --accent: #0078B4;
+  --accent-hover: #006199;
+  --accent-green: #008040;
   --gold: #D49000;
 }
 
@@ -122,7 +128,7 @@ body {
   backdrop-filter: blur(20px);
 }
 .card:hover {
-  border-color: rgba(200, 16, 46, 0.25);
+  border-color: rgba(0, 145, 213, 0.25);
   box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 20px var(--accent-glow);
   transform: translateY(-1px);
 }
@@ -150,7 +156,7 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 .tool-card:hover {
-  border-color: rgba(200, 16, 46, 0.2);
+  border-color: rgba(0, 145, 213, 0.2);
   box-shadow: 0 2px 16px rgba(0,0,0,0.3), 0 0 12px var(--accent-glow);
 }
 
@@ -170,7 +176,7 @@ body {
 
 /* Glass effect utility */
 .glass {
-  background: rgba(15, 23, 36, 0.6);
+  background: rgba(11, 20, 34, 0.6);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border);
 }

@@ -60,7 +60,7 @@ export default function CopyTradingPage() {
   }, [search, sortBy, timeframe]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#080C14' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#060D16' }}>
       {/* Header */}
       <div
         className="border-b px-6 py-5"
@@ -69,7 +69,7 @@ export default function CopyTradingPage() {
         <div className="flex items-center gap-3 mb-1">
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: '#C8102E' }}
+            style={{ backgroundColor: '#0091D5' }}
           >
             <Users size={18} color="#000" />
           </div>
@@ -99,8 +99,8 @@ export default function CopyTradingPage() {
             onClick={() => setActiveTab(tab.key)}
             className="flex items-center gap-1.5 px-4 py-3 text-xs font-medium transition-all border-b-2"
             style={{
-              borderColor: activeTab === tab.key ? '#C8102E' : 'transparent',
-              color: activeTab === tab.key ? '#C8102E' : 'rgba(255,255,255,0.4)',
+              borderColor: activeTab === tab.key ? '#0091D5' : 'transparent',
+              color: activeTab === tab.key ? '#0091D5' : 'rgba(255,255,255,0.4)',
             }}
           >
             {tab.icon}
@@ -125,7 +125,7 @@ export default function CopyTradingPage() {
                   placeholder="Search providers..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg text-xs text-white border outline-none focus:border-[#C8102E]/50 transition-colors"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg text-xs text-white border outline-none focus:border-[#0091D5]/50 transition-colors"
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.03)',
                     borderColor: 'rgba(255,255,255,0.06)',
@@ -151,10 +151,10 @@ export default function CopyTradingPage() {
                     className="px-2.5 py-1 rounded text-[10px] font-medium transition-all border"
                     style={{
                       backgroundColor:
-                        sortBy === s.key ? '#C8102E' : 'rgba(255,255,255,0.03)',
+                        sortBy === s.key ? '#0091D5' : 'rgba(255,255,255,0.03)',
                       color: sortBy === s.key ? '#000' : 'rgba(255,255,255,0.5)',
                       borderColor:
-                        sortBy === s.key ? '#C8102E' : 'rgba(255,255,255,0.06)',
+                        sortBy === s.key ? '#0091D5' : 'rgba(255,255,255,0.06)',
                     }}
                   >
                     {s.label}
@@ -184,7 +184,7 @@ export default function CopyTradingPage() {
                           ? 'rgba(41,171,226,0.15)'
                           : 'rgba(255,255,255,0.03)',
                       color:
-                        timeframe === t.key ? '#C8102E' : 'rgba(255,255,255,0.5)',
+                        timeframe === t.key ? '#0091D5' : 'rgba(255,255,255,0.5)',
                       borderColor:
                         timeframe === t.key
                           ? 'rgba(41,171,226,0.3)'
@@ -230,7 +230,7 @@ export default function CopyTradingPage() {
               className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4"
               style={{ backgroundColor: 'rgba(41,171,226,0.15)' }}
             >
-              <UserPlus size={24} className="text-[#C8102E]" />
+              <UserPlus size={24} className="text-[#0091D5]" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">
               Become a Signal Provider
@@ -241,7 +241,7 @@ export default function CopyTradingPage() {
             </p>
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="rounded-lg p-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                <div className="text-lg font-bold text-[#C8102E]">70%</div>
+                <div className="text-lg font-bold text-[#0091D5]">70%</div>
                 <div className="text-[10px] text-white/40">Revenue Share</div>
               </div>
               <div className="rounded-lg p-3" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
@@ -255,7 +255,7 @@ export default function CopyTradingPage() {
             </div>
             <button
               className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
-              style={{ backgroundColor: '#C8102E', color: '#000' }}
+              style={{ backgroundColor: '#0091D5', color: '#000' }}
             >
               Apply Now
             </button>

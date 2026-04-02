@@ -37,8 +37,8 @@ function MiniSparkline({ data }: { data: number[] }) {
     <svg width={width} height={height} className="opacity-60">
       <defs>
         <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#C8102E" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#C8102E" stopOpacity="0" />
+          <stop offset="0%" stopColor="#0091D5" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#0091D5" stopOpacity="0" />
         </linearGradient>
       </defs>
       <polygon
@@ -48,7 +48,7 @@ function MiniSparkline({ data }: { data: number[] }) {
       <polyline
         points={points.join(' ')}
         fill="none"
-        stroke="#C8102E"
+        stroke="#0091D5"
         strokeWidth="1.5"
       />
     </svg>
@@ -60,7 +60,7 @@ export default function ProviderCard({ provider, onCopy }: ProviderCardProps) {
 
   return (
     <div
-      className="rounded-lg border p-4 transition-all hover:border-[#C8102E]/30"
+      className="rounded-lg border p-4 transition-all hover:border-[#0091D5]/30"
       style={{
         backgroundColor: '#111118',
         borderColor: 'rgba(255,255,255,0.06)',
@@ -71,7 +71,7 @@ export default function ProviderCard({ provider, onCopy }: ProviderCardProps) {
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-            style={{ backgroundColor: '#C8102E', color: '#000' }}
+            style={{ backgroundColor: '#0091D5', color: '#000' }}
           >
             {provider.avatar}
           </div>
@@ -146,7 +146,7 @@ export default function ProviderCard({ provider, onCopy }: ProviderCardProps) {
         <button
           onClick={() => onCopy(provider)}
           className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-all hover:opacity-90"
-          style={{ backgroundColor: '#C8102E', color: '#000' }}
+          style={{ backgroundColor: '#0091D5', color: '#000' }}
         >
           <TrendingUp size={12} />
           Copy

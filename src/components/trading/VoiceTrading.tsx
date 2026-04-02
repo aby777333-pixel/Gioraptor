@@ -409,7 +409,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
         style={{ borderColor: 'var(--border)' }}
       >
         <div className="flex items-center gap-1.5">
-          <Volume2 size={13} style={{ color: '#C8102E' }} />
+          <Volume2 size={13} style={{ color: '#0091D5' }} />
           <span className="text-[11px] font-bold">Voice Trading</span>
         </div>
         <button
@@ -433,11 +433,11 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
               <>
                 <span
                   className="absolute inset-0 rounded-full animate-ping"
-                  style={{ backgroundColor: '#C8102E30' }}
+                  style={{ backgroundColor: '#0091D530' }}
                 />
                 <span
                   className="absolute -inset-1 rounded-full animate-pulse"
-                  style={{ border: '2px solid #C8102E40' }}
+                  style={{ border: '2px solid #0091D540' }}
                 />
               </>
             )}
@@ -449,11 +449,11 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
               style={{
                 backgroundColor:
                   state === 'listening'
-                    ? '#C8102E'
+                    ? '#0091D5'
                     : state === 'error'
                       ? '#FF174430'
                       : 'var(--bg-primary)',
-                border: `2px solid ${state === 'listening' ? '#C8102E' : 'var(--border)'}`,
+                border: `2px solid ${state === 'listening' ? '#0091D5' : 'var(--border)'}`,
               }}
             >
               {state === 'listening' ? (
@@ -473,7 +473,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
                 key={i}
                 className="w-1 rounded-full"
                 style={{
-                  backgroundColor: '#C8102E',
+                  backgroundColor: '#0091D5',
                   animation: `voiceWave 0.8s ease-in-out ${i * 0.07}s infinite alternate`,
                   height: 4,
                 }}
@@ -490,7 +490,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
             </p>
           )}
           {state === 'listening' && (
-            <p className="text-[10px]" style={{ color: '#C8102E' }}>
+            <p className="text-[10px]" style={{ color: '#0091D5' }}>
               Listening...
             </p>
           )}
@@ -570,9 +570,9 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
           <div
             className="text-[10px] px-2 py-1.5 rounded text-center mb-2"
             style={{
-              backgroundColor: '#C8102E15',
-              color: '#C8102E',
-              border: '1px solid #C8102E30',
+              backgroundColor: '#0091D515',
+              color: '#0091D5',
+              border: '1px solid #0091D530',
             }}
           >
             {feedback}

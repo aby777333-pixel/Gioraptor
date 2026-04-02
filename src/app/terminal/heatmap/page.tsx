@@ -25,7 +25,7 @@ export default function HeatmapPage() {
           <ArrowLeft size={14} /> Terminal
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--border)' }} />
-        <Grid3X3 size={16} style={{ color: '#C8102E' }} />
+        <Grid3X3 size={16} style={{ color: '#0091D5' }} />
         <h1 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           Market Heatmap & Currency Strength
         </h1>

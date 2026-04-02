@@ -48,7 +48,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#080C14] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#060D16] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-8">
@@ -78,7 +78,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#C8102E]/50 focus:ring-1 focus:ring-[#C8102E]/50"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#0091D5]/50 focus:ring-1 focus:ring-[#0091D5]/50"
             />
           </div>
 
@@ -93,7 +93,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimum 8 characters"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#C8102E]/50 focus:ring-1 focus:ring-[#C8102E]/50"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#0091D5]/50 focus:ring-1 focus:ring-[#0091D5]/50"
             />
           </div>
 
@@ -108,14 +108,14 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Repeat your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#C8102E]/50 focus:ring-1 focus:ring-[#C8102E]/50"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#0091D5]/50 focus:ring-1 focus:ring-[#0091D5]/50"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-[#C8102E] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#C8102E]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-[#0091D5] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#0091D5]/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
@@ -123,7 +123,7 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-500">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-[#C8102E] hover:text-[#C8102E]/80 transition-colors">
+          <Link href="/auth/login" className="text-[#0091D5] hover:text-[#0091D5]/80 transition-colors">
             Sign in
           </Link>
         </p>

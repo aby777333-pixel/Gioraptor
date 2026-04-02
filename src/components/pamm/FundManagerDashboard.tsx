@@ -88,7 +88,7 @@ export default function FundManagerDashboard() {
                     className="h-full rounded-full"
                     style={{
                       width: `${a.percentage}%`,
-                      backgroundColor: '#C8102E',
+                      backgroundColor: '#0091D5',
                       opacity: 0.4 + (a.percentage / 100) * 0.6,
                     }}
                   />
@@ -158,7 +158,7 @@ export default function FundManagerDashboard() {
           style={{
             backgroundColor: 'rgba(41,171,226,0.1)',
             borderColor: 'rgba(41,171,226,0.3)',
-            color: '#C8102E',
+            color: '#0091D5',
           }}
         >
           <Plus size={14} />
