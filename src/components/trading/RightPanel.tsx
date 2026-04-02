@@ -155,7 +155,7 @@ function LiveTVPanel() {
           className="inline-block w-1.5 h-1.5 rounded-full"
           style={{ backgroundColor: '#FF0000' }}
         />
-        Al Jazeera Business Live
+        CNBC Live
       </div>
       <div
         className="rounded-lg overflow-hidden"
@@ -165,8 +165,8 @@ function LiveTVPanel() {
         }}
       >
         <iframe
-          src="https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=1&mute=1"
-          title="Al Jazeera English Live"
+          src="https://player.cnbc.com/p/gZWlPC/cnbc_global?playertype=synd&byGuid=7000313536"
+          title="CNBC Live"
           allow="autoplay; encrypted-media"
           allowFullScreen
           style={{ width: '100%', height: 180, border: 'none', backgroundColor: '#000' }}
