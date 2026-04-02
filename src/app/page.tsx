@@ -508,13 +508,13 @@ export default function Home() {
               <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Platform</div>
               <div className="space-y-2.5 text-xs text-[#4A5568]">
                 {[
-                  { label: 'Trading Terminal', href: '/terminal' },
-                  { label: 'AI Signals', href: '/terminal/signals' },
-                  { label: 'EA Builder', href: '/terminal/ea-builder' },
-                  { label: 'Copy Trading', href: '/terminal/copy-trading' },
-                  { label: 'PAMM / MAM', href: '/terminal/pamm' },
-                  { label: 'Prop Trading', href: '/terminal/prop' },
-                  { label: 'Analytics', href: '/terminal/analytics' },
+                  { label: 'Trading Terminal', href: '/features/trading-terminal' },
+                  { label: 'AI Signals', href: '/features/ai-signals' },
+                  { label: 'EA Builder', href: '/features/ea-builder' },
+                  { label: 'Copy Trading', href: '/features/copy-trading' },
+                  { label: 'PAMM / MAM', href: '/features/pamm' },
+                  { label: 'Prop Trading', href: '/features/prop-trading' },
+                  { label: 'Analytics', href: '/features/analytics' },
                 ].map((l) => (
                   <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
@@ -526,9 +526,8 @@ export default function Home() {
               <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">For Brokers</div>
               <div className="space-y-2.5 text-xs text-[#4A5568]">
                 {[
-                  { label: 'White Label', href: '/terminal/white-label' },
-                  { label: 'Admin Panel', href: '/admin' },
-                  { label: 'Risk Management', href: '/admin/risk' },
+                  { label: 'White Label', href: '/features/white-label' },
+                  { label: 'Risk Management', href: '/features/risk-management' },
                   { label: 'About Us', href: '/about' },
                   { label: 'Contact', href: '/contact' },
                 ].map((l) => (
@@ -542,20 +541,20 @@ export default function Home() {
               <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Contact</div>
               <div className="space-y-3 text-xs text-[#4A5568]">
                 <div>
-                  <div className="text-[#7A8BA8] font-semibold mb-1">Dubai Office</div>
-                  <div>908, 9th Floor, Fifty-One Tower</div>
-                  <div>Marasi Drive, Business Bay</div>
-                  <div>Dubai, UAE</div>
-                  <div className="mt-1 text-[#0091D5]">+971 50 290 5860</div>
+                  <div className="text-[#7A8BA8] font-semibold mb-1">Head Office</div>
+                  <div>Lorem ipsum dolor sit amet</div>
+                  <div>Consectetur adipiscing elit</div>
+                  <div>Sed do eiusmod tempor</div>
+                  <div className="mt-1 text-[#0091D5]">+1 111 111 1111</div>
                 </div>
                 <div>
-                  <div className="text-[#7A8BA8] font-semibold mb-1">London Office</div>
-                  <div>Unit 7B, Cranbrook House</div>
-                  <div>61 Cranbrook Road, Ilford</div>
-                  <div>Essex, England, IG1 4PG</div>
-                  <div className="mt-1 text-[#0091D5]">+44 7444 468968</div>
+                  <div className="text-[#7A8BA8] font-semibold mb-1">Regional Office</div>
+                  <div>Ut enim ad minim veniam</div>
+                  <div>Quis nostrud exercitation</div>
+                  <div>Ullamco laboris nisi</div>
+                  <div className="mt-1 text-[#0091D5]">+1 111 111 1111</div>
                 </div>
-                <div className="text-[#0091D5]">support@gio4x.com</div>
+                <div className="text-[#0091D5]">support@gio4xraptor.com</div>
               </div>
             </div>
           </div>

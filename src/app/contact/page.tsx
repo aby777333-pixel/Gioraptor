@@ -26,23 +26,23 @@ export default function ContactPage() {
           {/* Offices */}
           <div className="space-y-8">
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> Dubai Office</h2>
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> Head Office</h2>
               <div className="space-y-3 text-sm text-[#7A8BA8]">
-                <p>908, 9th Floor, Fifty-One Tower<br />Marasi Drive, Business Bay<br />Dubai, United Arab Emirates</p>
-                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +971 50 290 5860</p>
-                <p className="flex items-center gap-2"><Clock size={14} /> Sun-Thu: 9:00 AM - 6:00 PM GST</p>
+                <p>Lorem ipsum dolor sit amet<br />Consectetur adipiscing elit<br />Sed do eiusmod tempor</p>
+                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +1 111 111 1111</p>
+                <p className="flex items-center gap-2"><Clock size={14} /> Mon-Fri: 9:00 AM - 6:00 PM</p>
               </div>
             </div>
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> London Office</h2>
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> Regional Office</h2>
               <div className="space-y-3 text-sm text-[#7A8BA8]">
-                <p>Unit 7B, Cranbrook House<br />61 Cranbrook Road, Ilford<br />Essex, England, IG1 4PG</p>
-                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +44 7444 468968</p>
-                <p className="flex items-center gap-2"><Clock size={14} /> Mon-Fri: 9:00 AM - 5:00 PM GMT</p>
+                <p>Ut enim ad minim veniam<br />Quis nostrud exercitation<br />Ullamco laboris nisi</p>
+                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +1 111 111 1111</p>
+                <p className="flex items-center gap-2"><Clock size={14} /> Mon-Fri: 9:00 AM - 5:00 PM</p>
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm text-[#0091D5]">
-              <Mail size={16} /> support@gio4x.com
+              <Mail size={16} /> support@gio4xraptor.com
             </div>
           </div>
 
