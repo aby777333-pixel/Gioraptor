@@ -52,7 +52,7 @@ export default function HeroShaderBg() {
       const renderScene = new RenderPass(scene, camera);
       const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.5, 0.4, 0.85);
       bloomPass.threshold = 1.0;
-      bloomPass.strength = 1.5;
+      bloomPass.strength = 0.8;
       bloomPass.radius = 0.8;
 
       const composer = new EffectComposer(renderer);
@@ -115,8 +115,8 @@ export default function HeroShaderBg() {
           float n2 = noise(vWorldPos * 2.0 - uTime * 0.5);
 
           // Brand-tinted base (blue/teal)
-          vec3 baseColor = vec3(0.005, 0.012, 0.025) + (vec3(0.0, 0.15, 0.22) * fresnel * n1);
-          baseColor *= (0.5 + 0.5 * n2);
+          vec3 baseColor = vec3(0.003, 0.008, 0.018) + (vec3(0.0, 0.08, 0.12) * fresnel * n1);
+          baseColor *= (0.3 + 0.3 * n2);
 
           vec3 pulseColor = vec3(0.0);
           if (vIsInput > 0.5 && uPulseProgress > -5.0) {
@@ -150,7 +150,8 @@ export default function HeroShaderBg() {
             }
           }
 
-          gl_FragColor = vec4(baseColor + pulseColor + actColor, 1.0);
+          vec3 finalColor = (baseColor + pulseColor + actColor) * 0.5;
+          gl_FragColor = vec4(finalColor, 1.0);
         }
       `;
 

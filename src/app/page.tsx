@@ -93,6 +93,8 @@ export default function Home() {
             <a href="#features" className="transition-colors hover:text-white">Platform</a>
             <a href="#modules" className="transition-colors hover:text-white">Modules</a>
             <a href="#technology" className="transition-colors hover:text-white">Technology</a>
+            <Link href="/about" className="transition-colors hover:text-white">About</Link>
+            <Link href="/contact" className="transition-colors hover:text-white">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -116,7 +118,7 @@ export default function Home() {
         {/* WebGL Shader Background */}
         <HeroShaderBg />
         {/* Overlay gradient for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#060D16]/60 via-transparent to-[#060D16]/90" style={{ zIndex: 1 }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#060D16]/70 via-[#060D16]/30 to-[#060D16]/95" style={{ zIndex: 1 }} />
 
         <div className="relative mx-auto max-w-5xl text-center" style={{ zIndex: 2 }}>
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#0091D5]/20 bg-[#0091D5]/[0.06] px-5 py-2 text-sm text-[#0091D5]">
@@ -505,8 +507,16 @@ export default function Home() {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Platform</div>
               <div className="space-y-2.5 text-xs text-[#4A5568]">
-                {['Trading Terminal', 'AI Signals', 'EA Builder', 'Copy Trading', 'PAMM / MAM', 'Prop Trading', 'Analytics'].map((l) => (
-                  <div key={l} className="hover:text-white transition-colors cursor-pointer">{l}</div>
+                {[
+                  { label: 'Trading Terminal', href: '/terminal' },
+                  { label: 'AI Signals', href: '/terminal/signals' },
+                  { label: 'EA Builder', href: '/terminal/ea-builder' },
+                  { label: 'Copy Trading', href: '/terminal/copy-trading' },
+                  { label: 'PAMM / MAM', href: '/terminal/pamm' },
+                  { label: 'Prop Trading', href: '/terminal/prop' },
+                  { label: 'Analytics', href: '/terminal/analytics' },
+                ].map((l) => (
+                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>
@@ -515,8 +525,14 @@ export default function Home() {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">For Brokers</div>
               <div className="space-y-2.5 text-xs text-[#4A5568]">
-                {['White Label', 'CRM System', 'IB Portal', 'Risk Management', 'Payment Gateway', 'Liquidity Solutions', 'Compliance Tools'].map((l) => (
-                  <div key={l} className="hover:text-white transition-colors cursor-pointer">{l}</div>
+                {[
+                  { label: 'White Label', href: '/terminal/white-label' },
+                  { label: 'Admin Panel', href: '/admin' },
+                  { label: 'Risk Management', href: '/admin/risk' },
+                  { label: 'About Us', href: '/about' },
+                  { label: 'Contact', href: '/contact' },
+                ].map((l) => (
+                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>
@@ -549,9 +565,9 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-xs text-[#4A5568]">&copy; {new Date().getFullYear()} GIO4X Raptor. All rights reserved.</p>
               <div className="flex gap-6 text-xs text-[#4A5568]">
-                <span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span>
-                <span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span>
-                <span className="hover:text-white transition-colors cursor-pointer">Risk Disclosure</span>
+                <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+                <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+                <Link href="/risk-disclosure" className="hover:text-white transition-colors">Risk Disclosure</Link>
               </div>
             </div>
             <p className="mt-4 text-[10px] text-[#4A5568]/60 leading-relaxed max-w-4xl">
