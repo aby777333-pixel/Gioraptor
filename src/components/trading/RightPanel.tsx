@@ -148,21 +148,19 @@ function LiveTVPanel() {
   return (
     <div className="p-3 flex flex-col gap-2">
       <div className="flex items-center gap-1.5 py-1 px-2 text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-muted)' }}>
-        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#00C853' }} />
-        Live Market Data
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
+        Bloomberg TV Live
       </div>
-      <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
+      >
         <iframe
-          src="https://s.tradingview.com/embed-widget/ticker-tape/?locale=en#%7B%22symbols%22%3A%5B%7B%22proName%22%3A%22FOREXCOM%3AEURUSD%22%7D%2C%7B%22proName%22%3A%22FOREXCOM%3AGBPUSD%22%7D%2C%7B%22proName%22%3A%22FX_IDC%3AUSDJPY%22%7D%2C%7B%22proName%22%3A%22OANDA%3AXAUUSD%22%7D%2C%7B%22proName%22%3A%22BITSTAMP%3ABTCUSD%22%7D%5D%2C%22showSymbolLogo%22%3Atrue%2C%22colorTheme%22%3A%22dark%22%2C%22isTransparent%22%3Atrue%2C%22displayMode%22%3A%22compact%22%7D"
-          title="Live Ticker"
-          style={{ width: '100%', height: 46, border: 'none' }}
-        />
-      </div>
-      <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-        <iframe
-          src="https://s.tradingview.com/embed-widget/market-overview/?locale=en#%7B%22colorTheme%22%3A%22dark%22%2C%22dateRange%22%3A%221D%22%2C%22showChart%22%3Atrue%2C%22isTransparent%22%3Atrue%2C%22showFloatingTooltip%22%3Afalse%2C%22tabs%22%3A%5B%7B%22title%22%3A%22Forex%22%2C%22symbols%22%3A%5B%7B%22s%22%3A%22FX%3AEURUSD%22%7D%2C%7B%22s%22%3A%22FX%3AGBPUSD%22%7D%2C%7B%22s%22%3A%22FX%3AUSDJPY%22%7D%2C%7B%22s%22%3A%22FX%3AAUDUSD%22%7D%5D%7D%2C%7B%22title%22%3A%22Crypto%22%2C%22symbols%22%3A%5B%7B%22s%22%3A%22BITSTAMP%3ABTCUSD%22%7D%2C%7B%22s%22%3A%22BITSTAMP%3AETHUSD%22%7D%5D%7D%5D%7D"
-          title="Market Overview"
-          style={{ width: '100%', height: 300, border: 'none' }}
+          src="https://www.bloomberg.com/media/embed/video/live/us"
+          title="Bloomberg TV Live"
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+          style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
         />
       </div>
     </div>
