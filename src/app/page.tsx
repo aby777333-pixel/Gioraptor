@@ -123,8 +123,10 @@ export default function Home() {
             <span className="h-1.5 w-1.5 rounded-full bg-[#0091D5] animate-pulse" />
             Raptor Trading System v2.0
           </div>
-          <h1 className="mb-6 text-5xl font-bold tracking-tight leading-[1.1] sm:text-7xl lg:text-8xl">
-            The Operating System
+          <h1 className="mb-6 text-4xl font-bold tracking-tight leading-[1.1] sm:text-6xl lg:text-7xl">
+            The Artificial Intelligence
+            <br />
+            Operating System
             <br />
             <span className="bg-gradient-to-r from-[#0082C8] via-[#00A5A8] to-[#009B4D] bg-clip-text text-transparent">
               for Modern Brokerages
@@ -302,6 +304,160 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Trading Platform Features */}
+      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-16 text-center">
+            <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">Trading Platform</span>
+            <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Professional Trading Tools</h2>
+            <p className="mx-auto max-w-2xl text-[#7A8BA8] text-lg">Everything a trader needs — from real-time data to advanced order types — in one unified interface.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { title: 'Real-Time Market Data', desc: 'Live quotes, global trends, and up-to-the-second updates across all markets.' },
+              { title: 'One-Click Trading', desc: 'Execute instantly with lightning speed and minimal slippage.' },
+              { title: 'Advanced Charting', desc: 'Custom indicators, drawing tools, and multiple chart types for precise analysis.' },
+              { title: 'Social Trading', desc: 'Connect with a vibrant community, follow strategies, and grow together.' },
+              { title: 'Multiple Take Profit', desc: 'Automate partial closes, secure gains step-by-step, and scale strategically.' },
+              { title: 'Trailing Stop Orders', desc: 'Protect profits automatically as markets move in your favor.' },
+              { title: 'Hedging Options', desc: 'Balance risk with multiple positions in the same instrument.' },
+              { title: 'API Integration', desc: 'Connect with third-party tools and build advanced algorithmic systems.' },
+            ].map((f) => (
+              <div key={f.title} className="rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-5 transition-all hover:border-[#0091D5]/20 hover:bg-[#0B1422]/60">
+                <h3 className="text-sm font-semibold mb-2">{f.title}</h3>
+                <p className="text-xs text-[#7A8BA8] leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* For Brokers Section */}
+      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#F0A500]">For Brokers</span>
+              <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">Launch Your Brokerage<br /><span className="text-[#F0A500]">In Days, Not Months</span></h2>
+              <p className="mb-8 text-[#7A8BA8] text-lg leading-relaxed">Running a successful brokerage requires more than just a trading platform. GIO4X Raptor provides everything — from company formation to liquidity solutions.</p>
+              <div className="space-y-4">
+                {[
+                  { title: 'Fully Integrated Platform', desc: 'Execution, risk management, reporting, CRM, and IB portal in one system.' },
+                  { title: 'Deep Liquidity Access', desc: 'Tier-1 providers for forex, commodities, indices, and crypto with tighter spreads.' },
+                  { title: 'White Label Solutions', desc: 'Proprietary platform branded to your identity — launch under your own name.' },
+                  { title: 'Regulatory & Company Setup', desc: 'Support with licensing, incorporations, and infrastructure setup.' },
+                  { title: 'Risk Management Tools', desc: 'Real-time risk monitoring, A/B book management, and margin controls.' },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-[#F0A500] shrink-0" />
+                    <div>
+                      <div className="text-sm font-semibold">{item.title}</div>
+                      <div className="text-xs text-[#7A8BA8]">{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Link href="/auth/register" className="mt-8 inline-flex h-12 items-center justify-center rounded-xl bg-[#F0A500] px-8 text-sm font-semibold text-black transition-all hover:bg-[#D49000] hover:shadow-xl hover:shadow-[#F0A500]/20">
+                Book a Demo
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'CRM Systems', desc: 'Streamline client onboarding, KYC/AML, and customer communication.' },
+                { label: 'Back Office', desc: 'Manage accounts, balance updates, and margin tracking efficiently.' },
+                { label: 'Compliance', desc: 'Meet regulatory requirements and safeguard client data.' },
+                { label: 'Payment Systems', desc: 'Multiple payment gateway integrations for seamless deposits.' },
+                { label: 'IB Portals', desc: 'Commission tracking and client activity for introducing brokers.' },
+                { label: 'Marketing Tools', desc: 'Track affiliates, monitor performance, and improve marketing ROI.' },
+              ].map((card) => (
+                <div key={card.label} className="rounded-xl border border-white/[0.06] bg-[#0B1422]/60 p-5 transition-all hover:border-[#F0A500]/20">
+                  <div className="text-xs font-bold text-[#F0A500] uppercase tracking-wider mb-2">{card.label}</div>
+                  <div className="text-xs text-[#7A8BA8] leading-relaxed">{card.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Innovation Section */}
+      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl text-center">
+          <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00A5A8]">Innovation</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">The Next Big Leap in Trading</h2>
+          <p className="mx-auto mb-16 max-w-2xl text-[#7A8BA8] text-lg">Innovations that will transform how the world trades.</p>
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              { title: 'Blockchain-Protected Trading', desc: 'Every order execution and trade transaction secured on the blockchain, ensuring full transparency and eliminating manipulation.', tag: 'LIVE', tagColor: '#00C853' },
+              { title: 'AI Strategy Builder', desc: 'Build, backtest, and deploy automated trading strategies with our drag-and-drop EA builder powered by machine learning.', tag: 'LIVE', tagColor: '#00C853' },
+              { title: 'Voice Command Trading', desc: 'Control trades with natural voice commands. Place orders, request data, and analyze trends — all hands-free.', tag: 'BETA', tagColor: '#F0A500' },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 text-left transition-all hover:border-[#00A5A8]/20">
+                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-4" style={{ backgroundColor: item.tagColor + '20', color: item.tagColor }}>{item.tag}</span>
+                <h3 className="text-lg font-bold mb-3">{item.title}</h3>
+                <p className="text-sm text-[#7A8BA8] leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-5xl text-center">
+          <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#009B4D]">Pricing</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Simple, Transparent Pricing</h2>
+          <p className="mx-auto mb-16 max-w-2xl text-[#7A8BA8] text-lg">Start free and scale as you grow.</p>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 text-left">
+              <div className="text-xs font-bold text-[#7A8BA8] uppercase tracking-wider mb-2">Free Trial</div>
+              <div className="text-4xl font-bold mb-1">Free</div>
+              <div className="text-xs text-[#7A8BA8] mb-6">30 days full access</div>
+              <div className="space-y-3 mb-8">
+                {['Basic trading terminal', 'Core platform features', 'Standard support', 'Mobile & web access', 'Limited broker connections'].map((f) => (
+                  <div key={f} className="flex items-center gap-2 text-sm text-[#7A8BA8]"><span className="h-1.5 w-1.5 rounded-full bg-[#009B4D]" />{f}</div>
+                ))}
+              </div>
+              <Link href="/auth/register" className="flex h-12 w-full items-center justify-center rounded-xl border border-white/10 text-sm font-semibold transition-all hover:bg-white/[0.03]">Start Free Trial</Link>
+            </div>
+            <div className="rounded-2xl border border-[#0091D5]/30 bg-[#0B1422]/60 p-8 text-left relative" style={{ boxShadow: '0 0 40px rgba(0,145,213,0.08)' }}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-3 py-1 rounded-full bg-[#0091D5] text-black">MOST POPULAR</div>
+              <div className="text-xs font-bold text-[#0091D5] uppercase tracking-wider mb-2">Professional</div>
+              <div className="text-4xl font-bold mb-1">Custom</div>
+              <div className="text-xs text-[#7A8BA8] mb-6">Billed monthly</div>
+              <div className="space-y-3 mb-8">
+                {['Full trading terminal suite', 'Unlimited broker access', 'White label solutions', 'Priority support', 'Advanced analytics', 'All advanced features', 'Multi-language support'].map((f) => (
+                  <div key={f} className="flex items-center gap-2 text-sm text-[#7A8BA8]"><span className="h-1.5 w-1.5 rounded-full bg-[#0091D5]" />{f}</div>
+                ))}
+              </div>
+              <Link href="/auth/register" className="flex h-12 w-full items-center justify-center rounded-xl bg-[#0091D5] text-sm font-semibold transition-all hover:bg-[#007AB8] text-black">Get Started</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CEO Letter */}
+      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-10 backdrop-blur-sm">
+            <div className="text-xs font-bold text-[#0091D5] uppercase tracking-wider mb-6">From the Desk of the CEO</div>
+            <h2 className="text-2xl font-bold mb-6">The Future of Trading Is Here</h2>
+            <div className="space-y-4 text-sm text-[#7A8BA8] leading-relaxed">
+              <p>Dear Future Partner,</p>
+              <p>From charts to profits — simplified. GIO4X Raptor ensures execution you can trust. Whether you&apos;re a newbie or a pro, trading freedom is in your hands.</p>
+              <p>When speed meets precision, you can turn market moves into profit moves every single day. Whether you&apos;re a broker seeking to grow your client base or a trader chasing your next big opportunity, GIO4X Raptor is here to help you go from vision to victory.</p>
+              <p>Our philosophy is simple: precision, speed, and transparency should belong to everyone.</p>
+              <p className="italic">Let&apos;s build the future of trading — together.</p>
+            </div>
+            <div className="mt-8 pt-6 border-t border-white/[0.06]">
+              <div className="text-sm font-semibold">Yours sincerely,</div>
+              <div className="text-sm text-[#0091D5] font-bold mt-1">Founder & CEO</div>
+              <div className="text-xs text-[#7A8BA8]">GIO4X Raptor Trading Platform</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="relative px-6 py-32 border-t border-white/[0.04]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_rgba(0,155,77,0.06)_0%,_transparent_60%)]" />
@@ -315,16 +471,10 @@ export default function Home() {
             Whether you&apos;re a trader, fund manager, or broker — Raptor scales with you.
           </p>
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link
-              href="/auth/register"
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto"
-            >
+            <Link href="/auth/register" className="flex h-14 w-full items-center justify-center rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto">
               Create Free Account
             </Link>
-            <Link
-              href="/terminal"
-              className="flex h-14 w-full items-center justify-center rounded-xl border border-white/10 px-10 text-base font-medium text-[#7A8BA8] transition-all hover:border-white/20 hover:bg-white/[0.03] hover:text-white sm:w-auto"
-            >
+            <Link href="/terminal" className="flex h-14 w-full items-center justify-center rounded-xl border border-white/10 px-10 text-base font-medium text-[#7A8BA8] transition-all hover:border-white/20 hover:bg-white/[0.03] hover:text-white sm:w-auto">
               Explore Terminal
             </Link>
           </div>
@@ -332,22 +482,82 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.06] px-6 py-10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="GIO4X" style={{ height: 24 }} />
-            <span className="text-sm font-semibold text-[#4A5568]">RAPTOR TRADING SYSTEM</span>
+      <footer className="border-t border-white/[0.06] px-6 py-16">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <img src="/logo.png" alt="GIO4X" style={{ height: 28 }} />
+                <span className="text-sm font-bold">RAPTOR</span>
+              </div>
+              <p className="text-xs text-[#7A8BA8] leading-relaxed mb-4">
+                Next-generation brokerage operating system. Precision. Speed. Confidence.
+              </p>
+              <div className="flex gap-3">
+                {['LinkedIn', 'Twitter', 'Instagram'].map((s) => (
+                  <span key={s} className="text-[10px] text-[#4A5568] border border-white/[0.06] rounded px-2 py-1 hover:text-white hover:border-white/20 transition-all cursor-pointer">{s}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Platform */}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Platform</div>
+              <div className="space-y-2.5 text-xs text-[#4A5568]">
+                {['Trading Terminal', 'AI Signals', 'EA Builder', 'Copy Trading', 'PAMM / MAM', 'Prop Trading', 'Analytics'].map((l) => (
+                  <div key={l} className="hover:text-white transition-colors cursor-pointer">{l}</div>
+                ))}
+              </div>
+            </div>
+
+            {/* For Brokers */}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">For Brokers</div>
+              <div className="space-y-2.5 text-xs text-[#4A5568]">
+                {['White Label', 'CRM System', 'IB Portal', 'Risk Management', 'Payment Gateway', 'Liquidity Solutions', 'Compliance Tools'].map((l) => (
+                  <div key={l} className="hover:text-white transition-colors cursor-pointer">{l}</div>
+                ))}
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#7A8BA8] mb-4">Contact</div>
+              <div className="space-y-3 text-xs text-[#4A5568]">
+                <div>
+                  <div className="text-[#7A8BA8] font-semibold mb-1">Dubai Office</div>
+                  <div>908, 9th Floor, Fifty-One Tower</div>
+                  <div>Marasi Drive, Business Bay</div>
+                  <div>Dubai, UAE</div>
+                  <div className="mt-1 text-[#0091D5]">+971 50 290 5860</div>
+                </div>
+                <div>
+                  <div className="text-[#7A8BA8] font-semibold mb-1">London Office</div>
+                  <div>Unit 7B, Cranbrook House</div>
+                  <div>61 Cranbrook Road, Ilford</div>
+                  <div>Essex, England, IG1 4PG</div>
+                  <div className="mt-1 text-[#0091D5]">+44 7444 468968</div>
+                </div>
+                <div className="text-[#0091D5]">support@gio4x.com</div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-xs text-[#4A5568]">
-            <span>Enterprise Infrastructure</span>
-            <span className="h-1 w-1 rounded-full bg-[#4A5568]" />
-            <span>Multi-Jurisdiction Compliance</span>
-            <span className="h-1 w-1 rounded-full bg-[#4A5568]" />
-            <span>White-Label Ready</span>
+
+          {/* Bottom bar */}
+          <div className="border-t border-white/[0.06] pt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-xs text-[#4A5568]">&copy; {new Date().getFullYear()} GIO4X Raptor. All rights reserved.</p>
+              <div className="flex gap-6 text-xs text-[#4A5568]">
+                <span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span>
+                <span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span>
+                <span className="hover:text-white transition-colors cursor-pointer">Risk Disclosure</span>
+              </div>
+            </div>
+            <p className="mt-4 text-[10px] text-[#4A5568]/60 leading-relaxed max-w-4xl">
+              Risk Warning: There is a significant degree of risk involved in trading leveraged financial products, such as futures, CFDs, and forex. This type of trading may not be appropriate for all investors. Losses from trading in these financial products may surpass your initial investment. Past performance is not indicative of future results.
+            </p>
           </div>
-          <p className="text-xs text-[#4A5568]">
-            &copy; {new Date().getFullYear()} GIO4X. All rights reserved.
-          </p>
         </div>
       </footer>
     </div>
