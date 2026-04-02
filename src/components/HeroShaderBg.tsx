@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type * as THREE_TYPES from 'three';
 
 export default function HeroShaderBg() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -10,11 +9,9 @@ export default function HeroShaderBg() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
     let cancelled = false;
 
     async function init() {
-      // Dynamically import Three.js
       const THREE = await import('three');
       const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
       const { EffectComposer } = await import('three/examples/jsm/postprocessing/EffectComposer.js');
@@ -23,341 +20,272 @@ export default function HeroShaderBg() {
 
       if (cancelled || !container) return;
 
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x060D16);
-      scene.fog = new THREE.FogExp2(0x060D16, 0.018);
+      const noiseChunk = `
+        float hash(vec3 p) {
+          p = fract(p * 0.3183099 + 0.1);
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+        float noise(in vec3 x) {
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
+                         mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+                     mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+                         mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+        }
+        float fbm(vec3 p) {
+          float f = 0.0; float amp = 0.5;
+          for(int i = 0; i < 4; i++) { f += amp * noise(p); p *= 2.2; amp *= 0.5; }
+          return f;
+        }
+        float ridge(vec3 p) {
+          float f = 0.0; float amp = 0.5;
+          for(int i = 0; i < 4; i++) { float n = noise(p); n = 1.0 - abs(n * 2.0 - 1.0); f += amp * n; p *= 2.2; amp *= 0.5; }
+          return f;
+        }
+        float veinNoise(vec3 p) {
+          float f = 0.0; float amp = 0.5;
+          for(int i = 0; i < 3; i++) { float n = noise(p); n = 1.0 - abs(n * 2.0 - 1.0); n = pow(n, 5.0); f += amp * n; p *= 2.5; amp *= 0.4; }
+          return f;
+        }
+      `;
 
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-
-      const camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 1000);
-      camera.position.set(0, 8, 45);
-
-      const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-      container.appendChild(renderer.domElement);
-      renderer.domElement.style.position = 'absolute';
-      renderer.domElement.style.inset = '0';
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.04;
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 0.5;
-      controls.enablePan = false;
-      controls.enableZoom = false;
-      controls.maxDistance = 80;
-
-      const renderScene = new RenderPass(scene, camera);
-      const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.5, 0.4, 0.85);
-      bloomPass.threshold = 1.0;
-      bloomPass.strength = 0.8;
-      bloomPass.radius = 0.8;
-
-      const composer = new EffectComposer(renderer);
-      composer.addPass(renderScene);
-      composer.addPass(bloomPass);
-
-      // Shader material
-      const vertexShader = `
-        attribute float aIsInput;
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        varying vec3 vNormal;
-        varying float vIsInput;
-        varying float vDist;
+      const volumeVertexShader = `
+        varying vec3 vWorldPosition;
         void main() {
-          vUv = uv;
-          vIsInput = aIsInput;
           vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPos = worldPos.xyz;
-          vDist = length(worldPos.xyz);
-          vNormal = normalize(normalMatrix * normal);
+          vWorldPosition = worldPos.xyz;
           gl_Position = projectionMatrix * viewMatrix * worldPos;
         }
       `;
 
-      const fragmentShader = `
+      const volumeFragmentShader = `
+        ${noiseChunk}
+        varying vec3 vWorldPosition;
+        uniform vec3 uColorCore;
+        uniform vec3 uColorMid;
+        uniform vec3 uColorOuter;
         uniform float uTime;
-        uniform float uPulseProgress;
-        uniform float uActivation;
-        uniform vec3 uCameraPos;
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        varying vec3 vNormal;
-        varying float vIsInput;
-        varying float vDist;
+        uniform float uRidgeTime;
+        uniform float uVeinTime;
+        uniform float uDensityMult;
+        uniform float uStructure;
 
-        float hash(vec3 p) {
-          p = fract(p * 0.3183099 + .1);
-          p *= 17.0;
-          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-        }
-        float noise(vec3 x) {
-          vec3 i = floor(x);
-          vec3 f = fract(x);
-          f = f*f*(3.0-2.0*f);
-          return mix(
-            mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
-                mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
-            mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
-                mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
-        }
-        vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
-          return a + b * cos(6.28318*(c*t+d));
+        vec2 hitBox(vec3 ro, vec3 rd, vec3 extents) {
+          vec3 t0 = (-extents - ro) / rd;
+          vec3 t1 = (extents - ro) / rd;
+          vec3 tmin = min(t0, t1);
+          vec3 tmax = max(t0, t1);
+          float tnear = max(max(tmin.x, tmin.y), tmin.z);
+          float tfar = min(min(tmax.x, tmax.y), tmax.z);
+          return vec2(tnear, tfar);
         }
 
         void main() {
-          vec3 viewDir = normalize(uCameraPos - vWorldPos);
-          float fresnel = pow(1.0 - max(dot(vNormal, viewDir), 0.0), 3.0);
-          float n1 = noise(vWorldPos * 0.5 + uTime * 0.2);
-          float n2 = noise(vWorldPos * 2.0 - uTime * 0.5);
+          vec3 ro = cameraPosition;
+          vec3 rd = normalize(vWorldPosition - cameraPosition);
+          vec2 hit = hitBox(ro, rd, vec3(5.0));
+          if(hit.x > hit.y || hit.y < 0.0) discard;
 
-          // Brand-tinted base (blue/teal)
-          vec3 baseColor = vec3(0.003, 0.008, 0.018) + (vec3(0.0, 0.08, 0.12) * fresnel * n1);
-          baseColor *= (0.3 + 0.3 * n2);
+          float stepSize = 0.3;
+          float t = max(hit.x, 0.0);
+          float tmax = min(hit.y, 15.0);
+          vec4 sum = vec4(0.0);
 
-          vec3 pulseColor = vec3(0.0);
-          if (vIsInput > 0.5 && uPulseProgress > -5.0) {
-            float pDist = abs(vDist - uPulseProgress);
-            float core = exp(-pDist * pDist * 3.0);
-            float trail = smoothstep(6.0, 0.0, vDist - uPulseProgress) * smoothstep(-2.0, 0.0, uPulseProgress - vDist);
-            float pi = max(core * 3.0, trail * 1.5);
-            pulseColor = vec3(0.0, 0.6, 1.0) * pi * (0.8 + 0.2*n2);
-          }
+          for(int i = 0; i < 32; i++) {
+            if(t >= tmax || sum.a >= 0.95) break;
+            vec3 p = ro + rd * t;
+            float r = length(p);
+            if(r < 4.8) {
+              vec3 q = p - vec3(0.0, uTime * 0.15, uTime * 0.05);
+              q *= uStructure * 3.0;
+              vec3 qRidge = p - vec3(0.0, uRidgeTime * 0.15, uRidgeTime * 0.05);
+              qRidge *= uStructure * 3.0;
+              vec3 qVein = p - vec3(0.0, uVeinTime * 0.15, uVeinTime * 0.05);
+              qVein *= uStructure * 3.0;
 
-          vec3 actColor = vec3(0.0);
-          if (uActivation > 0.0) {
-            float distFromWave = vDist - uActivation;
-            float waveFront = exp(-pow(distFromWave, 2.0) * 0.2) * step(0.0, -distFromWave);
-            float residual = smoothstep(uActivation, uActivation - 25.0, vDist);
-            float actIntensity = waveFront * 4.0 + residual * 1.5;
-            actIntensity *= (0.6 + 0.4 * noise(vWorldPos * 1.5 - uTime * 2.0));
+              float n1 = fbm(q);
+              float n2 = ridge(qRidge * 1.5 + n1 * 0.5);
+              float veins = veinNoise(qVein * 2.0 - vec3(uVeinTime * 0.1));
+              float falloff = smoothstep(4.5, 0.5, r);
+              float density = (n1 * 0.6 + n2 * 0.4) * falloff;
+              density -= fbm(q * 2.5) * 0.4;
+              density = max(density, 0.0) * uDensityMult;
 
-            vec3 dir = normalize(vWorldPos);
-            float angle = atan(dir.z, dir.x);
-            // Brand-themed palette: blue -> teal -> green
-            vec3 rainbow = palette(
-              angle * 0.15 + vDist * 0.05 - uTime * 0.5,
-              vec3(0.0, 0.3, 0.4), vec3(0.0, 0.3, 0.3),
-              vec3(1.0, 1.0, 1.0), vec3(0.55, 0.60, 0.67)
-            );
-            actColor = rainbow * actIntensity * 1.2;
-            if (vDist < 4.0) {
-              float somaFlash = exp(-pow(uActivation * 0.2, 2.0)) * 2.0;
-              actColor += vec3(0.0, 0.7, 1.0) * somaFlash;
+              if(density > 0.01) {
+                vec3 c = mix(uColorOuter, uColorMid, smoothstep(4.5, 1.5, r));
+                float coreGlow = smoothstep(2.5, 0.0, r) * (density * 1.0);
+                c = mix(c, uColorCore, coreGlow);
+                c = mix(c, vec3(0.0, 0.5, 0.8), smoothstep(0.6, 1.0, n2) * 0.3);
+                vec3 veinColor = mix(uColorMid, vec3(0.3, 0.7, 1.0), n1);
+                c += veinColor * veins * 2.0 * falloff;
+                c *= mix(0.1, 1.0, n1);
+                vec4 src = vec4(c * density * 1.2, density * 0.15 * 1.2);
+                sum += src * (1.0 - sum.a);
+              }
             }
+            t += stepSize;
           }
-
-          vec3 finalColor = (baseColor + pulseColor + actColor) * 0.5;
-          gl_FragColor = vec4(finalColor, 1.0);
+          gl_FragColor = sum;
         }
       `;
 
-      const material = new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms: {
-          uTime: { value: 0 },
-          uPulseProgress: { value: -10.0 },
-          uActivation: { value: 0 },
-          uCameraPos: { value: new THREE.Vector3() },
-        },
-        transparent: false,
-        depthWrite: true,
-        side: THREE.FrontSide,
-      });
-
-      const structureGroup = new THREE.Group();
-      scene.add(structureGroup);
-
-      function createWanderingPath(
-        start: THREE_TYPES.Vector3, dir: THREE_TYPES.Vector3,
-        length: number, segments: number, jitterScale: number,
-        endPoint?: THREE_TYPES.Vector3
-      ) {
-        const pts = [start.clone()];
-        let curr = start.clone();
-        const cDir = dir.clone().normalize();
-        for (let i = 0; i < segments; i++) {
-          cDir.x += (Math.random() - 0.5) * jitterScale;
-          cDir.y += (Math.random() - 0.5) * jitterScale;
-          cDir.z += (Math.random() - 0.5) * jitterScale;
-          cDir.normalize();
-          curr = curr.clone().add(cDir.clone().multiplyScalar(length / segments));
-          pts.push(curr);
+      const particleVS = `
+        attribute float size;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          float pSize = size * (10.0 / -mvPosition.z);
+          gl_PointSize = max(pSize, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
         }
-        if (endPoint) {
-          const approach = endPoint.clone().add(new THREE.Vector3(-1.5, 0, 0));
-          pts[pts.length - 1] = approach;
-          pts.push(endPoint.clone());
+      `;
+      const particleFS = `
+        varying vec3 vColor;
+        void main() {
+          float d = distance(gl_PointCoord, vec2(0.5));
+          if (d > 0.5) discard;
+          float alpha = smoothstep(0.5, 0.1, d);
+          gl_FragColor = vec4(vColor * 1.5, alpha);
         }
-        return new THREE.CatmullRomCurve3(pts);
-      }
+      `;
 
-      function taperGeometry(geo: THREE_TYPES.TubeGeometry, baseRadius: number, isInput: boolean) {
-        const pos = geo.attributes.position;
-        const norm = geo.attributes.normal;
-        const uv = geo.attributes.uv;
-        for (let i = 0; i < pos.count; i++) {
-          const u = uv.getX(i);
-          const t = isInput ? 1.0 : (1.0 - u);
-          const taper = Math.pow(t, 0.6);
-          const shrink = baseRadius * (1.0 - taper);
-          pos.setXYZ(i,
-            pos.getX(i) - norm.getX(i) * shrink,
-            pos.getY(i) - norm.getY(i) * shrink,
-            pos.getZ(i) - norm.getZ(i) * shrink,
-          );
-        }
-        geo.computeVertexNormals();
-      }
+      // Scene setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#060D16');
 
-      function addBranch(curve: THREE_TYPES.CatmullRomCurve3, radius: number, isInput: boolean) {
-        const geo = new THREE.TubeGeometry(curve, Math.floor(curve.getLength() * 3), radius, 12, false);
-        taperGeometry(geo, radius, isInput);
-        const arr = new Float32Array(geo.attributes.position.count).fill(isInput ? 1.0 : 0.0);
-        geo.setAttribute('aIsInput', new THREE.BufferAttribute(arr, 1));
-        structureGroup.add(new THREE.Mesh(geo, material));
-        return { curve };
-      }
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 1000);
+      camera.position.set(0, 0, 3.2);
 
-      // Build soma (cell body)
-      const somaRadius = 3.3;
-      const somaGeo = new THREE.IcosahedronGeometry(somaRadius, 16);
-      const somaPos = somaGeo.attributes.position;
-      for (let i = 0; i < somaPos.count; i++) {
-        const v = new THREE.Vector3().fromBufferAttribute(somaPos, i);
-        const n = Math.sin(v.x * 2) * Math.cos(v.y * 2) * Math.sin(v.z * 2) * 0.5 + Math.sin(v.x * 5 + v.y * 3) * 0.2;
-        v.add(v.clone().normalize().multiplyScalar(n));
-        somaPos.setXYZ(i, v.x, v.y, v.z);
-      }
-      somaGeo.computeVertexNormals();
-      somaGeo.setAttribute('aIsInput', new THREE.BufferAttribute(new Float32Array(somaPos.count).fill(0.0), 1));
-      structureGroup.add(new THREE.Mesh(somaGeo, material));
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5) * 0.75);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      container.appendChild(renderer.domElement);
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.inset = '0';
+      renderer.domElement.style.cursor = 'grab';
 
-      // Axon input
-      const inputCurve = createWanderingPath(
-        new THREE.Vector3(-45, 0, 0), new THREE.Vector3(1, 0, 0), 46, 30, 0.05,
-        new THREE.Vector3(-somaRadius * 0.1, 0, 0)
+      // Interactive orbit controls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 3.0;
+      controls.enablePan = false;
+      controls.enableZoom = true;
+      controls.minDistance = 2.0;
+      controls.maxDistance = 8;
+
+      // Post-processing
+      const renderScene = new RenderPass(scene, camera);
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(w, h), 0.4, 0.4, 0.4
       );
-      addBranch(inputCurve, 0.6, true);
+      const composer = new EffectComposer(renderer);
+      composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5) * 0.75);
+      composer.addPass(renderScene);
+      composer.addPass(bloomPass);
 
-      // Dendrites
-      for (let i = 0; i < 18; i++) {
-        let phi = Math.random() * Math.PI * 2;
-        const theta = Math.acos(Math.random() * 2 - 1);
-        if (Math.cos(phi) * Math.sin(theta) < -0.3)
-          phi = phi > Math.PI ? phi - Math.PI : phi + Math.PI;
+      const group = new THREE.Group();
+      scene.add(group);
 
-        const startDir = new THREE.Vector3(
-          Math.cos(phi) * Math.sin(theta),
-          Math.sin(phi) * Math.sin(theta),
-          Math.cos(theta)
-        );
-        const start = startDir.clone().multiplyScalar(somaRadius * 0.8);
-        const length = 20 + Math.random() * 30;
-        const mainRadius = 0.4 + Math.random() * 0.3;
-        const { curve: mainCurve } = addBranch(
-          createWanderingPath(start, startDir, length, 25, 0.4),
-          mainRadius, false
-        );
+      // Nebula volume — brand-colored (blue/teal)
+      const volumeGeo = new THREE.BoxGeometry(10, 10, 10);
+      const volumeUniforms = {
+        uTime: { value: 0 },
+        uRidgeTime: { value: 0 },
+        uVeinTime: { value: 0 },
+        uDensityMult: { value: 0.5 },
+        uStructure: { value: 0.14 },
+        uColorCore: { value: new THREE.Color('#b0e0ff') },
+        uColorMid: { value: new THREE.Color('#0091D5') },
+        uColorOuter: { value: new THREE.Color('#002a44') },
+      };
 
-        const numSec = Math.floor(Math.random() * 4) + 2;
-        for (let j = 0; j < numSec; j++) {
-          const t = 0.2 + Math.random() * 0.6;
-          const bStart = mainCurve.getPoint(t);
-          const tangent = mainCurve.getTangent(t);
-          const rv = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize();
-          const bDir = tangent.clone().cross(rv).normalize().add(tangent.multiplyScalar(0.5)).normalize();
-          addBranch(
-            createWanderingPath(bStart, bDir, (1 - t) * length * (0.4 + Math.random() * 0.4), 15, 0.6),
-            mainRadius * (1 - t) * 0.8, false
-          );
-        }
+      const volumeMaterial = new THREE.ShaderMaterial({
+        vertexShader: volumeVertexShader,
+        fragmentShader: volumeFragmentShader,
+        uniforms: volumeUniforms,
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+      });
+      group.add(new THREE.Mesh(volumeGeo, volumeMaterial));
+
+      // Stars
+      const particleCount = 500;
+      const particleGeo = new THREE.BufferGeometry();
+      const pPositions = new Float32Array(particleCount * 3);
+      const pColors = new Float32Array(particleCount * 3);
+      const pSizes = new Float32Array(particleCount);
+      const colorPalettes = [
+        new THREE.Color('#ffffff'),
+        new THREE.Color('#0091D5'),
+        new THREE.Color('#00A5A8'),
+      ];
+      for (let i = 0; i < particleCount; i++) {
+        const r = 0.5 + Math.random() * 8.0;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(Math.random() * 2 - 1);
+        pPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        pPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        pPositions[i * 3 + 2] = r * Math.cos(phi);
+        const color = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+        pColors[i * 3] = color.r;
+        pColors[i * 3 + 1] = color.g;
+        pColors[i * 3 + 2] = color.b;
+        pSizes[i] = Math.random() * 1.0 + 0.2;
       }
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+      particleGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+      particleGeo.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
 
-      // Dust particles
-      function makeParticles(count: number, spread: number, colorHex: number, size: number, opacity: number) {
-        const geo = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        for (let i = 0; i < count * 3; i++) positions[i] = (Math.random() - 0.5) * spread;
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const mat = new THREE.PointsMaterial({
-          color: colorHex, size, transparent: true, opacity,
-          blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
-        });
-        return new THREE.Points(geo, mat);
-      }
+      const particleMaterial = new THREE.ShaderMaterial({
+        vertexShader: particleVS,
+        fragmentShader: particleFS,
+        transparent: true,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const particles = new THREE.Points(particleGeo, particleMaterial);
+      group.add(particles);
 
-      const dustA = makeParticles(1200, 120, 0x0a2244, 0.08, 0.25);
-      const dustB = makeParticles(400, 90, 0x003355, 0.16, 0.18);
-      const dustC = makeParticles(120, 60, 0x0091D5, 0.30, 0.12);
-      scene.add(dustA, dustB, dustC);
-
-      // Auto-trigger neural pulse periodically
-      let state = 0;
-      let pulseProg = -10.0;
-      let actProg = 0.0;
-      const INPUT_LENGTH = 45.0;
-
-      function triggerPulse() {
-        if (state !== 0) return;
-        state = 1;
-        pulseProg = INPUT_LENGTH;
-        actProg = 0.0;
-        material.uniforms.uActivation.value = 0.0;
-      }
-
-      // Auto-fire every 8 seconds
-      const autoFireInterval = setInterval(triggerPulse, 8000);
-      // Also fire on first load after a short delay
-      setTimeout(triggerPulse, 1500);
-
+      // Animation
       const clock = new THREE.Clock();
+      let shaderTime = 0;
+      let ridgeTime = 0;
+      let veinTime = 0;
       let animId = 0;
 
       function animate() {
         if (cancelled) return;
         animId = requestAnimationFrame(animate);
         const delta = clock.getDelta();
+        shaderTime += delta * 1.0;
+        ridgeTime += delta * 0.3;
+        veinTime += delta * 1.0;
 
+        volumeUniforms.uTime.value = shaderTime;
+        volumeUniforms.uRidgeTime.value = ridgeTime;
+        volumeUniforms.uVeinTime.value = veinTime;
+
+        particles.rotation.y += delta * 0.02;
         controls.update();
-
-        dustA.rotation.y += delta * 0.008;
-        dustA.rotation.x += delta * 0.003;
-        dustB.rotation.y -= delta * 0.005;
-        dustB.rotation.z += delta * 0.002;
-        dustC.rotation.y += delta * 0.015;
-
-        material.uniforms.uTime.value += delta;
-        material.uniforms.uCameraPos.value.copy(camera.position);
-
-        if (state === 1) {
-          pulseProg -= delta * 35.0;
-          material.uniforms.uPulseProgress.value = pulseProg;
-          if (pulseProg <= 2.0) {
-            state = 2;
-            pulseProg = -10.0;
-            material.uniforms.uPulseProgress.value = -10.0;
-            actProg = 0.0;
-          }
-        } else if (state === 2) {
-          actProg += delta * 20.0;
-          material.uniforms.uActivation.value = actProg;
-          if (actProg > 75.0) {
-            state = 0;
-            material.uniforms.uActivation.value = 0.0;
-          }
-        }
-
         composer.render();
       }
 
       animate();
 
       const handleResize = () => {
+        if (!container) return;
         const w = container.clientWidth;
         const h = container.clientHeight;
         camera.aspect = w / h;
@@ -370,8 +298,8 @@ export default function HeroShaderBg() {
       cleanupRef.current = () => {
         cancelled = true;
         cancelAnimationFrame(animId);
-        clearInterval(autoFireInterval);
         window.removeEventListener('resize', handleResize);
+        controls.dispose();
         renderer.dispose();
         composer.dispose();
         if (renderer.domElement.parentNode) {
