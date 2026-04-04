@@ -10,7 +10,7 @@ export default function EABuilderPage() {
       description="Create custom trading strategies with our drag-and-drop visual builder or code editor. Backtest against historical data, optimize parameters, and deploy to live markets — all without leaving the browser."
       features={[
         { title: 'Visual Drag & Drop Builder', desc: 'No coding required. Build strategies by connecting condition blocks and action blocks in an intuitive visual interface.' },
-        { title: 'Code Editor', desc: 'For advanced users — write strategies in our NEXUS scripting language with syntax highlighting and auto-completion.' },
+        { title: 'Code Editor', desc: 'For advanced users — write strategies in our RAPTOR scripting language with syntax highlighting and auto-completion.' },
         { title: 'Backtesting Engine', desc: 'Test strategies against years of historical data with detailed performance reports, equity curves, and trade logs.' },
         { title: 'Strategy Optimization', desc: 'Automatically find optimal parameters by running thousands of backtest permutations.' },
         { title: 'Deploy to Live', desc: 'One-click deployment of tested strategies to live or demo accounts with real-time monitoring.' },

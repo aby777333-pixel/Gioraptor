@@ -6,14 +6,14 @@ import { useRef } from 'react';
 import HeroShaderBg from '@/components/HeroShaderBg';
 import AnimatedCounter from '@/components/landing/AnimatedCounter';
 import ScrollReveal from '@/components/landing/ScrollReveal';
-import NexusOrb from '@/components/landing/NexusOrb';
+import RaptorAIOrb from '@/components/landing/NexusOrb';
 import MarketTicker from '@/components/landing/MarketTicker';
 
 /* ─── Data ─── */
 const features = [
   { title: 'Ultra-Low Latency Execution', description: 'Sub-millisecond order routing with institutional-grade infrastructure across global data centers.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>, stat: '<1ms' },
   { title: 'Multi-Asset Trading', description: 'Forex, metals, indices, crypto, equities, and commodities from a single unified terminal.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>, stat: '500+' },
-  { title: 'NEXUS AI Intelligence', description: 'AI-powered market analysis, sentiment detection, pattern recognition, and personalized trade copilot.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>, stat: 'AI' },
+  { title: 'RAPTOR AI Intelligence', description: 'AI-powered market analysis, sentiment detection, pattern recognition, and personalized trade copilot.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>, stat: 'AI' },
   { title: 'Copy Trading & PAMM', description: 'Follow top strategies with automated mirroring, or manage investor funds with professional allocation tools.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>, stat: 'Social' },
   { title: 'White Label Platform', description: 'Launch your own branded brokerage with full customization, API access, and multi-tenant isolation.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" /></svg>, stat: 'B2B' },
   { title: 'Prop Trading Engine', description: 'Run funded account challenges with automated rule enforcement, scaling plans, and payout management.', icon: <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-7.54 0" /></svg>, stat: 'Funded' },
@@ -26,7 +26,7 @@ const modules = [
   { name: 'RAPTOR Price', desc: 'Spread construction & aggregation', color: '#F0A500' },
   { name: 'RAPTOR Charts', desc: '155+ indicators, all chart types', color: '#0091D5' },
   { name: 'RAPTOR Script', desc: 'TypeScript EA/indicator runtime', color: '#8b5cf6' },
-  { name: 'NEXUS AI', desc: 'Claude-powered intelligence layer', color: '#8b5cf6' },
+  { name: 'RAPTOR AI', desc: 'Claude-powered intelligence layer', color: '#8b5cf6' },
   { name: 'Copy Trading', desc: 'Social & mirror trading engine', color: '#00A5A8' },
   { name: 'PAMM / MAM', desc: 'Investor fund management', color: '#009B4D' },
   { name: 'Prop Trading', desc: 'Challenge engine & funded accounts', color: '#F0A500' },
@@ -44,7 +44,7 @@ const modules = [
 
 const architectureLayers = [
   { label: 'Presentation', items: ['Next.js 16', 'React 19', 'TradingView Charts', 'Framer Motion'], color: '#0091D5' },
-  { label: 'Intelligence', items: ['NEXUS AI (Claude)', 'Sentiment Engine', 'Pattern Recognition', 'Risk Scoring'], color: '#8b5cf6' },
+  { label: 'Intelligence', items: ['RAPTOR AI (Claude)', 'Sentiment Engine', 'Pattern Recognition', 'Risk Scoring'], color: '#8b5cf6' },
   { label: 'Core Engine', items: ['Order Management', 'Position Engine', 'Matching Engine', 'Price Aggregator'], color: '#00A5A8' },
   { label: 'Data Layer', items: ['PostgreSQL + RLS', 'TimescaleDB', 'Redis Cache', 'Elasticsearch'], color: '#009B4D' },
   { label: 'Infrastructure', items: ['Kubernetes', 'Multi-Region', 'Cloudflare CDN', '99.99% SLA'], color: '#F0A500' },
@@ -70,7 +70,7 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm text-[#7A8BA8]">
             <a href="#features" className="transition-colors hover:text-white">Platform</a>
-            <a href="#nexus" className="transition-colors hover:text-white">NEXUS AI</a>
+            <a href="#nexus" className="transition-colors hover:text-white">RAPTOR AI</a>
             <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
             <Link href="/developer" className="transition-colors hover:text-white">Developers</Link>
             <Link href="/blog" className="transition-colors hover:text-white">Blog</Link>
@@ -140,7 +140,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.95 }}
           >
-            Indigenous matching engine, 20+ integrated modules, NEXUS AI copilot, multi-asset execution, and complete white-label infrastructure — built from the ground up by GIO4X.
+            Indigenous matching engine, 20+ integrated modules, RAPTOR AI copilot, multi-asset execution, and complete white-label infrastructure — built from the ground up by GIO4X.
           </motion.p>
 
           <motion.div
@@ -244,7 +244,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {['Advanced Terminal', 'NEXUS AI Copilot', 'Copy Trading', 'Prop Challenges', 'Smart Alerts', 'Trade Journal', 'Education Hub', 'Social Feed'].map((f) => (
+                  {['Advanced Terminal', 'RAPTOR AI Copilot', 'Copy Trading', 'Prop Challenges', 'Smart Alerts', 'Trade Journal', 'Education Hub', 'Social Feed'].map((f) => (
                     <div key={f} className="flex items-center gap-2 text-sm text-[#7A8BA8]">
                       <span className="h-1 w-1 rounded-full bg-[#0091D5] shrink-0" />{f}
                     </div>
@@ -308,7 +308,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── NEXUS AI Section ─── */}
+      {/* ─── RAPTOR AI Section ─── */}
       <section id="nexus" className="relative px-6 py-32 border-t border-white/[0.04]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(139,92,246,0.06)_0%,_transparent_50%)]" />
         <div className="relative mx-auto max-w-7xl">
@@ -317,10 +317,10 @@ export default function Home() {
               <div>
                 <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#8b5cf6]">Powered by Claude</span>
                 <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">
-                  Meet <span className="text-[#8b5cf6]">NEXUS</span> — The AI Soul of RAPTOR
+                  Meet <span className="text-[#8b5cf6]">RAPTOR AI</span> — The AI Soul of RAPTOR
                 </h2>
                 <p className="mb-8 text-[#7A8BA8] text-lg leading-relaxed">
-                  NEXUS is not a chatbot. It is a unified AI consciousness embedded into every chart, every dashboard, every trade entry, and every risk decision. Powered by Claude API at its core.
+                  RAPTOR AI is not a chatbot. It is a unified AI consciousness embedded into every chart, every dashboard, every trade entry, and every risk decision. Powered by Claude API at its core.
                 </p>
                 <div className="space-y-4">
                   {[
@@ -343,11 +343,11 @@ export default function Home() {
             </ScrollReveal>
             <ScrollReveal direction="right" delay={0.2}>
               <div className="flex flex-col items-center gap-8">
-                <NexusOrb />
+                <RaptorAIOrb />
                 <div className="rounded-2xl border border-[#8b5cf6]/20 bg-[#8b5cf6]/[0.04] p-6 max-w-sm w-full backdrop-blur-sm">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="h-2 w-2 rounded-full bg-[#8b5cf6] animate-pulse" />
-                    <span className="text-xs font-semibold text-[#8b5cf6]">NEXUS INSIGHT</span>
+                    <span className="text-xs font-semibold text-[#8b5cf6]">RAPTOR AI INSIGHT</span>
                   </div>
                   <p className="text-sm text-[#7A8BA8] leading-relaxed italic">
                     &ldquo;EUR/USD approaching major resistance at 1.0880. RSI divergence detected on H4. Your historical win rate on counter-trend setups at this level is 38%. Consider waiting for confirmation.&rdquo;
@@ -504,12 +504,12 @@ class TrendFollowerPro extends RaptorEA {
             <div className="text-center mb-16">
               <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#F0A500]">For Brokers</span>
               <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Launch Your Brokerage<br /><span className="text-[#F0A500]">In Days, Not Months</span></h2>
-              <p className="mx-auto max-w-2xl text-[#7A8BA8] text-lg">Full white-label infrastructure with dealing desk, risk engine, CRM, IB network, compliance, and NEXUS AI — operational in under 48 hours.</p>
+              <p className="mx-auto max-w-2xl text-[#7A8BA8] text-lg">Full white-label infrastructure with dealing desk, risk engine, CRM, IB network, compliance, and RAPTOR AI — operational in under 48 hours.</p>
             </div>
           </ScrollReveal>
           <motion.div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             {[
-              { title: 'White Label', desc: 'Your brand, your domain, your NEXUS persona — full rebrand in minutes', color: '#F0A500' },
+              { title: 'White Label', desc: 'Your brand, your domain, your RAPTOR AI persona — full rebrand in minutes', color: '#F0A500' },
               { title: 'Risk Engine', desc: 'A/B-book routing, exposure monitoring, hedge desk, margin controls', color: '#FF4560' },
               { title: 'Dealing Desk', desc: 'Position monitor, order flow, price engine, spread constructor', color: '#0091D5' },
               { title: 'Compliance', desc: 'KYC/AML, transaction monitoring, SAR filing, regulatory reports', color: '#00C896' },
@@ -564,7 +564,7 @@ class TrendFollowerPro extends RaptorEA {
             {[
               { title: 'RAPTOR Core Engine', desc: 'Indigenous matching engine with 23 order types, netting and hedging modes, sub-millisecond atomic execution.', tag: 'LIVE', tagColor: '#00C896' },
               { title: 'RAPTOR Script Runtime', desc: 'TypeScript-native EA/Indicator runtime with sandboxed V8 isolates, WASM acceleration, and zero-copy price feeds.', tag: 'LIVE', tagColor: '#00C896' },
-              { title: 'NEXUS Voice Trading', desc: 'Speak to NEXUS — place orders, request analysis, and get real-time coaching hands-free via natural language.', tag: 'BETA', tagColor: '#F0A500' },
+              { title: 'RAPTOR AI Voice Trading', desc: 'Speak to RAPTOR AI — place orders, request analysis, and get real-time coaching hands-free via natural language.', tag: 'BETA', tagColor: '#F0A500' },
             ].map((item) => (
               <motion.div key={item.title} variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 text-left transition-all hover:border-[#00A5A8]/20">
                 <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-4" style={{ backgroundColor: item.tagColor + '20', color: item.tagColor }}>{item.tag}</span>
@@ -586,8 +586,8 @@ class TrendFollowerPro extends RaptorEA {
           </ScrollReveal>
           <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
-              { tier: 'Trader', price: 'Free', period: 'Forever for traders', features: ['Full trading terminal', 'NEXUS AI copilot', 'Copy trading access', 'Mobile app', 'Standard support'], cta: 'Start Trading', ctaStyle: 'border border-white/10 hover:bg-white/[0.03]', highlight: false },
-              { tier: 'Broker', price: 'Custom', period: 'Per month, scaled', features: ['Full brokerage platform', 'White label + custom domain', 'Risk engine + dealing desk', 'CRM + compliance suite', 'LP bridge manager', 'NEXUS AI for brokers', 'Priority support'], cta: 'Book Demo', ctaStyle: 'bg-[#0091D5] text-black hover:bg-[#007AB8]', highlight: true },
+              { tier: 'Trader', price: 'Free', period: 'Forever for traders', features: ['Full trading terminal', 'RAPTOR AI copilot', 'Copy trading access', 'Mobile app', 'Standard support'], cta: 'Start Trading', ctaStyle: 'border border-white/10 hover:bg-white/[0.03]', highlight: false },
+              { tier: 'Broker', price: 'Custom', period: 'Per month, scaled', features: ['Full brokerage platform', 'White label + custom domain', 'Risk engine + dealing desk', 'CRM + compliance suite', 'LP bridge manager', 'RAPTOR AI for brokers', 'Priority support'], cta: 'Book Demo', ctaStyle: 'bg-[#0091D5] text-black hover:bg-[#007AB8]', highlight: true },
               { tier: 'Enterprise', price: 'Contact', period: 'Custom agreement', features: ['Multi-entity management', 'Dedicated infrastructure', 'Custom integrations', 'SLA guarantees', 'Dedicated account team'], cta: 'Contact Sales', ctaStyle: 'border border-white/10 hover:bg-white/[0.03]', highlight: false },
             ].map((plan) => (
               <ScrollReveal key={plan.tier} delay={plan.highlight ? 0 : 0.1}>
@@ -661,7 +661,7 @@ class TrendFollowerPro extends RaptorEA {
                 <img src="/logo.png" alt="GIO4X" style={{ height: 28 }} />
                 <span className="text-sm font-bold">RAPTOR</span>
               </div>
-              <p className="text-xs text-[#7A8BA8] leading-relaxed mb-4 max-w-sm">The AI-native operating system for modern brokerages. Indigenous technology. 20+ integrated modules. NEXUS intelligence. Zero legacy dependencies.</p>
+              <p className="text-xs text-[#7A8BA8] leading-relaxed mb-4 max-w-sm">The AI-native operating system for modern brokerages. Indigenous technology. 20+ integrated modules. RAPTOR AI intelligence. Zero legacy dependencies.</p>
               <div className="flex gap-3">
                 {['LinkedIn', 'Twitter', 'Telegram'].map((s) => (
                   <span key={s} className="text-[10px] text-[#4A5568] border border-white/[0.06] rounded px-2 py-1 hover:text-white hover:border-white/20 transition-all cursor-pointer">{s}</span>

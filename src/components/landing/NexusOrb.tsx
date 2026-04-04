@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 
-export default function NexusOrb() {
+export default function RaptorAIOrb() {
   return (
     <div className="relative w-48 h-48 mx-auto">
       {/* Outer pulse rings */}
@@ -52,9 +52,9 @@ export default function NexusOrb() {
         animate={{ opacity: [0.5, 0.8, 0.5] }}
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
       />
-      {/* N label */}
+      {/* R label */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-2xl font-bold text-white/90 tracking-wider" style={{ textShadow: '0 0 20px rgba(139,92,246,0.5)' }}>N</span>
+        <span className="text-2xl font-bold text-white/90 tracking-wider" style={{ textShadow: '0 0 20px rgba(139,92,246,0.5)' }}>R</span>
       </div>
     </div>
   );

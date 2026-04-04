@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { Copy, Download, Upload, RotateCcw } from 'lucide-react';
 
-const DEFAULT_CODE = `// EMA Crossover Strategy - NEXUS Script
+const DEFAULT_CODE = `// EMA Crossover Strategy - RAPTOR Script
 // Buys when fast EMA crosses above slow EMA
 // Sells when fast EMA crosses below slow EMA
 
@@ -333,7 +333,7 @@ export default function CodeEditor({ code, onChange }: CodeEditorProps) {
           color: '#4A4A5A',
         }}
       >
-        <span>NEXUS Script (NSX)</span>
+        <span>RAPTOR Script (NSX)</span>
         <div className="flex items-center gap-3">
           <span>Lines: {lines.length}</span>
           <span>UTF-8</span>
