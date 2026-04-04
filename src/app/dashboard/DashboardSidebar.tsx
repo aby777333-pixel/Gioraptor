@@ -50,7 +50,9 @@ const navSections: NavSection[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/dashboard/terminal', label: 'Terminal', icon: Monitor },
+      { href: '/dashboard/raptor-charts', label: 'Charts', icon: TrendingUp },
       { href: '/dashboard/markets', label: 'Markets', icon: TrendingUp },
+      { href: '/dashboard/orders', label: 'Orders', icon: Briefcase },
     ],
   },
   {
@@ -59,31 +61,42 @@ const navSections: NavSection[] = [
       { href: '/dashboard/positions', label: 'Positions', icon: Briefcase },
       { href: '/dashboard/history', label: 'History', icon: History },
       { href: '/dashboard/portfolio', label: 'Portfolio', icon: PieChart },
+      { href: '/dashboard/analytics', label: 'Analytics', icon: PieChart },
+      { href: '/dashboard/journal', label: 'Journal', icon: BookOpen },
     ],
   },
   {
     label: 'Invest',
     items: [
-      { href: '/dashboard/copy-trading', label: 'Copy Trading', icon: Copy },
+      { href: '/dashboard/copy-trading-v2', label: 'Copy Trading', icon: Copy },
+      { href: '/dashboard/social', label: 'Social', icon: Users },
       { href: '/dashboard/pamm', label: 'PAMM', icon: Users },
-      { href: '/dashboard/prop', label: 'Prop', icon: Trophy },
+      { href: '/dashboard/prop-challenge', label: 'Prop Challenge', icon: Trophy },
     ],
   },
   {
-    label: 'Tools',
+    label: 'AI & Tools',
     items: [
-      { href: '/dashboard/alerts', label: 'Alerts', icon: Bell },
-      { href: '/dashboard/journal', label: 'Journal', icon: BookOpen },
+      { href: '/dashboard/nexus', label: 'NEXUS AI', icon: Cpu },
+      { href: '/dashboard/smart-alerts', label: 'Smart Alerts', icon: Bell },
+      { href: '/dashboard/script-ide', label: 'Script IDE', icon: Cpu },
+      { href: '/converter', label: 'EA Converter', icon: Cpu },
+      { href: '/dashboard/signals', label: 'Signals', icon: Radio },
+      { href: '/marketplace/hub', label: 'Marketplace', icon: Radio },
+    ],
+  },
+  {
+    label: 'Learn',
+    items: [
+      { href: '/dashboard/academy', label: 'Academy', icon: GraduationCap },
       { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
       { href: '/dashboard/news', label: 'News', icon: Newspaper },
-      { href: '/dashboard/education', label: 'Education', icon: GraduationCap },
-      { href: '/dashboard/signals', label: 'Signals', icon: Radio },
-      { href: '/dashboard/ea-builder', label: 'EA Builder', icon: Cpu },
     ],
   },
   {
     label: 'Account',
     items: [
+      { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
       { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
       { href: '/dashboard/referrals', label: 'Referrals', icon: UserPlus },
       { href: '/dashboard/support', label: 'Support', icon: HeadphonesIcon },

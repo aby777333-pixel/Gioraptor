@@ -49,58 +49,71 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    label: 'Overview',
+    label: 'Command',
     items: [
-      { href: '/broker/overview', label: 'Overview', icon: LayoutDashboard },
-      { href: '/broker/clients', label: 'Clients', icon: Users },
+      { href: '/broker/command-center', label: 'Command Center', icon: LayoutDashboard },
+      { href: '/broker/overview', label: 'Overview', icon: BarChart3 },
+      { href: '/broker/ai-guardian', label: 'AI Intelligence', icon: Eye },
+      { href: '/broker/intel', label: 'Business Intel', icon: BarChart3 },
     ],
   },
   {
     label: 'Trading',
     items: [
       { href: '/broker/dealing-desk', label: 'Dealing Desk', icon: BookMarked },
-      { href: '/broker/risk', label: 'Risk', icon: ShieldAlert },
+      { href: '/broker/core-engine', label: 'Core Engine', icon: Settings },
+      { href: '/broker/risk', label: 'Risk Engine', icon: ShieldAlert },
+      { href: '/broker/symbols', label: 'Symbols', icon: BarChart3 },
       { href: '/broker/surveillance', label: 'Surveillance', icon: Eye },
-      { href: '/broker/book', label: 'Book', icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Clients',
+    items: [
+      { href: '/broker/clients', label: 'Client List', icon: Users },
+      { href: '/broker/crm', label: 'CRM Pipeline', icon: Users },
+      { href: '/broker/comms', label: 'Communications', icon: HeadphonesIcon },
+      { href: '/broker/ib-management', label: 'IB Management', icon: Network },
+      { href: '/broker/ib', label: 'IB Network', icon: Network },
     ],
   },
   {
     label: 'Finance',
     items: [
       { href: '/broker/payments', label: 'Payments', icon: CreditCard },
-      { href: '/broker/treasury', label: 'Treasury', icon: Landmark },
       { href: '/broker/reconciliation', label: 'Reconciliation', icon: FileCheck },
-      { href: '/broker/ib', label: 'IB', icon: Network },
+      { href: '/broker/bi', label: 'Report Builder', icon: ClipboardList },
+      { href: '/broker/reports', label: 'Reports', icon: FileText },
     ],
   },
   {
-    label: 'Growth',
+    label: 'Compliance',
     items: [
-      { href: '/broker/marketing', label: 'Marketing', icon: Megaphone },
-      { href: '/broker/copy-trading', label: 'Copy Trading', icon: Copy },
-      { href: '/broker/pamm', label: 'PAMM', icon: BarChart3 },
-      { href: '/broker/prop', label: 'Prop', icon: Trophy },
-      { href: '/broker/education', label: 'Education', icon: GraduationCap },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { href: '/broker/kyc', label: 'KYC', icon: UserCheck },
+      { href: '/broker/kyc', label: 'KYC Review', icon: UserCheck },
       { href: '/broker/compliance', label: 'Compliance', icon: Scale },
-      { href: '/broker/support', label: 'Support', icon: HeadphonesIcon },
-      { href: '/broker/contracts', label: 'Contracts', icon: FileText },
-      { href: '/broker/audit', label: 'Audit', icon: ClipboardList },
+      { href: '/broker/comply', label: 'Regulatory', icon: Scale },
+      { href: '/broker/security', label: 'Security', icon: ShieldAlert },
+      { href: '/broker/incidents', label: 'Incidents', icon: Flag },
     ],
   },
   {
-    label: 'Settings',
+    label: 'Infrastructure',
     items: [
-      { href: '/broker/config', label: 'Config', icon: Settings },
-      { href: '/broker/symbols', label: 'Symbols', icon: BarChart3 },
+      { href: '/broker/integrations', label: 'Integrations', icon: Network },
+      { href: '/broker/connect', label: 'Migration', icon: Network },
+      { href: '/broker/brand', label: 'Brand Studio', icon: Settings },
+      { href: '/broker/mobile-apps', label: 'Mobile Apps', icon: Settings },
+      { href: '/broker/raptor-app', label: 'RAPTOR App', icon: Settings },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { href: '/broker/staff', label: 'Staff & Roles', icon: UserCog },
       { href: '/broker/team', label: 'Team', icon: UserCog },
-      { href: '/broker/feature-flags', label: 'Feature Flags', icon: Flag },
-      { href: '/broker/notifications', label: 'Notifications', icon: BellRing },
+      { href: '/broker/operations', label: 'Operations', icon: Settings },
+      { href: '/broker/settings', label: 'Settings', icon: Settings },
+      { href: '/broker/support', label: 'Support Queue', icon: HeadphonesIcon },
     ],
   },
 ];
