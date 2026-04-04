@@ -30,7 +30,13 @@ const PUBLIC_PATHS = [
 const PUBLIC_PREFIXES = ['/auth/', '/features/', '/blog/', '/developer/', '/education/'];
 
 // Protected route prefixes that require authentication
-const PROTECTED_PREFIXES = ['/dashboard', '/broker', '/admin', '/onboarding'];
+const PROTECTED_PREFIXES = ['/dashboard', '/broker', '/admin', '/onboarding', '/converter', '/terminal'];
+
+// Routes that ONLY broker_admin and gio4x_admin can access (hard deny for traders)
+const BROKER_ONLY_PREFIXES = ['/broker'];
+
+// Routes that ONLY gio4x_admin can access
+const SUPERADMIN_ONLY_PREFIXES = ['/admin'];
 
 type UserRole = 'trader' | 'broker_admin' | 'gio4x_admin';
 
@@ -68,14 +74,20 @@ function getDefaultPathForRole(role: UserRole): string {
 }
 
 /**
- * Check if a role is allowed to access a given path.
+ * HARD ROLE ENFORCEMENT — not UI hiding, architecture-level separation.
+ *
+ * Principle: If role is unclear or unrecognized → DENY ACCESS (fail-safe).
+ * Traders can NEVER access broker routes. Brokers can NEVER access admin routes.
+ * This is enforced at middleware level — before any page/component renders.
+ *
  * Returns the redirect path if denied, or null if allowed.
  */
 function getRoleRedirect(role: UserRole, pathname: string): string | null {
-  // gio4x_admin can access everything
+  // gio4x_admin (Super Admin / Platform Owner) — access everything
   if (role === 'gio4x_admin') return null;
 
-  // broker_admin: can access /broker/* and /dashboard/*, but NOT /admin/*
+  // broker_admin: /broker/*, /dashboard/*, /converter, /terminal, /marketplace
+  // DENIED: /admin/*
   if (role === 'broker_admin') {
     if (pathname.startsWith('/admin')) {
       return '/broker/overview';
@@ -83,7 +95,10 @@ function getRoleRedirect(role: UserRole, pathname: string): string | null {
     return null;
   }
 
-  // trader: can access /dashboard/* and /onboarding, but NOT /broker/* or /admin/*
+  // trader: /dashboard/*, /converter, /terminal/*, /marketplace/*, /onboarding
+  // HARD DENY: /broker/*, /admin/*
+  // Traders must NEVER see: broker internals, risk engine, dealing desk,
+  // LP details, other client data, A/B routing, spread manipulation, CRM
   if (role === 'trader') {
     if (pathname.startsWith('/broker') || pathname.startsWith('/admin')) {
       return '/dashboard';
@@ -91,7 +106,8 @@ function getRoleRedirect(role: UserRole, pathname: string): string | null {
     return null;
   }
 
-  return null;
+  // FAIL-SAFE: Unrecognized role → deny access to all protected routes
+  return '/auth/login';
 }
 
 export async function updateSession(request: NextRequest) {
