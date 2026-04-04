@@ -9,6 +9,7 @@ import {
   TrendingUp, Heart, Clock, Lightbulb, User,
 } from 'lucide-react';
 import type { NexusSentiment } from '@/types/nexus';
+import { evaluateTraderProactiveMessages, evaluateBrokerProactiveMessages } from '@/lib/nexus/nexus-proactive';
 
 interface NexusMessage {
   id: string;
@@ -112,6 +113,59 @@ export function NexusGlobal() {
       });
     }
   }, [pathname, isExcluded]);
+
+  // Proactive intelligence — NEXUS voluntarily provides alerts
+  useEffect(() => {
+    if (isExcluded || isSnoozed) return;
+
+    const evaluateProactive = () => {
+      const isBrokerPage = pathname.startsWith('/broker');
+
+      if (isBrokerPage) {
+        // B2B proactive messages (mock context — replace with real data)
+        const brokerMessages = evaluateBrokerProactiveMessages({
+          netExposurePct: 45, exposureLimit: 50000000,
+          marginCallClients: 2,
+          lpFillRates: [{ name: 'LMAX', fillRate: 99.4 }, { name: 'Integral', fillRate: 92.1 }],
+          churnRiskClients: [{ name: 'Client Alpha', probability: 78 }],
+          revenueToday: 28000, revenueYesterdaySameTime: 34000,
+          pendingWithdrawals: 12,
+          regulatoryDeadlines: [{ name: 'MiFID II ARM', daysRemaining: 3 }],
+          ibDeclines: [{ name: 'TradeSchool', declinePct: 42 }],
+          toxicFlowAlerts: 1,
+        });
+        if (brokerMessages.length > 0) {
+          const top = brokerMessages[0];
+          setMessages(prev => {
+            if (prev.some(m => m.id === top.id)) return prev;
+            return [{ id: top.id, text: top.message, sentiment: top.sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev];
+          });
+        }
+      } else {
+        // B2C proactive messages (mock context — replace with real data)
+        const traderMessages = evaluateTraderProactiveMessages({
+          openPositions: [],
+          sessionMinutes: 0,
+          tradesToday: 0, avgTradesPerDay: 4, consecutiveLosses: 0,
+          lastPositionSize: 0.1, avgPositionSize: 0.1,
+          currentDrawdownPct: 0, watchlist: ['EURUSD', 'XAUUSD'],
+          upcomingEvents: [], dayOfWeek: new Date().getDay(), hour: new Date().getHours(),
+        });
+        if (traderMessages.length > 0) {
+          const top = traderMessages[0];
+          setMessages(prev => {
+            if (prev.some(m => m.id === top.id)) return prev;
+            return [{ id: top.id, text: top.message, sentiment: top.sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev];
+          });
+        }
+      }
+    };
+
+    // Evaluate on mount and every 5 minutes
+    const timer = setInterval(evaluateProactive, 300000);
+    evaluateProactive();
+    return () => clearInterval(timer);
+  }, [pathname, isExcluded, isSnoozed]);
 
   useEffect(() => {
     if (snoozeUntil && Date.now() < snoozeUntil) {
