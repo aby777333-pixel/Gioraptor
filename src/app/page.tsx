@@ -77,7 +77,8 @@ export default function Home() {
             <Link href="/contact" className="transition-colors hover:text-white">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="text-sm text-[#7A8BA8] transition-colors hover:text-white">Sign In</Link>
+            <Link href="/auth/broker-login" className="text-sm text-[#F0A500] transition-colors hover:text-[#D49000]">Broker Login</Link>
+            <Link href="/auth/login" className="text-sm text-[#7A8BA8] transition-colors hover:text-white">Trader Login</Link>
             <Link href="/auth/register" className="rounded-lg bg-[#0091D5] px-5 py-2 text-sm font-semibold transition-all hover:bg-[#007AB8] hover:shadow-lg hover:shadow-[#0091D5]/20">Get Started</Link>
           </div>
         </div>
