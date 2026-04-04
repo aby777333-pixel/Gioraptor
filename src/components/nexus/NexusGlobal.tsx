@@ -60,22 +60,33 @@ function getContextMessage(pathname: string): NexusMessage | null {
   return null;
 }
 
-// Mock NEXUS responses based on keywords
-function generateResponse(input: string): string {
-  const lower = input.toLowerCase();
-  if (lower.includes('trade idea') || lower.includes('setup'))
-    return 'Based on current market conditions, I see 3 potential setups:\n\n1. **EURUSD H4** — Bullish flag breakout forming. Entry near 1.0855, SL 1.0820, TP 1.0920. Confidence: 76%.\n\n2. **XAUUSD H1** — RSI oversold bounce at support 2340. Watch for confirmation candle.\n\n3. **GBPJPY D1** — Head & shoulders neckline test. Bearish bias if closes below 192.50.\n\n⚠️ These are AI-generated ideas, not financial advice.';
-  if (lower.includes('position') || lower.includes('analyze'))
-    return 'Looking at your open positions:\n\n• Your EURUSD long is currently +$342 — approaching first TP target. Consider a partial close to lock in profit.\n\n• No stop loss detected on your GBPUSD position — I recommend adding one below the nearest structure at 1.2615.\n\n• Overall margin usage: 34%. You have room for 1-2 more trades at your normal size.';
-  if (lower.includes('stop loss') || lower.includes('sl') || lower.includes('tp'))
-    return 'Based on ATR(14) and nearest structure:\n\n• **Stop Loss:** 45 pips below entry (below the H4 support zone)\n• **Take Profit 1:** 67 pips (next resistance, R:R = 1.5:1)\n• **Take Profit 2:** 112 pips (weekly R1, R:R = 2.5:1)\n\nYour historical win rate with similar R:R setups is 64%.';
-  if (lower.includes('market') || lower.includes('briefing'))
-    return 'Good morning! Here\'s your market brief:\n\n• **USD** weakening across the board (-0.3% DXY)\n• **Gold** testing 2365 resistance — breakout watch\n• **Key event:** ECB rate decision at 13:45 GMT\n• **Your portfolio:** +2.1% today, 3 open positions\n\nVolatility expected to spike around the ECB announcement. Consider tightening stops on EUR pairs.';
-  if (lower.includes('debrief') || lower.includes('review') || lower.includes('last trade'))
-    return 'Let\'s review your last trade:\n\n**EURUSD Long** — Closed +$187 (+1.2%)\n\n✅ Good: Entry was on a confirmed H4 flag breakout\n✅ Good: Position size was appropriate (1.5% risk)\n⚠️ Note: You closed 22 pips before TP was hit. Your data shows you close winners early 40% of the time.\n\n**Suggestion:** Try using a trailing stop next time to let winners run while protecting profit.';
-  if (lower.includes('pre-trade') || lower.includes('checklist'))
-    return 'Pre-trade checklist:\n\n✅ Trend: Aligned with H4 and D1 uptrend\n✅ RSI: 55 — room to move, not overbought\n✅ Volume: Increasing on recent up-candles\n⚠️ News: NFP in 47 minutes — consider waiting\n⚠️ Existing: You have 2 EUR longs already\n\n**Verdict: CONSIDER WAITING** — setup is valid but NFP timing adds risk. Re-evaluate after the release.';
-  return `I understand your question about "${input.slice(0, 50)}". Let me analyze the current market context and your account state...\n\nBased on available data, I\'d suggest reviewing the current trend on the H4 timeframe and checking RSI for any divergence signals. Would you like me to dig deeper into any specific aspect?\n\n⚠️ This is AI analysis, not financial advice.`;
+/**
+ * Call the real NEXUS API endpoint which proxies to Claude
+ */
+async function callNexusAPI(userMessage: string, conversationHistory: ChatMessage[]): Promise<string> {
+  try {
+    const res = await fetch('/api/nexus/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: userMessage,
+        history: conversationHistory.slice(-10).map(m => ({
+          role: m.role === 'nexus' ? 'assistant' : 'user',
+          content: m.text,
+        })),
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return (err as Record<string, string>).fallback ?? 'I\'m having trouble connecting right now. Please try again in a moment.';
+    }
+
+    const data = await res.json();
+    return data.response ?? 'I received your message but couldn\'t generate a response. Try rephrasing your question.';
+  } catch {
+    return 'Connection issue — I\'m temporarily offline. Please try again shortly.';
+  }
 }
 
 export function NexusGlobal() {
@@ -131,18 +142,17 @@ export function NexusGlobal() {
     }
   };
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = async (text: string) => {
+    if (!text.trim() || isTyping) return;
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text: text.trim(), timestamp: new Date().toISOString() };
-    setChatMessages(prev => [...prev, userMsg]);
+    const updatedHistory = [...chatMessages, userMsg];
+    setChatMessages(updatedHistory);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const response = generateResponse(text);
-      setChatMessages(prev => [...prev, { id: `n-${Date.now()}`, role: 'nexus', text: response, timestamp: new Date().toISOString() }]);
-      setIsTyping(false);
-    }, 1200 + Math.random() * 800);
+    const response = await callNexusAPI(text.trim(), updatedHistory);
+    setChatMessages(prev => [...prev, { id: `n-${Date.now()}`, role: 'nexus', text: response, timestamp: new Date().toISOString() }]);
+    setIsTyping(false);
   };
 
   return (
