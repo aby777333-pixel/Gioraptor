@@ -71,9 +71,9 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-6 text-sm text-[#7A8BA8]">
             <a href="#features" className="transition-colors hover:text-white">Platform</a>
             <a href="#nexus" className="transition-colors hover:text-white">RAPTOR AI</a>
+            <Link href="/marketplace/hub" className="transition-colors hover:text-white">Marketplace</Link>
             <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
             <Link href="/developer" className="transition-colors hover:text-white">Developers</Link>
-            <Link href="/blog" className="transition-colors hover:text-white">Blog</Link>
             <Link href="/contact" className="transition-colors hover:text-white">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
@@ -282,7 +282,7 @@ export default function Home() {
       </section>
 
       {/* ─── Core Features ─── */}
-      <section id="features" className="relative px-6 py-32">
+      <section id="features" className="relative px-6 py-20">
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="mb-16 text-center">
@@ -309,7 +309,7 @@ export default function Home() {
       </section>
 
       {/* ─── RAPTOR AI Section ─── */}
-      <section id="nexus" className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section id="nexus" className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(139,92,246,0.06)_0%,_transparent_50%)]" />
         <div className="relative mx-auto max-w-7xl">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -365,7 +365,7 @@ export default function Home() {
       </section>
 
       {/* ─── 20 Modules Grid ─── */}
-      <section id="modules" className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section id="modules" className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="mb-16 text-center">
@@ -402,7 +402,7 @@ export default function Home() {
       </section>
 
       {/* ─── Architecture Visualization ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-5xl">
           <ScrollReveal>
             <div className="mb-16 text-center">
@@ -439,7 +439,7 @@ export default function Home() {
       </section>
 
       {/* ─── EA Converter Highlight ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-7xl">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <ScrollReveal direction="left">
@@ -497,8 +497,134 @@ class TrendFollowerPro extends RaptorEA {
         </div>
       </section>
 
+      {/* ─── Trader Features Mega Section ─── */}
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl">
+          <ScrollReveal>
+            <div className="text-center mb-14">
+              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">For Traders</span>
+              <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Everything a Trader Needs.<br /><span className="text-[#0091D5]">Nothing They Don&apos;t.</span></h2>
+            </div>
+          </ScrollReveal>
+          <motion.div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            {[
+              { title: 'RAPTOR Charts', desc: '15 chart types, 155+ indicators, 50+ drawing tools, 30+ timeframes', stat: '155+', color: '#0091D5', href: '/dashboard/raptor-charts' },
+              { title: 'NEXUS AI Copilot', desc: 'Pre-trade analysis, psychology coaching, weekly reports, voice mode', stat: 'AI', color: '#8b5cf6', href: '/dashboard/nexus' },
+              { title: 'Script IDE', desc: 'TypeScript-native scripting with backtest engine and parameter optimization', stat: 'IDE', color: '#00A5A8', href: '/dashboard/script-ide' },
+              { title: 'Copy Trading', desc: 'Follow verified providers with risk-adjusted allocation and auto-copy', stat: 'Social', color: '#009B4D', href: '/dashboard/copy-trading-v2' },
+              { title: 'Prop Challenges', desc: '1-phase, 2-phase, instant funding with live progress gauges and scaling', stat: 'Funded', color: '#F0A500', href: '/dashboard/prop-challenge' },
+              { title: 'Social Trading', desc: 'Share trades, leaderboards, forums, live rooms, trading competitions', stat: 'Feed', color: '#00C896', href: '/dashboard/social' },
+              { title: 'Smart Alerts', desc: 'Price, indicator, pattern, calendar, position, and news sentiment alerts', stat: '7ch', color: '#FF4560', href: '/dashboard/smart-alerts' },
+              { title: 'Finance Portal', desc: 'Card, wire, crypto deposits. Tax summaries. Internal transfers. Statements', stat: 'Pay', color: '#F0A500', href: '/dashboard/finance' },
+              { title: 'Performance Analytics', desc: 'Equity curve, Sharpe, Sortino, Calmar, monthly heatmap, trade distribution', stat: '20+', color: '#0091D5', href: '/dashboard/analytics' },
+              { title: 'RAPTOR Academy', desc: 'Courses, XP levels, badges, streaks, quizzes, AI tutor, paper trading', stat: 'XP', color: '#8b5cf6', href: '/dashboard/academy' },
+              { title: 'Marketplace', desc: 'EAs, indicators, signal providers, plugins — free and paid', stat: 'Store', color: '#009B4D', href: '/marketplace/hub' },
+              { title: 'EA Converter', desc: 'Upload MQL5 files — AI converts to RAPTOR Script in minutes', stat: 'MT5→', color: '#00A5A8', href: '/converter' },
+            ].map((f) => (
+              <motion.div key={f.title} variants={fadeUp}>
+                <Link href={f.href} className="block rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-4 transition-all hover:bg-[#0B1422]/70 hover:border-[#0091D5]/20 group h-full">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: f.color }}>{f.title}</span>
+                    <span className="text-[10px] font-bold mono" style={{ color: f.color + '80' }}>{f.stat}</span>
+                  </div>
+                  <p className="text-[11px] text-[#7A8BA8] leading-relaxed">{f.desc}</p>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ─── RAPTOR Charts + Indicators Showcase ─── */}
+      <section className="relative px-6 py-16 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <ScrollReveal direction="left">
+              <div>
+                <span className="mb-3 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">RAPTOR Charts</span>
+                <h2 className="mb-4 text-2xl font-bold tracking-tight sm:text-3xl">155+ Indigenous Indicators.<br/>15 Chart Types. 50+ Drawing Tools.</h2>
+                <p className="mb-5 text-sm text-[#7A8BA8] leading-relaxed">Every indicator is 100% RAPTOR-native TypeScript — no dependency on TradingView calculations. Plus 8 exclusive RAPTOR indicators and 5 NEXUS AI overlays.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {['SMA/EMA/DEMA/TEMA/HMA', 'RSI/Stochastic/CCI/MACD', 'Bollinger/ATR/Keltner', 'VWAP/OBV/Volume Profile', 'Ichimoku Cloud (full)', 'Supertrend/ADX/SAR', 'Fibonacci (7 types)', 'Elliott Wave + Harmonic'].map((g) => (
+                    <div key={g} className="flex items-center gap-1.5 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#0091D5] shrink-0"/>{g}</div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal direction="right" delay={0.1}>
+              <div className="grid grid-cols-4 gap-1.5">
+                {['PULSE','MWAVE','LIQMAP','SMART','FLOW','REGIME','SENT','SIGNAL','ZONES','PATTERNS','DIV','ENTRY'].map((ind) => (
+                  <div key={ind} className="rounded-lg border border-white/[0.06] bg-[#0B1422]/40 px-2 py-2 text-center">
+                    <span className="text-[9px] font-bold mono" style={{ color: ind.length <= 5 ? '#ff6b35' : '#8b5cf6' }}>{ind}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEXUS Psychology + Responsible Trading ─── */}
+      <section className="relative px-6 py-16 border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid lg:grid-cols-3 gap-4">
+            <ScrollReveal delay={0}>
+              <div className="rounded-xl border border-[#8b5cf6]/15 bg-[#8b5cf6]/[0.03] p-5 h-full">
+                <div className="text-xs font-bold text-[#8b5cf6] uppercase tracking-wider mb-3">NEXUS Psychology Coach</div>
+                <div className="space-y-2">
+                  {['Overtrading detection', 'Revenge trading alerts', 'FOMO pattern recognition', 'Loss aversion coaching', 'Early profit-taking analysis', 'Weekly performance reports', 'Crisis support + resources'].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#8b5cf6] shrink-0"/>{f}</div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal delay={0.1}>
+              <div className="rounded-xl border border-[#00C896]/15 bg-[#00C896]/[0.03] p-5 h-full">
+                <div className="text-xs font-bold text-[#00C896] uppercase tracking-wider mb-3">Responsible Trading</div>
+                <div className="space-y-2">
+                  {['Self-set deposit limits', 'Daily/weekly loss limits', 'Session time limits', 'Reality check popups', 'Cooling-off periods', 'Self-exclusion (immediate)', 'GamCare + BeGambleAware links'].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#00C896] shrink-0"/>{f}</div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal delay={0.2}>
+              <div className="rounded-xl border border-[#F0A500]/15 bg-[#F0A500]/[0.03] p-5 h-full">
+                <div className="text-xs font-bold text-[#F0A500] uppercase tracking-wider mb-3">Loyalty & Gamification</div>
+                <div className="space-y-2">
+                  {['XP system: trades + education', '6 tiers: Rookie → Legend', '100+ achievement badges', 'Weekly trading challenges', 'Tier spread discounts', 'Referral rewards program', 'Community competitions'].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#F0A500] shrink-0"/>{f}</div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Platform Numbers ─── */}
+      <section className="relative px-6 py-14 border-t border-white/[0.06]">
+        <div className="mx-auto max-w-6xl">
+          <motion.div className="grid grid-cols-3 sm:grid-cols-6 gap-3" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            {[
+              { n: '23', label: 'Order Types' },
+              { n: '155+', label: 'Indicators' },
+              { n: '50+', label: 'Drawing Tools' },
+              { n: '15', label: 'Chart Types' },
+              { n: '22+', label: 'Integrations' },
+              { n: '90+', label: 'DB Tables' },
+            ].map((s) => (
+              <motion.div key={s.label} variants={fadeUp} className="text-center py-3">
+                <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0082C8] to-[#009B4D] bg-clip-text text-transparent mono">{s.n}</div>
+                <div className="text-[9px] text-[#7A8BA8] uppercase tracking-wider mt-0.5">{s.label}</div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* ─── For Brokers Section ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04] bg-gradient-to-b from-[#060D16] to-[#0B1422]/50">
+      <section className="relative px-6 py-20 border-t border-white/[0.04] bg-gradient-to-b from-[#060D16] to-[#0B1422]/50">
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="text-center mb-16">
@@ -553,7 +679,7 @@ class TrendFollowerPro extends RaptorEA {
       </section>
 
       {/* ─── Innovation Section ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-7xl text-center">
           <ScrollReveal>
             <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00A5A8]">Innovation</span>
@@ -577,7 +703,7 @@ class TrendFollowerPro extends RaptorEA {
       </section>
 
       {/* ─── Pricing Section ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-5xl text-center">
           <ScrollReveal>
             <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#009B4D]">Pricing</span>
@@ -610,7 +736,7 @@ class TrendFollowerPro extends RaptorEA {
       </section>
 
       {/* ─── CEO Letter ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="mx-auto max-w-3xl">
           <ScrollReveal>
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-10 backdrop-blur-sm">
@@ -634,7 +760,7 @@ class TrendFollowerPro extends RaptorEA {
       </section>
 
       {/* ─── Final CTA ─── */}
-      <section className="relative px-6 py-32 border-t border-white/[0.04]">
+      <section className="relative px-6 py-20 border-t border-white/[0.04]">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_rgba(0,155,77,0.06)_0%,_transparent_60%)]" />
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <ScrollReveal>
@@ -673,12 +799,14 @@ class TrendFollowerPro extends RaptorEA {
               <div className="space-y-2.5 text-xs text-[#4A5568]">
                 {[
                   { label: 'Trading Terminal', href: '/features/trading-terminal' },
-                  { label: 'AI Signals', href: '/features/ai-signals' },
-                  { label: 'EA Converter', href: '/features/ea-builder' },
-                  { label: 'Copy Trading', href: '/features/copy-trading' },
-                  { label: 'PAMM / MAM', href: '/features/pamm' },
-                  { label: 'Prop Trading', href: '/features/prop-trading' },
-                  { label: 'Analytics', href: '/features/analytics' },
+                  { label: 'RAPTOR Charts', href: '/dashboard/raptor-charts' },
+                  { label: 'NEXUS AI Copilot', href: '/dashboard/nexus' },
+                  { label: 'Script IDE', href: '/dashboard/script-ide' },
+                  { label: 'Copy Trading', href: '/dashboard/copy-trading-v2' },
+                  { label: 'Prop Challenges', href: '/dashboard/prop-challenge' },
+                  { label: 'Social Trading', href: '/dashboard/social' },
+                  { label: 'Marketplace', href: '/marketplace/hub' },
+                  { label: 'EA Converter', href: '/converter' },
                 ].map((l) => (
                   <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
@@ -690,7 +818,10 @@ class TrendFollowerPro extends RaptorEA {
                 {[
                   { label: 'White Label', href: '/features/white-label' },
                   { label: 'Risk Management', href: '/features/risk-management' },
-                  { label: 'Sandbox', href: '/sandbox' },
+                  { label: 'Dealing Desk', href: '/broker/dealing-desk' },
+                  { label: 'Core Engine', href: '/broker/core-engine' },
+                  { label: 'Integrations', href: '/broker/integrations' },
+                  { label: 'Security Center', href: '/broker/security' },
                   { label: 'Partners', href: '/partners' },
                   { label: 'Contact Sales', href: '/contact?type=broker' },
                 ].map((l) => (
