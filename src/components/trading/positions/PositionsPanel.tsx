@@ -795,7 +795,7 @@ export default function PositionsPanel() {
                 <div
                   className="grid gap-0 px-2 text-[11px] uppercase tracking-wider font-semibold sticky top-0 z-10"
                   style={{
-                    gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
+                    gridTemplateColumns: 'minmax(40px,1fr) minmax(70px,1fr) minmax(52px,1fr) minmax(80px,1fr) minmax(58px,1fr) minmax(90px,1fr) minmax(72px,1fr) minmax(72px,1fr) minmax(68px,1fr) minmax(42px,0.5fr)',
                     background: S.headerBg,
                     borderBottom: `1px solid ${S.border}`,
                     color: S.textDim,
@@ -823,7 +823,7 @@ export default function PositionsPanel() {
                       key={ord.id}
                       className="grid gap-0 px-2 text-[12px] transition-colors"
                       style={{
-                        gridTemplateColumns: '42px 62px 52px 78px 58px 82px 72px 72px 68px 42px',
+                        gridTemplateColumns: 'minmax(40px,1fr) minmax(70px,1fr) minmax(52px,1fr) minmax(80px,1fr) minmax(58px,1fr) minmax(90px,1fr) minmax(72px,1fr) minmax(72px,1fr) minmax(68px,1fr) minmax(42px,0.5fr)',
                         borderBottom: `1px solid ${S.border}`,
                         background: isAlt ? S.rowAltBg : 'transparent',
                         height: 32,
