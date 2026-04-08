@@ -6,7 +6,7 @@
 import type { PriceTick, OHLCVBar } from '@/types/trading';
 import { PriceEngine } from './price-engine';
 
-export type Resolution = '1' | '5' | '15' | '30' | '60' | '240' | '1D';
+export type Resolution = '1' | '5' | '15' | '30' | '60' | '240' | '1D' | '1W' | '1MN';
 
 const RESOLUTION_MS: Record<Resolution, number> = {
   '1': 60_000,
@@ -16,6 +16,8 @@ const RESOLUTION_MS: Record<Resolution, number> = {
   '60': 3_600_000,
   '240': 14_400_000,
   '1D': 86_400_000,
+  '1W': 604_800_000,
+  '1MN': 2_592_000_000, // ~30 days
 };
 
 /** Map user-facing timeframe label to resolution key */
@@ -23,9 +25,12 @@ export const TF_TO_RESOLUTION: Record<string, Resolution> = {
   '1m': '1',
   '5m': '5',
   '15m': '15',
+  '30m': '30',
   '1H': '60',
   '4H': '240',
   '1D': '1D',
+  '1W': '1W',
+  '1Mo': '1MN',
 };
 
 function getBarOpenTime(ts: number, resolutionMs: number): number {

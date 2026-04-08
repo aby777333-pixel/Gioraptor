@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Search, Settings2, TrendingUp, Activity, BarChart3, Volume2 } from 'lucide-react';
+import { X, Search, Settings2, TrendingUp, Activity, BarChart3, Volume2, Brain } from 'lucide-react';
 
 // ─── Indicator definitions ─────────────────────────────────────
 
@@ -13,16 +13,27 @@ export type IndicatorId =
   | 'bbands'
   | 'atr14'
   | 'stoch'
-  | 'vwap';
+  | 'vwap'
+  // Extended indicators
+  | 'aroon'
+  | 'adx'
+  | 'bullsbears'
+  | 'donchian'
+  | 'envelope'
+  | 'fractals'
+  | 'ichimoku'
+  | 'momentum'
+  | 'psar'
+  | 'pivotpoints';
 
-export type IndicatorCategory = 'Trend' | 'Momentum' | 'Volatility' | 'Volume';
+export type IndicatorCategory = 'Trend' | 'Momentum' | 'Volatility' | 'Volume' | 'Overlay';
 
 export interface IndicatorConfig {
   id: IndicatorId;
   name: string;
   shortName: string;
   category: IndicatorCategory;
-  overlay: boolean; // true = rendered on main chart; false = separate pane / scale
+  overlay: boolean;
   defaultParams: Record<string, number>;
   description: string;
 }
@@ -33,17 +44,31 @@ export const INDICATOR_DEFS: IndicatorConfig[] = [
   { id: 'sma21',  name: 'SMA (21)',           shortName: 'SMA 21',  category: 'Trend', overlay: true,  defaultParams: { period: 21 },  description: 'Simple Moving Average (21 period)' },
   { id: 'sma50',  name: 'SMA (50)',           shortName: 'SMA 50',  category: 'Trend', overlay: true,  defaultParams: { period: 50 },  description: 'Simple Moving Average (50 period)' },
   { id: 'sma200', name: 'SMA (200)',          shortName: 'SMA 200', category: 'Trend', overlay: true,  defaultParams: { period: 200 }, description: 'Simple Moving Average (200 period)' },
-  { id: 'ema9',   name: 'EMA (9)',            shortName: 'EMA 9',   category: 'Trend', overlay: true,  defaultParams: { period: 9 },   description: 'Exponential Moving Average (9 period)' },
-  { id: 'ema21',  name: 'EMA (21)',           shortName: 'EMA 21',  category: 'Trend', overlay: true,  defaultParams: { period: 21 },  description: 'Exponential Moving Average (21 period)' },
-  { id: 'ema50',  name: 'EMA (50)',           shortName: 'EMA 50',  category: 'Trend', overlay: true,  defaultParams: { period: 50 },  description: 'Exponential Moving Average (50 period)' },
+  { id: 'ema9',   name: 'Exponential Moving Average (9)',  shortName: 'EMA 9',   category: 'Trend', overlay: true,  defaultParams: { period: 9 },   description: 'Exponential Moving Average (9 period)' },
+  { id: 'ema21',  name: 'Exponential Moving Average (21)', shortName: 'EMA 21',  category: 'Trend', overlay: true,  defaultParams: { period: 21 },  description: 'Exponential Moving Average (21 period)' },
+  { id: 'ema50',  name: 'Exponential Moving Average (50)', shortName: 'EMA 50',  category: 'Trend', overlay: true,  defaultParams: { period: 50 },  description: 'Exponential Moving Average (50 period)' },
   { id: 'vwap',   name: 'VWAP',              shortName: 'VWAP',    category: 'Trend', overlay: true,  defaultParams: {},               description: 'Volume Weighted Average Price' },
+  { id: 'ichimoku', name: 'Ichimoku Cloud',   shortName: 'Ichimoku', category: 'Trend', overlay: true, defaultParams: { conversion: 9, base: 26, spanB: 52, displacement: 26 }, description: 'Ichimoku Kinko Hyo cloud system' },
+  { id: 'psar',    name: 'Parabolic SAR',     shortName: 'PSAR',    category: 'Trend', overlay: true, defaultParams: { step: 0.02, max: 0.2 }, description: 'Parabolic Stop and Reverse' },
+  { id: 'envelope', name: 'Envelope',         shortName: 'ENV',     category: 'Trend', overlay: true, defaultParams: { period: 20, percent: 2.5 }, description: 'Moving Average Envelope' },
+
+  // Volatility
   { id: 'bbands', name: 'Bollinger Bands',    shortName: 'BB',      category: 'Volatility', overlay: true, defaultParams: { period: 20, stdDev: 2 }, description: 'Bollinger Bands (20, 2)' },
+  { id: 'atr14',  name: 'ATR (14)',           shortName: 'ATR',     category: 'Volatility', overlay: false, defaultParams: { period: 14 }, description: 'Average True Range (14 period)' },
+  { id: 'donchian', name: 'Donchian Channel', shortName: 'DC',      category: 'Volatility', overlay: true, defaultParams: { period: 20 }, description: 'Donchian Channel (20 period)' },
+
   // Momentum
   { id: 'rsi14',  name: 'RSI (14)',           shortName: 'RSI',     category: 'Momentum', overlay: false, defaultParams: { period: 14 }, description: 'Relative Strength Index (14 period)' },
   { id: 'macd',   name: 'MACD (12,26,9)',     shortName: 'MACD',    category: 'Momentum', overlay: false, defaultParams: { fast: 12, slow: 26, signal: 9 }, description: 'Moving Average Convergence Divergence' },
   { id: 'stoch',  name: 'Stochastic (14,3)',  shortName: 'Stoch',   category: 'Momentum', overlay: false, defaultParams: { kPeriod: 14, dPeriod: 3 },       description: 'Stochastic Oscillator' },
-  // Volatility
-  { id: 'atr14',  name: 'ATR (14)',           shortName: 'ATR',     category: 'Volatility', overlay: false, defaultParams: { period: 14 }, description: 'Average True Range (14 period)' },
+  { id: 'aroon',  name: 'Aroon',             shortName: 'Aroon',   category: 'Momentum', overlay: false, defaultParams: { period: 25 }, description: 'Aroon Up / Down oscillator' },
+  { id: 'adx',    name: 'Average Directional Index', shortName: 'ADX', category: 'Momentum', overlay: false, defaultParams: { period: 14 }, description: 'Trend strength indicator with +DI/-DI' },
+  { id: 'momentum', name: 'Momentum',        shortName: 'MOM',     category: 'Momentum', overlay: false, defaultParams: { period: 10 }, description: 'Price momentum (close - close[n])' },
+  { id: 'bullsbears', name: 'Bulls Bears Power', shortName: 'BBP', category: 'Momentum', overlay: false, defaultParams: { period: 13 }, description: 'Bull and Bear power relative to EMA' },
+
+  // Overlay
+  { id: 'fractals', name: 'Fractals',        shortName: 'Fractals', category: 'Overlay', overlay: true, defaultParams: {}, description: 'Williams Fractals — swing highs and lows' },
+  { id: 'pivotpoints', name: 'Pivot Points',  shortName: 'PP',      category: 'Overlay', overlay: true, defaultParams: {}, description: 'Standard pivot points with R1-R3, S1-S3' },
 ];
 
 export function getIndicatorDef(id: IndicatorId): IndicatorConfig | undefined {
@@ -57,6 +82,7 @@ const CATEGORY_ICONS: Record<IndicatorCategory, React.ReactNode> = {
   Momentum: <Activity size={14} />,
   Volatility: <BarChart3 size={14} />,
   Volume: <Volume2 size={14} />,
+  Overlay: <Brain size={14} />,
 };
 
 // ─── Component ─────────────────────────────────────────────────
@@ -91,7 +117,6 @@ export default function IndicatorPanel({
     );
   }, [searchQuery]);
 
-  // Group by category
   const grouped = useMemo(() => {
     const map = new Map<IndicatorCategory, IndicatorConfig[]>();
     for (const ind of filteredIndicators) {
@@ -106,8 +131,8 @@ export default function IndicatorPanel({
     <div
       className="absolute top-10 left-12 z-50 flex flex-col"
       style={{
-        width: 320,
-        maxHeight: 420,
+        width: 340,
+        maxHeight: 500,
         backgroundColor: '#111118',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 8,
@@ -158,13 +183,11 @@ export default function IndicatorPanel({
       <div className="flex-1 overflow-y-auto px-1 py-1" style={{ scrollbarWidth: 'thin' }}>
         {Array.from(grouped.entries()).map(([category, indicators]) => (
           <div key={category} className="mb-1">
-            {/* Category header */}
             <div className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>
               {CATEGORY_ICONS[category]}
               {category}
             </div>
 
-            {/* Indicators in category */}
             {indicators.map((ind) => {
               const isActive = activeIndicators.has(ind.id);
               const isEditing = editingId === ind.id;
@@ -186,7 +209,6 @@ export default function IndicatorPanel({
                     }}
                   >
                     <div className="flex items-center gap-2">
-                      {/* Toggle switch */}
                       <div
                         className="relative rounded-full transition-colors"
                         style={{
@@ -215,7 +237,6 @@ export default function IndicatorPanel({
                       </div>
                     </div>
 
-                    {/* Settings button */}
                     {Object.keys(ind.defaultParams).length > 0 && (
                       <button
                         onClick={(e) => {
@@ -230,7 +251,6 @@ export default function IndicatorPanel({
                     )}
                   </div>
 
-                  {/* Parameter editor */}
                   {isEditing && (
                     <div className="mx-3 mb-1 p-2 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
                       {Object.entries(params).map(([key, value]) => (

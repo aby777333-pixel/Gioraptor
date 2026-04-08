@@ -299,11 +299,387 @@ export function vwap(
 
   for (let i = 0; i < length; i++) {
     const typicalPrice = (high[i] + low[i] + close[i]) / 3;
-    const vol = volume[i] || 1; // Avoid zero volume
+    const vol = volume[i] || 1;
     cumulativeTPV += typicalPrice * vol;
     cumulativeVolume += vol;
     result[i] = cumulativeTPV / cumulativeVolume;
   }
 
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Extended Indicators
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Aroon Up & Down
+ */
+export function aroon(
+  high: number[],
+  low: number[],
+  period: number = 25
+): { up: (number | null)[]; down: (number | null)[] } {
+  const len = high.length;
+  const up: (number | null)[] = new Array(len).fill(null);
+  const down: (number | null)[] = new Array(len).fill(null);
+  if (len < period) return { up, down };
+
+  for (let i = period; i < len; i++) {
+    let highIdx = i - period;
+    let lowIdx = i - period;
+    for (let j = i - period; j <= i; j++) {
+      if (high[j] >= high[highIdx]) highIdx = j;
+      if (low[j] <= low[lowIdx]) lowIdx = j;
+    }
+    up[i] = ((period - (i - highIdx)) / period) * 100;
+    down[i] = ((period - (i - lowIdx)) / period) * 100;
+  }
+  return { up, down };
+}
+
+/**
+ * Average Directional Index (ADX) with +DI / -DI
+ */
+export function adx(
+  high: number[],
+  low: number[],
+  close: number[],
+  period: number = 14
+): { adx: (number | null)[]; plusDI: (number | null)[]; minusDI: (number | null)[] } {
+  const len = high.length;
+  const adxResult: (number | null)[] = new Array(len).fill(null);
+  const plusDI: (number | null)[] = new Array(len).fill(null);
+  const minusDI: (number | null)[] = new Array(len).fill(null);
+  if (len < period * 2) return { adx: adxResult, plusDI, minusDI };
+
+  const trArr: number[] = [high[0] - low[0]];
+  const plusDM: number[] = [0];
+  const minusDM: number[] = [0];
+
+  for (let i = 1; i < len; i++) {
+    const hl = high[i] - low[i];
+    const hpc = Math.abs(high[i] - close[i - 1]);
+    const lpc = Math.abs(low[i] - close[i - 1]);
+    trArr.push(Math.max(hl, hpc, lpc));
+
+    const upMove = high[i] - high[i - 1];
+    const downMove = low[i - 1] - low[i];
+    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+  }
+
+  // Smoothed TR, +DM, -DM using Wilder's smoothing
+  let smoothTR = 0, smoothPlusDM = 0, smoothMinusDM = 0;
+  for (let i = 0; i < period; i++) {
+    smoothTR += trArr[i];
+    smoothPlusDM += plusDM[i];
+    smoothMinusDM += minusDM[i];
+  }
+
+  const dxValues: number[] = [];
+
+  for (let i = period; i < len; i++) {
+    smoothTR = smoothTR - smoothTR / period + trArr[i];
+    smoothPlusDM = smoothPlusDM - smoothPlusDM / period + plusDM[i];
+    smoothMinusDM = smoothMinusDM - smoothMinusDM / period + minusDM[i];
+
+    const pdi = smoothTR > 0 ? (smoothPlusDM / smoothTR) * 100 : 0;
+    const mdi = smoothTR > 0 ? (smoothMinusDM / smoothTR) * 100 : 0;
+    plusDI[i] = pdi;
+    minusDI[i] = mdi;
+
+    const diSum = pdi + mdi;
+    const dx = diSum > 0 ? (Math.abs(pdi - mdi) / diSum) * 100 : 0;
+    dxValues.push(dx);
+
+    if (dxValues.length >= period) {
+      if (dxValues.length === period) {
+        let sum = 0;
+        for (const v of dxValues) sum += v;
+        adxResult[i] = sum / period;
+      } else {
+        adxResult[i] = ((adxResult[i - 1]! * (period - 1)) + dx) / period;
+      }
+    }
+  }
+  return { adx: adxResult, plusDI, minusDI };
+}
+
+/**
+ * Donchian Channel
+ */
+export function donchianChannel(
+  high: number[],
+  low: number[],
+  period: number = 20
+): { upper: (number | null)[]; middle: (number | null)[]; lower: (number | null)[] } {
+  const len = high.length;
+  const upper: (number | null)[] = new Array(len).fill(null);
+  const middle: (number | null)[] = new Array(len).fill(null);
+  const lower: (number | null)[] = new Array(len).fill(null);
+
+  for (let i = period - 1; i < len; i++) {
+    let hh = -Infinity, ll = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (high[j] > hh) hh = high[j];
+      if (low[j] < ll) ll = low[j];
+    }
+    upper[i] = hh;
+    lower[i] = ll;
+    middle[i] = (hh + ll) / 2;
+  }
+  return { upper, middle, lower };
+}
+
+/**
+ * Envelope (Moving Average Envelope)
+ */
+export function envelope(
+  close: number[],
+  period: number = 20,
+  percent: number = 2.5
+): { upper: (number | null)[]; basis: (number | null)[]; lower: (number | null)[] } {
+  const basis = sma(close, period);
+  const len = close.length;
+  const upper: (number | null)[] = new Array(len).fill(null);
+  const lower: (number | null)[] = new Array(len).fill(null);
+
+  for (let i = 0; i < len; i++) {
+    if (basis[i] !== null) {
+      upper[i] = basis[i]! * (1 + percent / 100);
+      lower[i] = basis[i]! * (1 - percent / 100);
+    }
+  }
+  return { upper, basis, lower };
+}
+
+/**
+ * Fractals (Williams Fractals) — bearish highs & bullish lows
+ * Returns arrays of price values at fractal points, null otherwise.
+ */
+export function fractals(
+  high: number[],
+  low: number[]
+): { up: (number | null)[]; down: (number | null)[] } {
+  const len = high.length;
+  const up: (number | null)[] = new Array(len).fill(null);
+  const down: (number | null)[] = new Array(len).fill(null);
+
+  for (let i = 2; i < len - 2; i++) {
+    if (
+      high[i] > high[i - 1] && high[i] > high[i - 2] &&
+      high[i] > high[i + 1] && high[i] > high[i + 2]
+    ) {
+      up[i] = high[i];
+    }
+    if (
+      low[i] < low[i - 1] && low[i] < low[i - 2] &&
+      low[i] < low[i + 1] && low[i] < low[i + 2]
+    ) {
+      down[i] = low[i];
+    }
+  }
+  return { up, down };
+}
+
+/**
+ * Ichimoku Cloud
+ */
+export function ichimoku(
+  high: number[],
+  low: number[],
+  close: number[],
+  conversionPeriod: number = 9,
+  basePeriod: number = 26,
+  spanBPeriod: number = 52,
+  displacement: number = 26
+): {
+  conversion: (number | null)[];
+  base: (number | null)[];
+  spanA: (number | null)[];
+  spanB: (number | null)[];
+  lagging: (number | null)[];
+} {
+  const len = high.length;
+
+  const calcMidpoint = (h: number[], l: number[], period: number): (number | null)[] => {
+    const result: (number | null)[] = new Array(len).fill(null);
+    for (let i = period - 1; i < len; i++) {
+      let hh = -Infinity, ll = Infinity;
+      for (let j = i - period + 1; j <= i; j++) {
+        if (h[j] > hh) hh = h[j];
+        if (l[j] < ll) ll = l[j];
+      }
+      result[i] = (hh + ll) / 2;
+    }
+    return result;
+  };
+
+  const conversion = calcMidpoint(high, low, conversionPeriod);
+  const base = calcMidpoint(high, low, basePeriod);
+
+  // Span A = (conversion + base) / 2, shifted forward by displacement
+  const spanA: (number | null)[] = new Array(len).fill(null);
+  const spanB: (number | null)[] = new Array(len).fill(null);
+  const rawSpanB = calcMidpoint(high, low, spanBPeriod);
+
+  for (let i = 0; i < len; i++) {
+    if (conversion[i] !== null && base[i] !== null) {
+      const idx = i + displacement;
+      if (idx < len) {
+        spanA[idx] = (conversion[i]! + base[i]!) / 2;
+      }
+    }
+    if (rawSpanB[i] !== null) {
+      const idx = i + displacement;
+      if (idx < len) {
+        spanB[idx] = rawSpanB[i];
+      }
+    }
+  }
+
+  // Lagging span = close shifted back by displacement
+  const lagging: (number | null)[] = new Array(len).fill(null);
+  for (let i = displacement; i < len; i++) {
+    lagging[i - displacement] = close[i];
+  }
+
+  return { conversion, base, spanA, spanB, lagging };
+}
+
+/**
+ * Momentum (close - close[n])
+ */
+export function momentum(
+  close: number[],
+  period: number = 10
+): (number | null)[] {
+  const len = close.length;
+  const result: (number | null)[] = new Array(len).fill(null);
+  for (let i = period; i < len; i++) {
+    result[i] = close[i] - close[i - period];
+  }
+  return result;
+}
+
+/**
+ * Parabolic SAR
+ */
+export function parabolicSAR(
+  high: number[],
+  low: number[],
+  step: number = 0.02,
+  max: number = 0.2
+): (number | null)[] {
+  const len = high.length;
+  if (len < 2) return new Array(len).fill(null);
+
+  const result: (number | null)[] = new Array(len).fill(null);
+  let isLong = true;
+  let af = step;
+  let ep = high[0];
+  let sar = low[0];
+
+  for (let i = 1; i < len; i++) {
+    const prevSar = sar;
+
+    if (isLong) {
+      sar = prevSar + af * (ep - prevSar);
+      sar = Math.min(sar, low[i - 1], i > 1 ? low[i - 2] : low[i - 1]);
+
+      if (high[i] > ep) {
+        ep = high[i];
+        af = Math.min(af + step, max);
+      }
+
+      if (low[i] < sar) {
+        isLong = false;
+        sar = ep;
+        ep = low[i];
+        af = step;
+      }
+    } else {
+      sar = prevSar + af * (ep - prevSar);
+      sar = Math.max(sar, high[i - 1], i > 1 ? high[i - 2] : high[i - 1]);
+
+      if (low[i] < ep) {
+        ep = low[i];
+        af = Math.min(af + step, max);
+      }
+
+      if (high[i] > sar) {
+        isLong = true;
+        sar = ep;
+        ep = high[i];
+        af = step;
+      }
+    }
+
+    result[i] = sar;
+  }
+
+  return result;
+}
+
+/**
+ * Pivot Points (Standard)
+ */
+export function pivotPoints(
+  high: number[],
+  low: number[],
+  close: number[]
+): {
+  pivot: (number | null)[];
+  r1: (number | null)[];
+  r2: (number | null)[];
+  r3: (number | null)[];
+  s1: (number | null)[];
+  s2: (number | null)[];
+  s3: (number | null)[];
+} {
+  const len = high.length;
+  const pivot: (number | null)[] = new Array(len).fill(null);
+  const r1: (number | null)[] = new Array(len).fill(null);
+  const r2: (number | null)[] = new Array(len).fill(null);
+  const r3: (number | null)[] = new Array(len).fill(null);
+  const s1: (number | null)[] = new Array(len).fill(null);
+  const s2: (number | null)[] = new Array(len).fill(null);
+  const s3: (number | null)[] = new Array(len).fill(null);
+
+  for (let i = 1; i < len; i++) {
+    const pp = (high[i - 1] + low[i - 1] + close[i - 1]) / 3;
+    pivot[i] = pp;
+    r1[i] = 2 * pp - low[i - 1];
+    s1[i] = 2 * pp - high[i - 1];
+    r2[i] = pp + (high[i - 1] - low[i - 1]);
+    s2[i] = pp - (high[i - 1] - low[i - 1]);
+    r3[i] = high[i - 1] + 2 * (pp - low[i - 1]);
+    s3[i] = low[i - 1] - 2 * (high[i - 1] - pp);
+  }
+
+  return { pivot, r1, r2, r3, s1, s2, s3 };
+}
+
+/**
+ * Bulls Bears Power
+ */
+export function bullsBearsPower(
+  high: number[],
+  low: number[],
+  close: number[],
+  period: number = 13
+): { bulls: (number | null)[]; bears: (number | null)[] } {
+  const emaValues = ema(close, period);
+  const len = close.length;
+  const bulls: (number | null)[] = new Array(len).fill(null);
+  const bears: (number | null)[] = new Array(len).fill(null);
+
+  for (let i = 0; i < len; i++) {
+    if (emaValues[i] !== null) {
+      bulls[i] = high[i] - emaValues[i]!;
+      bears[i] = low[i] - emaValues[i]!;
+    }
+  }
+  return { bulls, bears };
 }
