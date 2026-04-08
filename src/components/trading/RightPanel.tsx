@@ -95,12 +95,12 @@ function BloombergTVPanel() {
     <div className="p-3 flex flex-col gap-2">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold px-1" style={{ color: 'var(--text-muted)' }}>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
-        Bloomberg TV Live
+        Bloomberg QuickTake Live
       </div>
       <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <iframe
-          src="https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ68-rmLjdnA&autoplay=1&mute=1"
-          title="Bloomberg TV Live"
+          src="https://www.bloomberg.com/media-manifest/embed/quicktake"
+          title="Bloomberg QuickTake Live"
           allow="autoplay; encrypted-media; picture-in-picture"
           allowFullScreen
           style={{ width: '100%', height: 180, border: 'none', backgroundColor: '#000' }}
