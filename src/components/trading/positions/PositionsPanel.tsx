@@ -67,22 +67,24 @@ const S = {
   textMuted: 'rgba(255,255,255,0.50)',
 } as const;
 
-// Base columns always shown — wider for readability
-const BASE_COLS = '48px 72px 58px 90px 68px 96px';
-// Optional columns with keys
+// Use minmax + fr so columns stretch to fill the full panel width
+// #  TIME  TYPE  SYMBOL  LOT  ENTRY_PRICE  [ENTRY_VALUE]  S/L  T/P  MARKET_PRICE  [MARKET_VALUE]  [COMMISSION]  PROFIT/LOSS  [P/L%]  ACTIONS  [REMARK]
+const fr = (min: number) => `minmax(${min}px, 1fr)`;
+
+const BASE_COLS = `40px ${fr(70)} ${fr(52)} ${fr(80)} ${fr(60)} ${fr(90)}`;
 const OPT_COLS: { key: string; width: string }[] = [
-  { key: 'entryValue', width: '100px' },
+  { key: 'entryValue', width: fr(90) },
 ];
-const MID_COLS = '84px 84px 96px';
+const MID_COLS = `${fr(60)} ${fr(60)} ${fr(90)}`;
 const OPT_COLS2: { key: string; width: string }[] = [
-  { key: 'marketValue', width: '100px' },
-  { key: 'commission', width: '90px' },
+  { key: 'marketValue', width: fr(90) },
+  { key: 'commission', width: fr(80) },
 ];
-const PNL_COL = '96px';
+const PNL_COL = fr(90);
 const OPT_COLS3: { key: string; width: string }[] = [
-  { key: 'pnlPct', width: '72px' },
+  { key: 'pnlPct', width: fr(60) },
 ];
-const ACTIONS_COL = '72px';
+const ACTIONS_COL = fr(70);
 const OPT_COLS4: { key: string; width: string }[] = [
   { key: 'remark', width: '1fr' },
 ];
@@ -99,7 +101,7 @@ function buildColTemplate(visible: Set<string>): string {
   return parts.join(' ');
 }
 const histColTemplate =
-  '48px 72px 58px 90px 68px 96px 96px 84px 84px 84px 96px 72px 1fr';
+  `40px ${fr(70)} ${fr(52)} ${fr(80)} ${fr(60)} ${fr(90)} ${fr(90)} ${fr(60)} ${fr(60)} ${fr(60)} ${fr(90)} ${fr(60)} 1fr`;
 
 export default function PositionsPanel() {
   const {
