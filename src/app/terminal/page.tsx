@@ -100,7 +100,7 @@ export default function TerminalPage() {
         className="flex-1 overflow-hidden"
         style={{
           display: 'grid',
-          gridTemplateRows: '1fr 200px 30px',
+          gridTemplateRows: '1fr 240px 30px',
           gridTemplateColumns: '240px 1fr 280px',
         }}
       >
@@ -119,8 +119,8 @@ export default function TerminalPage() {
           <RightPanel />
         </div>
 
-        {/* PositionsPanel - spans full width */}
-        <div className="border-t border-[var(--border)] overflow-hidden" style={{ gridColumn: '1 / -1' }}>
+        {/* PositionsPanel - spans full width with horizontal scroll */}
+        <div className="border-t border-[var(--border)] overflow-auto" style={{ gridColumn: '1 / -1' }}>
           <PositionsPanel />
         </div>
 

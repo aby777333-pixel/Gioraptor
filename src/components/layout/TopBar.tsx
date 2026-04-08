@@ -263,7 +263,11 @@ export default function TopBar() {
 
       {/* ── Categorized dropdown menus (desktop) ── */}
       <div className="hidden lg:flex items-center gap-0.5" ref={menuRef}>
-        {menuCategories.map((cat) => (
+        {menuCategories.filter((cat) => {
+          // Hide Admin menu on /terminal pages — it belongs in the admin panel only
+          if (cat.label === 'Admin' && (pathname === '/terminal' || pathname?.startsWith('/terminal/'))) return false;
+          return true;
+        }).map((cat) => (
           <div key={cat.label} className="relative">
             <button
               onClick={() => setOpenMenu(openMenu === cat.label ? null : cat.label)}
@@ -481,7 +485,10 @@ export default function TopBar() {
           style={{ top: 44, backgroundColor: 'var(--bg-primary)' }}
         >
           <div className="overflow-y-auto h-full p-4 space-y-2">
-            {menuCategories.map((cat) => (
+            {menuCategories.filter((cat) => {
+              if (cat.label === 'Admin' && (pathname === '/terminal' || pathname?.startsWith('/terminal/'))) return false;
+              return true;
+            }).map((cat) => (
               <div key={cat.label}>
                 <div className="text-[10px] font-bold uppercase tracking-wider px-3 py-2" style={{ color: 'var(--text-muted)' }}>
                   {cat.label}

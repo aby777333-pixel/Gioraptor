@@ -67,22 +67,22 @@ const S = {
   textMuted: 'rgba(255,255,255,0.50)',
 } as const;
 
-// Base columns always shown
-const BASE_COLS = '42px 62px 52px 78px 58px 82px';
+// Base columns always shown — wider for readability
+const BASE_COLS = '48px 72px 58px 90px 68px 96px';
 // Optional columns with keys
 const OPT_COLS: { key: string; width: string }[] = [
-  { key: 'entryValue', width: '88px' },
+  { key: 'entryValue', width: '100px' },
 ];
-const MID_COLS = '72px 72px 82px';
+const MID_COLS = '84px 84px 96px';
 const OPT_COLS2: { key: string; width: string }[] = [
-  { key: 'marketValue', width: '88px' },
-  { key: 'commission', width: '72px' },
+  { key: 'marketValue', width: '100px' },
+  { key: 'commission', width: '90px' },
 ];
-const PNL_COL = '82px';
+const PNL_COL = '96px';
 const OPT_COLS3: { key: string; width: string }[] = [
-  { key: 'pnlPct', width: '62px' },
+  { key: 'pnlPct', width: '72px' },
 ];
-const ACTIONS_COL = '58px';
+const ACTIONS_COL = '72px';
 const OPT_COLS4: { key: string; width: string }[] = [
   { key: 'remark', width: '1fr' },
 ];
@@ -99,7 +99,7 @@ function buildColTemplate(visible: Set<string>): string {
   return parts.join(' ');
 }
 const histColTemplate =
-  '42px 62px 52px 78px 58px 82px 82px 72px 72px 72px 82px 62px 80px';
+  '48px 72px 58px 90px 68px 96px 96px 84px 84px 84px 96px 72px 1fr';
 
 export default function PositionsPanel() {
   const {
