@@ -91,24 +91,59 @@ function ToolsMediaSection() {
 // ─── Bloomberg TV Panel (single working stream) ───────────────────
 
 function BloombergTVPanel() {
+  const newsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!newsRef.current) return;
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-timeline.js';
+    script.async = true;
+    script.type = 'text/javascript';
+    script.textContent = JSON.stringify({
+      feedMode: 'all_symbols',
+      isTransparent: true,
+      displayMode: 'compact',
+      width: '100%',
+      height: 250,
+      colorTheme: 'dark',
+      locale: 'en',
+    });
+    newsRef.current.innerHTML = '';
+    newsRef.current.appendChild(script);
+  }, []);
+
   return (
     <div className="p-3 flex flex-col gap-2">
+      {/* Live TV - CNBC International via YouTube */}
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold px-1" style={{ color: 'var(--text-muted)' }}>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
-        Yahoo Finance Live
+        Finance TV Live
       </div>
       <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <iframe
-          src="https://www.youtube.com/embed/FlBkTqBPKeE?autoplay=1&mute=1&rel=0"
-          title="Yahoo Finance Live"
+          src="https://www.youtube.com/embed/9NyxcX3rhQs?autoplay=1&mute=1&rel=0"
+          title="CNBC Live"
           allow="autoplay; encrypted-media; picture-in-picture"
           allowFullScreen
-          style={{ width: '100%', height: 200, border: 'none', backgroundColor: '#000' }}
+          style={{ width: '100%', height: 170, border: 'none', backgroundColor: '#000' }}
         />
       </div>
-      <div className="text-[9px] text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>
-        Yahoo Finance — Live market coverage
+
+      {/* Market News Feed — scaled down */}
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold px-1 mt-1" style={{ color: 'var(--text-muted)' }}>
+        Market Headlines
       </div>
+      <div
+        ref={newsRef}
+        className="rounded-lg overflow-hidden"
+        style={{
+          border: '1px solid rgba(255,255,255,0.06)',
+          height: 250,
+          transform: 'scale(0.85)',
+          transformOrigin: 'top left',
+          width: '117.6%',
+        }}
+      />
     </div>
   );
 }

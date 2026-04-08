@@ -159,6 +159,70 @@ function renderDrawings(ctx: CanvasRenderingContext2D, drawings: Drawing[], w: n
   }
 }
 
+// ─── Multiscreen Layout Grids ─────────────────────────────────────
+
+const LAYOUT_GRIDS: Record<LayoutType, React.CSSProperties> = {
+  single:    { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' },
+  split:     { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' },
+  vsplit:    { gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' },
+  h3:        { gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr 1fr' },
+  v3:        { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr' },
+  quarters:  { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' },
+  onefive:   { gridTemplateColumns: '2fr 1fr', gridTemplateRows: '1fr 1fr 1fr' },
+  table3x2:  { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' },
+};
+
+// Extra symbols for secondary panes (main chart always shows activeSymbol)
+const LAYOUT_EXTRA_PANES: Record<LayoutType, string[]> = {
+  single:   [],
+  split:    ['GBPUSD'],
+  vsplit:   ['XAUUSD'],
+  h3:       ['GBPUSD', 'XAUUSD'],
+  v3:       ['GBPUSD', 'XAUUSD'],
+  quarters: ['GBPUSD', 'XAUUSD', 'USDJPY'],
+  onefive:  ['GBPUSD', 'XAUUSD', 'USDJPY', 'BTCUSD', 'US30'],
+  table3x2: ['GBPUSD', 'XAUUSD', 'USDJPY', 'BTCUSD', 'US30'],
+};
+
+// Mini chart pane using TradingView widget for secondary screens
+function MiniChartPane({ symbol }: { symbol: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    if (!ref.current || loaded.current) return;
+    loaded.current = true;
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+    script.async = true;
+    script.type = 'text/javascript';
+    script.textContent = JSON.stringify({
+      symbol: `FX:${symbol}`,
+      width: '100%',
+      height: '100%',
+      locale: 'en',
+      dateRange: '1D',
+      colorTheme: 'dark',
+      isTransparent: true,
+      autosize: true,
+      largeChartUrl: '',
+      noTimeScale: false,
+      chartOnly: false,
+    });
+    ref.current.innerHTML = '';
+    ref.current.appendChild(script);
+  }, [symbol]);
+
+  return (
+    <div className="relative" style={{ backgroundColor: '#060D16', overflow: 'hidden' }}>
+      <div ref={ref} className="absolute inset-0" />
+      <div className="absolute top-1 left-2 z-10 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5' }}>
+        {symbol}
+      </div>
+    </div>
+  );
+}
+
 // ─── Indicator Colors ─────────────────────────────────────────────
 
 const INDICATOR_COLORS: Record<string, string> = {
@@ -205,6 +269,26 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     }
     window.addEventListener('raptor-timeframe-change', handleTfChange);
     return () => window.removeEventListener('raptor-timeframe-change', handleTfChange);
+  }, []);
+
+  // Listen for drawing tool selection from the toolbar dropdown
+  useEffect(() => {
+    const TOOL_LABEL_MAP: Record<string, DrawingToolId> = {
+      'Trend Line': 'trendline', 'Horizontal Line': 'horizontal', 'Line': 'trendline',
+      'Fibonacci Retracement': 'fibonacci', 'Fibonacci Arcs': 'fibonacci',
+      'Rectangle': 'rectangle', 'Text': 'text', 'Ruler / Measure': 'measure',
+      'Arrow': 'trendline', 'Circle': 'rectangle', 'Flag': 'rectangle',
+      'Forecast': 'trendline', 'Gann Box': 'rectangle', 'Gann Fan': 'trendline',
+      'Head And Shoulders': 'trendline', 'Parallel Channel': 'rectangle',
+      'ABCD Pattern': 'trendline',
+    };
+    function handleToolSelect(e: Event) {
+      const label = (e as CustomEvent<string>).detail;
+      const toolId = TOOL_LABEL_MAP[label];
+      if (toolId) setActiveTool(toolId);
+    }
+    window.addEventListener('raptor-drawing-tool', handleToolSelect);
+    return () => window.removeEventListener('raptor-drawing-tool', handleToolSelect);
   }, []);
 
   // Indicator state
@@ -806,7 +890,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         )}
       </div>
 
-      {/* Main area: Drawing sidebar + Chart */}
+      {/* Main area: Drawing sidebar + Chart(s) */}
       <div className="flex-1 flex min-h-0">
         {/* Drawing tools sidebar */}
         <div
@@ -816,70 +900,73 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
           {renderToolsWithSeparators()}
         </div>
 
-        {/* Chart area */}
-        <div
-          className="flex-1 relative"
-          style={{ backgroundColor: '#060D16', zIndex: 1 }}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-          onDrop={(e) => {
-            e.preventDefault();
-            try {
-              const ea = JSON.parse(e.dataTransfer.getData('text/plain'));
-              if (ea?.name) {
-                // Show notification that EA was attached
-                const div = document.createElement('div');
-                div.className = 'fixed top-20 right-4 z-[9999] px-4 py-3 rounded-lg text-sm font-semibold';
-                div.style.cssText = 'background:#0091D5;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeIn 0.3s ease';
-                div.textContent = `EA "${ea.name}" attached to chart`;
-                document.body.appendChild(div);
-                setTimeout(() => div.remove(), 3000);
-              }
-            } catch { /* not an EA drop */ }
-          }}
-        >
-          <div ref={chartContainerRef} className="absolute inset-0" />
+        {/* Chart grid area */}
+        <div className="flex-1" style={{ display: 'grid', ...LAYOUT_GRIDS[activeLayout], gap: 1, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          {/* Primary chart (always cell 1) */}
+          <div
+            className="relative"
+            style={{ backgroundColor: '#060D16', zIndex: 1 }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+            onDrop={(e) => {
+              e.preventDefault();
+              try {
+                const ea = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (ea?.name) {
+                  const div = document.createElement('div');
+                  div.className = 'fixed top-20 right-4 z-[9999] px-4 py-3 rounded-lg text-sm font-semibold';
+                  div.style.cssText = 'background:#0091D5;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+                  div.textContent = `EA "${ea.name}" attached to chart`;
+                  document.body.appendChild(div);
+                  setTimeout(() => div.remove(), 3000);
+                }
+              } catch { /* noop */ }
+            }}
+          >
+            <div ref={chartContainerRef} className="absolute inset-0" />
 
-          {/* Drawing canvas overlay */}
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0"
-            style={{ pointerEvents: canvasActive ? 'auto' : 'none', zIndex: 10, cursor: canvasActive ? 'crosshair' : 'default' }}
-            onMouseDown={handleDrawStart}
-            onMouseMove={handleDrawMove}
-            onMouseUp={handleDrawEnd}
-          />
-
-          {/* Indicator Panel dropdown */}
-          {showIndicatorPanel && (
-            <IndicatorPanel
-              activeIndicators={activeIndicators}
-              indicatorParams={indicatorParams}
-              onToggle={handleIndicatorToggle}
-              onUpdateParams={handleIndicatorParamsUpdate}
-              onClose={() => setShowIndicatorPanel(false)}
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0"
+              style={{ pointerEvents: canvasActive ? 'auto' : 'none', zIndex: 10, cursor: canvasActive ? 'crosshair' : 'default' }}
+              onMouseDown={handleDrawStart}
+              onMouseMove={handleDrawMove}
+              onMouseUp={handleDrawEnd}
             />
-          )}
 
-          {/* Bid/Ask spread overlay */}
-          {currentTick && (
-            <div className="absolute top-2 right-2 z-20 px-3 py-1.5 rounded" style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center gap-3 text-[12px] font-mono">
-                <div><span className="opacity-40 mr-1">B</span><span className="text-green-400">{formatPrice(currentTick.bid, decimals)}</span></div>
-                <div><span className="opacity-40 mr-1">A</span><span className="text-red-400">{formatPrice(currentTick.ask, decimals)}</span></div>
-                <div className="opacity-40"><span className="mr-1">S</span><span>{currentTick.spread.toFixed(decimals > 3 ? 1 : decimals)}</span></div>
-              </div>
-            </div>
-          )}
+            {showIndicatorPanel && (
+              <IndicatorPanel
+                activeIndicators={activeIndicators}
+                indicatorParams={indicatorParams}
+                onToggle={handleIndicatorToggle}
+                onUpdateParams={handleIndicatorParamsUpdate}
+                onClose={() => setShowIndicatorPanel(false)}
+              />
+            )}
 
-          {/* Loading state */}
-          {!ohlcvBuilder && (
-            <div className="absolute inset-0 flex items-center justify-center z-5">
-              <div className="text-center opacity-30">
-                <BarChart3 size={48} className="mx-auto mb-3 animate-pulse" />
-                <div className="text-sm font-medium">Initializing chart...</div>
+            {currentTick && (
+              <div className="absolute top-2 right-2 z-20 px-3 py-1.5 rounded" style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center gap-3 text-[12px] font-mono">
+                  <div><span className="opacity-40 mr-1">B</span><span className="text-green-400">{formatPrice(currentTick.bid, decimals)}</span></div>
+                  <div><span className="opacity-40 mr-1">A</span><span className="text-red-400">{formatPrice(currentTick.ask, decimals)}</span></div>
+                  <div className="opacity-40"><span className="mr-1">S</span><span>{currentTick.spread.toFixed(decimals > 3 ? 1 : decimals)}</span></div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {!ohlcvBuilder && (
+              <div className="absolute inset-0 flex items-center justify-center z-5">
+                <div className="text-center opacity-30">
+                  <BarChart3 size={48} className="mx-auto mb-3 animate-pulse" />
+                  <div className="text-sm font-medium">Initializing chart...</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Secondary chart panes for multiscreen layouts */}
+          {LAYOUT_EXTRA_PANES[activeLayout]?.map((symbol, idx) => (
+            <MiniChartPane key={`${activeLayout}-${idx}`} symbol={symbol} />
+          ))}
         </div>
       </div>
     </div>

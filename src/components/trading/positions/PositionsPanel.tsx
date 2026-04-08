@@ -711,11 +711,26 @@ export default function PositionsPanel() {
                         </button>
                       </span>
 
-                      {/* REMARK */}
+                      {/* REMARK — editable */}
                       {visibleColumns.has('remark') && (
-                        <span style={{ color: S.textDim, fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          --
-                        </span>
+                        <input
+                          type="text"
+                          placeholder="Add note..."
+                          defaultValue=""
+                          className="bg-transparent outline-none w-full"
+                          style={{
+                            color: 'rgba(255,255,255,0.6)',
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            border: 'none',
+                            borderBottom: '1px solid transparent',
+                            padding: '1px 4px',
+                            transition: 'border-color 0.15s',
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderBottomColor = S.accentBlue; }}
+                          onBlur={(e) => { e.currentTarget.style.borderBottomColor = 'transparent'; }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       )}
                     </div>
                   );
