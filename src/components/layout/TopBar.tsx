@@ -333,23 +333,11 @@ export default function TopBar() {
 
       <Separator />
 
-      {/* ── Active symbol + timeframe (hide on small mobile) ── */}
+      {/* ── Active symbol (hide on small mobile) ── */}
       <div className="hidden sm:flex items-center gap-2 px-3">
         <Search size={14} className="opacity-40" />
         <span className="font-mono font-semibold text-[13px]">{activeSymbol}</span>
-        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-elevated)', opacity: 0.8 }}>1D</span>
-        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-elevated)', opacity: 0.8 }}>1m</span>
       </div>
-
-      {/* ── Indicators button (hidden on mobile) ── */}
-      <button
-        className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] opacity-60 hover:opacity-90 transition-opacity"
-        style={{ backgroundColor: 'var(--bg-elevated)' }}
-        title="Indicators"
-      >
-        <Activity size={14} />
-        Indicators
-      </button>
 
       {/* ── Spacer ── */}
       <div className="flex-1" />

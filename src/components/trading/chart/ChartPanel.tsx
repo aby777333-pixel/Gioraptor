@@ -817,7 +817,26 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         </div>
 
         {/* Chart area */}
-        <div className="flex-1 relative" style={{ backgroundColor: '#060D16' }}>
+        <div
+          className="flex-1 relative"
+          style={{ backgroundColor: '#060D16', zIndex: 1 }}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+          onDrop={(e) => {
+            e.preventDefault();
+            try {
+              const ea = JSON.parse(e.dataTransfer.getData('text/plain'));
+              if (ea?.name) {
+                // Show notification that EA was attached
+                const div = document.createElement('div');
+                div.className = 'fixed top-20 right-4 z-[9999] px-4 py-3 rounded-lg text-sm font-semibold';
+                div.style.cssText = 'background:#0091D5;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeIn 0.3s ease';
+                div.textContent = `EA "${ea.name}" attached to chart`;
+                document.body.appendChild(div);
+                setTimeout(() => div.remove(), 3000);
+              }
+            } catch { /* not an EA drop */ }
+          }}
+        >
           <div ref={chartContainerRef} className="absolute inset-0" />
 
           {/* Drawing canvas overlay */}
