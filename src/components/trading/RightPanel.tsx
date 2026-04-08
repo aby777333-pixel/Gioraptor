@@ -69,7 +69,7 @@ function ToolsMediaSection() {
             color: mediaTab === 'tv' ? '#fff' : 'rgba(255,255,255,0.45)',
           }}
         >
-          <Tv size={12} /> Bloomberg TV
+          <Tv size={12} /> Market News
         </button>
         <button
           onClick={() => setMediaTab('videochat')}
@@ -91,24 +91,39 @@ function ToolsMediaSection() {
 // ─── Bloomberg TV Panel (single working stream) ───────────────────
 
 function BloombergTVPanel() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    // TradingView Timeline widget — always available, never 404s
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-timeline.js';
+    script.async = true;
+    script.type = 'text/javascript';
+    script.textContent = JSON.stringify({
+      feedMode: 'all_symbols',
+      isTransparent: true,
+      displayMode: 'compact',
+      width: '100%',
+      height: 300,
+      colorTheme: 'dark',
+      locale: 'en',
+    });
+    containerRef.current.innerHTML = '';
+    containerRef.current.appendChild(script);
+  }, []);
+
   return (
     <div className="p-3 flex flex-col gap-2">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold px-1" style={{ color: 'var(--text-muted)' }}>
         <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#FF0000' }} />
-        Bloomberg QuickTake Live
+        Market News Live
       </div>
-      <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-        <iframe
-          src="https://www.bloomberg.com/media-manifest/embed/quicktake"
-          title="Bloomberg QuickTake Live"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-          style={{ width: '100%', height: 180, border: 'none', backgroundColor: '#000' }}
-        />
-      </div>
-      <div className="text-[9px] text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>
-        Live stream — Financial markets coverage
-      </div>
+      <div
+        ref={containerRef}
+        className="rounded-lg overflow-hidden tradingview-widget-container"
+        style={{ border: '1px solid rgba(255,255,255,0.06)', height: 300 }}
+      />
     </div>
   );
 }
