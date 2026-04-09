@@ -366,7 +366,7 @@ export function DashboardClient({
                     className="rounded-lg bg-surface/50 px-3 py-2.5"
                   >
                     <p className="text-xs font-medium text-foreground">{n.title as string}</p>
-                    <p className="text-[10px] text-muted mt-0.5">{n.message as string}</p>
+                    <p className="text-[10px] text-muted mt-0.5">{(n.body || n.message) as string}</p>
                   </div>
                 ))}
               </div>

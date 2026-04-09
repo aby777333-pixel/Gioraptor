@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('notifications')
-      .update({ read: read !== false, read_at: read !== false ? new Date().toISOString() : null })
+      .update({ is_read: read !== false, read_at: read !== false ? new Date().toISOString() : null })
       .eq('id', id)
       .eq('user_id', user.id)
       .select()

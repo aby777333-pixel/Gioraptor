@@ -45,9 +45,9 @@ export default async function DashboardPage() {
   // Fetch notifications
   const { data: notifications } = await supabase
     .from('notifications')
-    .select('id, title, message, type, read, created_at')
+    .select('id, title, body, notification_type, is_read, created_at')
     .eq('user_id', user.id)
-    .eq('read', false)
+    .eq('is_read', false)
     .order('created_at', { ascending: false })
     .limit(5);
 
