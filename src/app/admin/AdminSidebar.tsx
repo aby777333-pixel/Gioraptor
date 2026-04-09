@@ -22,6 +22,8 @@ import {
   PanelLeft,
   LogOut,
   Bell,
+  Monitor,
+  ExternalLink,
 } from 'lucide-react';
 
 interface NavItem {
@@ -31,6 +33,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { href: '/terminal', label: 'Trading Terminal', icon: Monitor },
+  { href: '/dashboard', label: 'Trader Dashboard', icon: ExternalLink },
+  { href: '/broker/overview', label: 'Broker Panel', icon: Building2 },
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/brokers', label: 'Brokers', icon: Building2 },
   { href: '/admin/health', label: 'System Health', icon: Activity },

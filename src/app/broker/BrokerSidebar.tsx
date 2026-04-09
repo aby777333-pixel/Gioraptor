@@ -34,6 +34,9 @@ import {
   ChevronRight,
   Bell,
   LogOut,
+  Monitor,
+  ExternalLink,
+  Rocket,
 } from 'lucide-react';
 
 interface NavItem {
@@ -48,6 +51,14 @@ interface NavSection {
 }
 
 const navSections: NavSection[] = [
+  {
+    label: 'Platform',
+    items: [
+      { href: '/terminal', label: 'Trading Terminal', icon: Monitor },
+      { href: '/dashboard', label: 'Trader Dashboard', icon: Rocket },
+      { href: '/marketplace', label: 'Marketplace', icon: ExternalLink },
+    ],
+  },
   {
     label: 'Command',
     items: [
