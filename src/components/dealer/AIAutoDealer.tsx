@@ -112,8 +112,9 @@ export default function AIAutoDealer() {
         <span className="text-[10px] font-bold text-white/40">AI</span>
         <div
           className={`relative h-4 w-8 rounded-full transition-colors ${
-            enabled ? 'bg-cyan-500 shadow-[0_0_8px_rgba(0,180,216,0.5)]' : 'bg-white/10'
+            enabled ? 'bg-cyan-500' : 'bg-white/10'
           }`}
+          style={enabled ? { animation: 'pulse-backlight-cyan 2s ease-in-out infinite', boxShadow: '0 0 12px #00B4D860' } : undefined}
         >
           <div
             className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${
@@ -126,7 +127,14 @@ export default function AIAutoDealer() {
       {/* Active badge + stats */}
       {enabled && (
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 animate-pulse rounded bg-cyan-500/20 px-1.5 py-0.5 text-[9px] font-bold text-cyan-400">
+          <span
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-cyan-400"
+            style={{
+              backgroundColor: '#00B4D818',
+              animation: 'pulse-backlight-cyan 1.5s ease-in-out infinite',
+              boxShadow: '0 0 10px #00B4D840',
+            }}
+          >
             <Bot size={10} />
             AI AUTO
           </span>

@@ -151,6 +151,12 @@ function AlertBell() {
   return (
     <button
       className="relative flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/5"
+      style={unreadCount > 0 ? {
+        animation: 'pulse-backlight-orange 2s ease-in-out infinite',
+        boxShadow: '0 0 10px #FF6D0040',
+        backgroundColor: '#FF6D0012',
+        borderRadius: 6,
+      } : undefined}
       aria-label="Alerts"
     >
       <Bell size={18} className={unreadCount > 0 ? 'blink-danger' : ''} style={{ color: unreadCount > 0 ? '#FFB300' : '#888899' }} />
@@ -174,14 +180,15 @@ function ExpertToggle() {
   return (
     <button
       onClick={toggle}
-      className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all select-none ${expertMode ? 'pulse-amber' : ''}`}
+      className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all select-none"
       style={
         expertMode
           ? {
-              backgroundColor: '#FFB30020',
+              backgroundColor: '#FFB30018',
               border: '1px solid #FFB30055',
               color: '#FFB300',
-              boxShadow: '0 0 8px #FFB30022',
+              boxShadow: '0 0 12px #FFB30040, inset 0 0 12px #FFB30015',
+              animation: 'pulse-backlight-amber 2s ease-in-out infinite',
             }
           : {
               backgroundColor: '#1A1A22',
@@ -364,7 +371,8 @@ export default function DealerTopBar() {
             style={{
               backgroundColor: '#E50914',
               color: '#F2F2F2',
-              boxShadow: '0 0 10px #E5091444',
+              boxShadow: '0 0 14px #E5091466, inset 0 0 8px #E5091420',
+              animation: 'pulse-backlight-red 1.8s ease-in-out infinite',
             }}
           >
             <AlertTriangle size={14} />
@@ -381,11 +389,35 @@ export default function DealerTopBar() {
         />
       )}
 
-      {/* Keyframe for live dot pulse */}
+      {/* Backlight keyframes for tabs */}
       <style jsx global>{`
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+        @keyframes pulse-backlight-red {
+          0%, 100% { box-shadow: 0 0 8px #E5091444, inset 0 0 6px #E5091415; }
+          50% { box-shadow: 0 0 22px #E5091488, inset 0 0 14px #E5091430; }
+        }
+        @keyframes pulse-backlight-amber {
+          0%, 100% { box-shadow: 0 0 8px #FFB30030, inset 0 0 6px #FFB30010; }
+          50% { box-shadow: 0 0 20px #FFB30066, inset 0 0 12px #FFB30025; }
+        }
+        @keyframes pulse-backlight-orange {
+          0%, 100% { box-shadow: 0 0 6px #FF6D0030; background-color: #FF6D0008; }
+          50% { box-shadow: 0 0 16px #FF6D0060; background-color: #FF6D0018; }
+        }
+        @keyframes pulse-backlight-cyan {
+          0%, 100% { box-shadow: 0 0 8px #00B4D830, inset 0 0 6px #00B4D810; }
+          50% { box-shadow: 0 0 22px #00B4D866, inset 0 0 14px #00B4D825; }
+        }
+        @keyframes pulse-backlight-green {
+          0%, 100% { box-shadow: 0 0 6px #00C85330; background-color: #00C85308; }
+          50% { box-shadow: 0 0 18px #00C85360; background-color: #00C85315; }
+        }
+        @keyframes pulse-backlight-purple {
+          0%, 100% { box-shadow: 0 0 6px #8b5cf630; background-color: #8b5cf608; }
+          50% { box-shadow: 0 0 18px #8b5cf660; background-color: #8b5cf615; }
         }
       `}</style>
     </>

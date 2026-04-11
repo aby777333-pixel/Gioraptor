@@ -538,11 +538,16 @@ export default function DealerPage() {
         </div>
         <button
           onClick={() => setHedgingOpen((v) => !v)}
-          className={`flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5 ${
-            hedgingOpen
-              ? 'bg-cyan-500/20 text-cyan-400 pulse-cyan'
-              : 'bg-white/5 text-white/40 hover:text-white/70'
-          }`}
+          className="flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5"
+          style={hedgingOpen ? {
+            backgroundColor: '#00B4D818',
+            color: '#00B4D8',
+            animation: 'pulse-backlight-cyan 2s ease-in-out infinite',
+            boxShadow: '0 0 12px #00B4D840, inset 0 0 8px #00B4D815',
+          } : {
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            color: 'rgba(255,255,255,0.4)',
+          }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -551,15 +556,20 @@ export default function DealerPage() {
         </button>
         <button
           onClick={() => setMediaPanelOpen((v) => !v)}
-          className={`flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5 ${
-            mediaPanelOpen
-              ? 'bg-red-500/20 text-red-400'
-              : 'bg-white/5 text-white/40 hover:text-white/70'
-          }`}
+          className="flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5"
+          style={mediaPanelOpen ? {
+            backgroundColor: '#E5091418',
+            color: '#ff4560',
+            animation: 'pulse-backlight-red 1.8s ease-in-out infinite',
+            boxShadow: '0 0 14px #E5091450, inset 0 0 10px #E5091418',
+          } : {
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            color: 'rgba(255,255,255,0.4)',
+          }}
         >
           <span className="relative flex h-1.5 w-1.5">
             <span className={`absolute inline-flex h-full w-full rounded-full ${mediaPanelOpen ? 'animate-ping bg-red-500 opacity-75' : 'bg-white/30'}`} />
-            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${mediaPanelOpen ? 'bg-red-500 status-dot-live blink-danger' : 'bg-white/30'}`} />
+            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${mediaPanelOpen ? 'bg-red-500' : 'bg-white/30'}`} />
           </span>
           LIVE TV
         </button>
