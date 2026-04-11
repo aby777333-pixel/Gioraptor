@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 import DealerTopBar from '@/components/dealer/DealerTopBar';
+import PriceTicker from '@/components/dealer/PriceTicker';
+import NewsCountdown from '@/components/dealer/NewsCountdown';
 import OrderQueue from '@/components/dealer/OrderQueue';
+import DealerRadar from '@/components/dealer/DealerRadar';
 import ExecutionConsole from '@/components/dealer/ExecutionConsole';
 import OpenBookMonitor from '@/components/dealer/OpenBookMonitor';
+import CounterpartyWatch from '@/components/dealer/CounterpartyWatch';
 import DealerBlotter from '@/components/dealer/DealerBlotter';
+import NexusPanel from '@/components/dealer/NexusPanel';
+import HotkeyOverlay from '@/components/dealer/HotkeyOverlay';
 
 import { useDealerHotkeys } from '@/lib/hooks/useDealerHotkeys';
 import {
@@ -15,6 +21,7 @@ import {
   useExposureStore,
   useAlertStore,
 } from '@/stores/dealer';
+import { useNexusStore } from '@/stores/nexus';
 
 import type {
   Trade,
@@ -244,12 +251,12 @@ const SEED_POSITIONS: Trade[] = [
 ];
 
 const SEED_EXPOSURES: SymbolExposure[] = [
-  { symbol: 'EURUSD', net_position: -1.0, total_buy: 7.0, total_sell: 8.0, unrealized_pnl: 191.70, client_count: 14, risk_level: 'low', max_exposure_lots: 500, utilization_pct: 3.0, is_breached: false },
-  { symbol: 'GBPUSD', net_position: -5.0, total_buy: 12.0, total_sell: 17.0, unrealized_pnl: -310.00, client_count: 9, risk_level: 'medium', max_exposure_lots: 400, utilization_pct: 7.25, is_breached: false },
-  { symbol: 'XAUUSD', net_position: 3.0, total_buy: 8.0, total_sell: 5.0, unrealized_pnl: 580.00, client_count: 6, risk_level: 'medium', max_exposure_lots: 100, utilization_pct: 13.0, is_breached: false },
-  { symbol: 'USDJPY', net_position: 8.0, total_buy: 15.0, total_sell: 7.0, unrealized_pnl: -215.30, client_count: 11, risk_level: 'high', max_exposure_lots: 300, utilization_pct: 7.67, is_breached: false },
-  { symbol: 'BTCUSD', net_position: -0.25, total_buy: 1.5, total_sell: 1.75, unrealized_pnl: 42.50, client_count: 4, risk_level: 'low', max_exposure_lots: 50, utilization_pct: 3.5, is_breached: false },
-  { symbol: 'GBPJPY', net_position: 4.0, total_buy: 6.0, total_sell: 2.0, unrealized_pnl: -890.00, client_count: 3, risk_level: 'extreme', max_exposure_lots: 200, utilization_pct: 3.0, is_breached: false },
+  { symbol: 'EURUSD', net_position: 13.1, total_buy: 45.2, total_sell: 32.1, unrealized_pnl: 840000, client_count: 14, risk_level: 'high', max_exposure_lots: 100, utilization_pct: 77.3, is_breached: false },
+  { symbol: 'XAUUSD', net_position: -3.5, total_buy: 8.5, total_sell: 12.0, unrealized_pnl: 4800000, client_count: 6, risk_level: 'extreme', max_exposure_lots: 25, utilization_pct: 82.0, is_breached: true },
+  { symbol: 'BTCUSD', net_position: 1.6, total_buy: 2.1, total_sell: 0.5, unrealized_pnl: 176000, client_count: 4, risk_level: 'medium', max_exposure_lots: 5, utilization_pct: 52.0, is_breached: false },
+  { symbol: 'GBPJPY', net_position: -3.4, total_buy: 15.3, total_sell: 18.7, unrealized_pnl: 660000, client_count: 3, risk_level: 'high', max_exposure_lots: 50, utilization_pct: 68.0, is_breached: false },
+  { symbol: 'USDJPY', net_position: 2.5, total_buy: 22.0, total_sell: 19.5, unrealized_pnl: 620000, client_count: 11, risk_level: 'high', max_exposure_lots: 60, utilization_pct: 69.2, is_breached: false },
+  { symbol: 'GBPUSD', net_position: 2.3, total_buy: 11.2, total_sell: 8.9, unrealized_pnl: 254000, client_count: 9, risk_level: 'medium', max_exposure_lots: 40, utilization_pct: 50.3, is_breached: false },
 ];
 
 const SEED_ALERTS: SystemAlert[] = [
@@ -417,6 +424,10 @@ export default function DealerPage() {
   const removeOrder = useDealingDeskStore((s) => s.removeOrder);
   const resetSession = useDealingDeskStore((s) => s.resetSession);
 
+  const nexusOpen = useNexusStore((s) => s.isOpen);
+  const toggleNexus = useNexusStore((s) => s.togglePanel);
+  const [hotkeyOverlayVisible, setHotkeyOverlayVisible] = useState(false);
+
   // Initialize seed data on mount
   useEffect(() => {
     cleanupRef.current = initDealerData();
@@ -467,8 +478,17 @@ export default function DealerPage() {
       toggle_book: () => {
         // Handled by OpenBookMonitor
       },
+      toggle_nexus: () => {
+        toggleNexus();
+      },
+      emergency_flatten: () => {
+        console.log('EMERGENCY FLATTEN triggered');
+      },
+      hotkey_overlay: () => {
+        setHotkeyOverlayVisible((v) => !v);
+      },
     };
-  }, [orders, selectedOrderId, selectOrder, removeOrder])();
+  }, [orders, selectedOrderId, selectOrder, removeOrder, toggleNexus])();
 
   useDealerHotkeys(hotkeyHandlers);
 
@@ -479,11 +499,22 @@ export default function DealerPage() {
         <DealerTopBar />
       </div>
 
+      {/* Price Ticker -- 32px */}
+      <div className="flex-shrink-0" style={{ height: 32 }}>
+        <PriceTicker />
+      </div>
+
+      {/* News Countdown Banner -- 48px, shows when event imminent */}
+      <NewsCountdown />
+
       {/* Main 3-zone row */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Order Queue -- 280px */}
-        <div className="w-[280px] flex-shrink-0 border-r border-white/5">
-          <OrderQueue />
+        {/* Left: Order Queue + Dealer Radar -- 280px */}
+        <div className="w-[280px] flex-shrink-0 border-r border-white/5 flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            <OrderQueue />
+          </div>
+          <DealerRadar />
         </div>
 
         {/* Centre: Execution Console -- flex-1 */}
@@ -491,9 +522,12 @@ export default function DealerPage() {
           <ExecutionConsole />
         </div>
 
-        {/* Right: Open Book Monitor -- 320px */}
-        <div className="w-[320px] flex-shrink-0 border-l border-white/5">
-          <OpenBookMonitor />
+        {/* Right: Open Book Monitor + Counterparty Watch -- 320px */}
+        <div className="w-[320px] flex-shrink-0 border-l border-white/5 flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            <OpenBookMonitor />
+          </div>
+          <CounterpartyWatch />
         </div>
       </div>
 
@@ -503,6 +537,21 @@ export default function DealerPage() {
           <DealerBlotter />
         </div>
       )}
+
+      {/* NEXUS AI Co-Pilot Panel */}
+      <NexusPanel
+        isOpen={nexusOpen}
+        onClose={toggleNexus}
+        onApplyRecommendation={(rec) => {
+          console.log('Applied NEXUS recommendation:', rec);
+        }}
+      />
+
+      {/* Hotkey Reference Overlay */}
+      <HotkeyOverlay
+        isOpen={hotkeyOverlayVisible}
+        onClose={() => setHotkeyOverlayVisible(false)}
+      />
     </div>
   );
 }

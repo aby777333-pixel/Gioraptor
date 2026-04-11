@@ -30,6 +30,13 @@ const CTRL_HOTKEYS: Record<string, string> = {
   b: 'toggle_book',
   e: 'toggle_expert',
   l: 'toggle_blotter',
+  n: 'toggle_nexus',
+  f: 'emergency_flatten',
+};
+
+// Standard keys that map to actions (non-Ctrl)
+const CHAR_HOTKEYS: Record<string, string> = {
+  '?': 'hotkey_overlay',
 };
 
 // ---------------------------------------------------------------
@@ -75,6 +82,14 @@ export function useDealerHotkeys(handlers: Record<string, () => void>) {
           return;
         }
         // Don't intercept other Ctrl combos (Ctrl+C, Ctrl+V, etc.)
+        return;
+      }
+
+      // --- Character hotkeys (e.g. ?) ---
+      const charAction = CHAR_HOTKEYS[event.key];
+      if (charAction) {
+        const charHandler = handlers[charAction];
+        if (charHandler) charHandler();
         return;
       }
 

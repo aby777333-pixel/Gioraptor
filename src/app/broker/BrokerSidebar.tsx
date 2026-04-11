@@ -37,6 +37,11 @@ import {
   Monitor,
   ExternalLink,
   Rocket,
+  Layers,
+  Clock,
+  CalendarOff,
+  FileSpreadsheet,
+  Gauge,
 } from 'lucide-react';
 
 interface NavItem {
@@ -71,11 +76,22 @@ const navSections: NavSection[] = [
   {
     label: 'Trading',
     items: [
-      { href: '/broker/dealing-desk', label: 'Dealing Desk', icon: BookMarked },
+      { href: '/dealer', label: 'Dealing Desk', icon: Gauge },
+      { href: '/broker/dealing-desk', label: 'Dealing Room', icon: BookMarked },
       { href: '/broker/core-engine', label: 'Core Engine', icon: Settings },
       { href: '/broker/risk', label: 'Risk Engine', icon: ShieldAlert },
       { href: '/broker/symbols', label: 'Symbols', icon: BarChart3 },
       { href: '/broker/surveillance', label: 'Surveillance', icon: Eye },
+    ],
+  },
+  {
+    label: 'Market Configuration',
+    items: [
+      { href: '/trading-terms', label: 'Trading Terms', icon: FileSpreadsheet },
+      { href: '/instruments', label: 'Instruments', icon: BarChart3 },
+      { href: '/instruments/groups', label: 'Symbol Groups', icon: Layers },
+      { href: '/trading-sessions', label: 'Trading Sessions', icon: Clock },
+      { href: '/trading-sessions/holidays', label: 'Market Holidays', icon: CalendarOff },
     ],
   },
   {
