@@ -150,7 +150,7 @@ function OrderCard({ order, isSelected, onSelect }: OrderCardProps) {
         isSelected
           ? 'border-l-[#E50914] bg-[#1A1A22]'
           : 'border-l-transparent hover:bg-[#1A1A22]',
-        isPulsingBorder && !isSelected ? 'order-card-pulse-border' : '',
+        isPulsingBorder && !isSelected ? 'order-card-pulse-border border-pulse-red' : '',
         isPulsingBg ? 'order-card-pulse-bg' : '',
       ]
         .filter(Boolean)
@@ -170,7 +170,7 @@ function OrderCard({ order, isSelected, onSelect }: OrderCardProps) {
         </span>
 
         {isToxic && (
-          <span title="Toxic flow detected" className="text-[#FFB300]">
+          <span title="Toxic flow detected" className="text-[#FFB300] pulse-red">
             <AlertTriangle className="w-3 h-3" />
           </span>
         )}
@@ -180,12 +180,12 @@ function OrderCard({ order, isSelected, onSelect }: OrderCardProps) {
           </span>
         )}
         {isNews && (
-          <span title="News flag" className="text-[#888899]">
+          <span title="News flag" className="text-[#888899] pulse-amber">
             <Newspaper className="w-3 h-3" />
           </span>
         )}
 
-        <span className="ml-auto font-mono text-[10px] text-[#888899] leading-none tabular-nums">
+        <span className={`ml-auto font-mono text-[10px] text-[#888899] leading-none tabular-nums ${ageMs >= AGE_CRITICAL_MS ? 'blink-danger' : ''}`}>
           {ageSeconds}s ago
         </span>
       </div>

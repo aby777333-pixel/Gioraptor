@@ -42,6 +42,13 @@ import {
   CalendarOff,
   FileSpreadsheet,
   Gauge,
+  Activity,
+  SlidersHorizontal,
+  ShieldCheck,
+  Store,
+  TrendingUp,
+  Wallet,
+  Radio,
 } from 'lucide-react';
 
 interface NavItem {
@@ -60,14 +67,18 @@ const navSections: NavSection[] = [
     label: 'Platform',
     items: [
       { href: '/terminal', label: 'Trading Terminal', icon: Monitor },
-      { href: '/dashboard', label: 'Trader Dashboard', icon: Rocket },
-      { href: '/marketplace', label: 'Marketplace', icon: ExternalLink },
+      { href: '/dealer', label: 'Dealer Dashboard', icon: Gauge },
+      { href: '/marketplace/hub', label: 'Marketplace', icon: Store },
     ],
   },
   {
     label: 'Command',
     items: [
       { href: '/broker/command-center', label: 'Command Center', icon: LayoutDashboard },
+      { href: '/broker/command-center/session', label: 'Current Session', icon: TrendingUp },
+      { href: '/broker/command-center/pnl', label: 'Total PnL & Winners', icon: Trophy },
+      { href: '/broker/command-center/deposits', label: 'Deposits & Withdrawals', icon: Wallet },
+      { href: '/broker/dealing-desk', label: 'Dealing Stream', icon: Radio },
       { href: '/broker/overview', label: 'Overview', icon: BarChart3 },
       { href: '/broker/ai-guardian', label: 'AI Intelligence', icon: Eye },
       { href: '/broker/intel', label: 'Business Intel', icon: BarChart3 },
@@ -95,6 +106,14 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    label: 'Risk Management',
+    items: [
+      { href: '/broker/risk/exposure', label: 'Exposure Monitor', icon: Activity },
+      { href: '/broker/risk/controls', label: 'Leverage & Spread Controls', icon: SlidersHorizontal },
+      { href: '/broker/quotes', label: 'Quote Integrity', icon: ShieldCheck },
+    ],
+  },
+  {
     label: 'Clients',
     items: [
       { href: '/broker/clients', label: 'Client List', icon: Users },
@@ -109,8 +128,8 @@ const navSections: NavSection[] = [
     items: [
       { href: '/broker/payments', label: 'Payments', icon: CreditCard },
       { href: '/broker/reconciliation', label: 'Reconciliation', icon: FileCheck },
+      { href: '/broker/reports', label: 'Reports & Analytics', icon: FileText },
       { href: '/broker/bi', label: 'Report Builder', icon: ClipboardList },
-      { href: '/broker/reports', label: 'Reports', icon: FileText },
     ],
   },
   {

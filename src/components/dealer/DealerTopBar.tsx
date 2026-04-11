@@ -52,7 +52,7 @@ function EnvBadge({ env }: { env: 'LIVE' | 'DEMO' }) {
   const dotColor = isLive ? '#E50914' : '#2979FF';
   return (
     <div
-      className="flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wider select-none"
+      className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wider select-none ${isLive ? 'pulse-cyan' : ''}`}
       style={{
         backgroundColor: '#1A1A22',
         border: '1px solid #252530',
@@ -60,11 +60,10 @@ function EnvBadge({ env }: { env: 'LIVE' | 'DEMO' }) {
       }}
     >
       <span
-        className="inline-block h-2 w-2 rounded-full"
+        className={`inline-block h-2 w-2 rounded-full ${isLive ? 'status-dot-live' : ''}`}
         style={{
           backgroundColor: dotColor,
           boxShadow: `0 0 6px ${dotColor}`,
-          animation: isLive ? 'pulse-dot 1.5s ease-in-out infinite' : undefined,
         }}
       />
       {env}
@@ -154,7 +153,7 @@ function AlertBell() {
       className="relative flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/5"
       aria-label="Alerts"
     >
-      <Bell size={18} style={{ color: unreadCount > 0 ? '#FFB300' : '#888899' }} />
+      <Bell size={18} className={unreadCount > 0 ? 'blink-danger' : ''} style={{ color: unreadCount > 0 ? '#FFB300' : '#888899' }} />
       {unreadCount > 0 && (
         <span
           className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none"
@@ -175,7 +174,7 @@ function ExpertToggle() {
   return (
     <button
       onClick={toggle}
-      className="flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all select-none"
+      className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all select-none ${expertMode ? 'pulse-amber' : ''}`}
       style={
         expertMode
           ? {

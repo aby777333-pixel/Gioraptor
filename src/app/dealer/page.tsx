@@ -540,7 +540,7 @@ export default function DealerPage() {
           onClick={() => setHedgingOpen((v) => !v)}
           className={`flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5 ${
             hedgingOpen
-              ? 'bg-cyan-500/20 text-cyan-400'
+              ? 'bg-cyan-500/20 text-cyan-400 pulse-cyan'
               : 'bg-white/5 text-white/40 hover:text-white/70'
           }`}
         >
@@ -559,7 +559,7 @@ export default function DealerPage() {
         >
           <span className="relative flex h-1.5 w-1.5">
             <span className={`absolute inline-flex h-full w-full rounded-full ${mediaPanelOpen ? 'animate-ping bg-red-500 opacity-75' : 'bg-white/30'}`} />
-            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${mediaPanelOpen ? 'bg-red-500' : 'bg-white/30'}`} />
+            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${mediaPanelOpen ? 'bg-red-500 status-dot-live blink-danger' : 'bg-white/30'}`} />
           </span>
           LIVE TV
         </button>
