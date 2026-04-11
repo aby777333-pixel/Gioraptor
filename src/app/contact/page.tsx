@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { MapPin, Phone, Mail, Clock, ArrowLeft } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 export default function ContactPage() {
   return (
@@ -9,8 +10,7 @@ export default function ContactPage() {
       <nav className="border-b border-white/[0.06] bg-[#060D16]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="GIO4X" style={{ height: 36 }} />
-            <span className="text-sm font-semibold text-[#7A8BA8]">RAPTOR</span>
+            <Logo height={36} theme="dark" />
           </Link>
           <Link href="/" className="flex items-center gap-2 text-sm text-[#7A8BA8] hover:text-white transition-colors">
             <ArrowLeft size={16} /> Back
@@ -26,22 +26,22 @@ export default function ContactPage() {
           {/* Offices */}
           <div className="space-y-8">
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> Head Office</h2>
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#00B4D8]" /> Head Office</h2>
               <div className="space-y-3 text-sm text-[#7A8BA8]">
                 <p>Lorem ipsum dolor sit amet<br />Consectetur adipiscing elit<br />Sed do eiusmod tempor</p>
-                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +1 111 111 1111</p>
+                <p className="flex items-center gap-2"><Phone size={14} className="text-[#00B4D8]" /> +1 111 111 1111</p>
                 <p className="flex items-center gap-2"><Clock size={14} /> Mon-Fri: 9:00 AM - 6:00 PM</p>
               </div>
             </div>
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#0091D5]" /> Regional Office</h2>
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><MapPin size={20} className="text-[#00B4D8]" /> Regional Office</h2>
               <div className="space-y-3 text-sm text-[#7A8BA8]">
                 <p>Ut enim ad minim veniam<br />Quis nostrud exercitation<br />Ullamco laboris nisi</p>
-                <p className="flex items-center gap-2"><Phone size={14} className="text-[#0091D5]" /> +1 111 111 1111</p>
+                <p className="flex items-center gap-2"><Phone size={14} className="text-[#00B4D8]" /> +1 111 111 1111</p>
                 <p className="flex items-center gap-2"><Clock size={14} /> Mon-Fri: 9:00 AM - 5:00 PM</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-[#0091D5]">
+            <div className="flex items-center gap-2 text-sm text-[#00B4D8]">
               <Mail size={16} /> support@gio4xraptor.com
             </div>
           </div>
@@ -53,26 +53,26 @@ export default function ContactPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A8BA8] mb-1 block">First Name</label>
-                  <input type="text" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#0091D5] transition-colors" placeholder="John" />
+                  <input type="text" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#00B4D8] transition-colors" placeholder="John" />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A8BA8] mb-1 block">Last Name</label>
-                  <input type="text" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#0091D5] transition-colors" placeholder="Doe" />
+                  <input type="text" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#00B4D8] transition-colors" placeholder="Doe" />
                 </div>
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A8BA8] mb-1 block">Email</label>
-                <input type="email" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#0091D5] transition-colors" placeholder="john@example.com" />
+                <input type="email" required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#00B4D8] transition-colors" placeholder="john@example.com" />
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A8BA8] mb-1 block">Phone</label>
-                <input type="tel" className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#0091D5] transition-colors" placeholder="+1 234 567 8901" />
+                <input type="tel" className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#00B4D8] transition-colors" placeholder="+1 234 567 8901" />
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A8BA8] mb-1 block">Message</label>
-                <textarea rows={4} required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#0091D5] transition-colors resize-none" placeholder="How can we help you?" />
+                <textarea rows={4} required className="w-full px-4 py-3 rounded-lg text-sm bg-[#060D16] border border-white/[0.06] outline-none focus:border-[#00B4D8] transition-colors resize-none" placeholder="How can we help you?" />
               </div>
-              <button type="submit" className="w-full py-3 rounded-lg bg-[#0091D5] text-sm font-bold text-black transition-all hover:bg-[#007AB8]">
+              <button type="submit" className="w-full py-3 rounded-lg bg-[#00B4D8] text-sm font-bold text-black transition-all hover:bg-[#007AB8]">
                 Send Message
               </button>
             </form>

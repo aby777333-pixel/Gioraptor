@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  /* GIO4X Raptor Design System — derived from logo
-     Logo gradient: Blue #0082C8 → Teal #00A5A8 → Green #009B4D
-     "GIO" gray: #9CA0A8 | "4" blue | "X" green                */
+  /* GIO RAPTOR Design System — derived from brand logo
+     Logo gradient: Teal #00D4AA → Cyan #00B4D8 → Deep Teal #007A8C
+     "GIO" cyan: #00B4D8 | "RAPTOR" silver-gray adaptive              */
   --bg-primary: #060D16;
   --bg-surface: #0B1422;
   --bg-elevated: #111D2E;
@@ -13,11 +13,11 @@
   --text-primary: #EAF0FA;
   --text-secondary: #7A8BA8;
   --text-muted: #4A5568;
-  --accent: #0091D5;
-  --accent-hover: #007AB8;
-  --accent-glow: rgba(0, 145, 213, 0.22);
-  --accent-green: #009B4D;
-  --accent-green-glow: rgba(0, 155, 77, 0.2);
+  --accent: #00B4D8;
+  --accent-hover: #0091B3;
+  --accent-glow: rgba(0, 180, 216, 0.22);
+  --accent-green: #00D4AA;
+  --accent-green-glow: rgba(0, 212, 170, 0.2);
   --teal: #00A5A8;
   --teal-glow: rgba(0, 165, 168, 0.2);
   --gold: #F0A500;
@@ -60,9 +60,9 @@
   --text-primary: #0F1A2E;
   --text-secondary: #3E4C66;
   --text-muted: #7A8599;
-  --accent: #0078B4;
-  --accent-hover: #006199;
-  --accent-green: #008040;
+  --accent: #0091B3;
+  --accent-hover: #007A8C;
+  --accent-green: #00B89C;
   --gold: #D49000;
 }
 
@@ -128,7 +128,7 @@ body {
   backdrop-filter: blur(20px);
 }
 .card:hover {
-  border-color: rgba(0, 145, 213, 0.25);
+  border-color: rgba(0, 180, 216, 0.25);
   box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 20px var(--accent-glow);
   transform: translateY(-1px);
 }
@@ -156,7 +156,7 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 .tool-card:hover {
-  border-color: rgba(0, 145, 213, 0.2);
+  border-color: rgba(0, 180, 216, 0.2);
   box-shadow: 0 2px 16px rgba(0,0,0,0.3), 0 0 12px var(--accent-glow);
 }
 

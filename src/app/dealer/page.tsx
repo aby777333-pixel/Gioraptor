@@ -1,0 +1,508 @@
+'use client';
+
+import { useEffect, useRef, useCallback } from 'react';
+
+import DealerTopBar from '@/components/dealer/DealerTopBar';
+import OrderQueue from '@/components/dealer/OrderQueue';
+import ExecutionConsole from '@/components/dealer/ExecutionConsole';
+import OpenBookMonitor from '@/components/dealer/OpenBookMonitor';
+import DealerBlotter from '@/components/dealer/DealerBlotter';
+
+import { useDealerHotkeys } from '@/lib/hooks/useDealerHotkeys';
+import {
+  useDealingDeskStore,
+  usePriceFeedStore,
+  useExposureStore,
+  useAlertStore,
+} from '@/stores/dealer';
+
+import type {
+  Trade,
+  SymbolExposure,
+  SystemAlert,
+  PriceTick,
+} from '@/lib/dealer/types';
+
+// ===============================================================
+// Mock seed data
+// ===============================================================
+
+const SEED_ORDERS: Trade[] = [
+  {
+    id: 'ORD-001',
+    account_id: 'ACC-10042',
+    client_id: 'CLT-3001',
+    symbol: 'EURUSD',
+    direction: 'buy',
+    type: 'market',
+    status: 'pending_validation',
+    requested_price: 1.08452,
+    fill_price: null,
+    requested_size: 5.0,
+    filled_size: 0,
+    remaining_size: 5.0,
+    sl: 1.08200,
+    tp: 1.08900,
+    trailing_stop_pips: null,
+    time_in_force: 'IOC',
+    commission: 0,
+    swap: 0,
+    floating_pnl: 0,
+    realized_pnl: null,
+    routing_mode: null,
+    lp_order_id: null,
+    lp_fill_price: null,
+    lp_name: null,
+    slippage: 0,
+    latency_ms: null,
+    source: 'MT5-Web',
+    comment: '',
+    dealer_id: null,
+    dealer_action: null,
+    risk_score: 35,
+    toxic_score: 12,
+    margin_used: 5420,
+    created_at: new Date(Date.now() - 8000).toISOString(),
+    updated_at: new Date(Date.now() - 8000).toISOString(),
+    filled_at: null,
+    closed_at: null,
+    expired_at: null,
+  },
+  {
+    id: 'ORD-002',
+    account_id: 'ACC-10078',
+    client_id: 'CLT-3015',
+    symbol: 'GBPUSD',
+    direction: 'sell',
+    type: 'market',
+    status: 'risk_check',
+    requested_price: 1.27130,
+    fill_price: null,
+    requested_size: 10.0,
+    filled_size: 0,
+    remaining_size: 10.0,
+    sl: 1.27400,
+    tp: 1.26500,
+    trailing_stop_pips: null,
+    time_in_force: 'IOC',
+    commission: 0,
+    swap: 0,
+    floating_pnl: 0,
+    realized_pnl: null,
+    routing_mode: null,
+    lp_order_id: null,
+    lp_fill_price: null,
+    lp_name: null,
+    slippage: 0,
+    latency_ms: null,
+    source: 'FIX-API',
+    comment: 'High volume client',
+    dealer_id: null,
+    dealer_action: null,
+    risk_score: 72,
+    toxic_score: 58,
+    margin_used: 12730,
+    created_at: new Date(Date.now() - 5200).toISOString(),
+    updated_at: new Date(Date.now() - 5200).toISOString(),
+    filled_at: null,
+    closed_at: null,
+    expired_at: null,
+  },
+  {
+    id: 'ORD-003',
+    account_id: 'ACC-10115',
+    client_id: 'CLT-3042',
+    symbol: 'XAUUSD',
+    direction: 'buy',
+    type: 'limit',
+    status: 'pending_new',
+    requested_price: 2342.50,
+    fill_price: null,
+    requested_size: 2.0,
+    filled_size: 0,
+    remaining_size: 2.0,
+    sl: 2335.00,
+    tp: 2360.00,
+    trailing_stop_pips: null,
+    time_in_force: 'GTC',
+    commission: 0,
+    swap: 0,
+    floating_pnl: 0,
+    realized_pnl: null,
+    routing_mode: null,
+    lp_order_id: null,
+    lp_fill_price: null,
+    lp_name: null,
+    slippage: 0,
+    latency_ms: null,
+    source: 'MT5-Desktop',
+    comment: '',
+    dealer_id: null,
+    dealer_action: null,
+    risk_score: 20,
+    toxic_score: 5,
+    margin_used: 9370,
+    created_at: new Date(Date.now() - 3400).toISOString(),
+    updated_at: new Date(Date.now() - 3400).toISOString(),
+    filled_at: null,
+    closed_at: null,
+    expired_at: null,
+  },
+  {
+    id: 'ORD-004',
+    account_id: 'ACC-10042',
+    client_id: 'CLT-3001',
+    symbol: 'USDJPY',
+    direction: 'sell',
+    type: 'market',
+    status: 'margin_check',
+    requested_price: 154.820,
+    fill_price: null,
+    requested_size: 3.0,
+    filled_size: 0,
+    remaining_size: 3.0,
+    sl: 155.100,
+    tp: 154.200,
+    trailing_stop_pips: null,
+    time_in_force: 'IOC',
+    commission: 0,
+    swap: 0,
+    floating_pnl: 0,
+    realized_pnl: null,
+    routing_mode: null,
+    lp_order_id: null,
+    lp_fill_price: null,
+    lp_name: null,
+    slippage: 0,
+    latency_ms: null,
+    source: 'MT5-Web',
+    comment: '',
+    dealer_id: null,
+    dealer_action: null,
+    risk_score: 35,
+    toxic_score: 12,
+    margin_used: 2910,
+    created_at: new Date(Date.now() - 1800).toISOString(),
+    updated_at: new Date(Date.now() - 1800).toISOString(),
+    filled_at: null,
+    closed_at: null,
+    expired_at: null,
+  },
+  {
+    id: 'ORD-005',
+    account_id: 'ACC-10200',
+    client_id: 'CLT-3088',
+    symbol: 'BTCUSD',
+    direction: 'buy',
+    type: 'market',
+    status: 'routing',
+    requested_price: 67480.00,
+    fill_price: null,
+    requested_size: 0.5,
+    filled_size: 0,
+    remaining_size: 0.5,
+    sl: 66500.00,
+    tp: 69000.00,
+    trailing_stop_pips: null,
+    time_in_force: 'IOC',
+    commission: 0,
+    swap: 0,
+    floating_pnl: 0,
+    realized_pnl: null,
+    routing_mode: 'a_book',
+    lp_order_id: null,
+    lp_fill_price: null,
+    lp_name: null,
+    slippage: 0,
+    latency_ms: null,
+    source: 'REST-API',
+    comment: 'Institutional desk',
+    dealer_id: null,
+    dealer_action: null,
+    risk_score: 45,
+    toxic_score: 30,
+    margin_used: 33740,
+    created_at: new Date(Date.now() - 600).toISOString(),
+    updated_at: new Date(Date.now() - 600).toISOString(),
+    filled_at: null,
+    closed_at: null,
+    expired_at: null,
+  },
+];
+
+const SEED_POSITIONS: Trade[] = [
+  { ...SEED_ORDERS[0], id: 'POS-101', status: 'filled', fill_price: 1.08440, filled_size: 2.0, remaining_size: 0, floating_pnl: 124.50, routing_mode: 'b_book', created_at: new Date(Date.now() - 3600000).toISOString(), filled_at: new Date(Date.now() - 3595000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-102', symbol: 'GBPUSD', direction: 'sell', status: 'filled', fill_price: 1.27180, filled_size: 5.0, remaining_size: 0, floating_pnl: -310.00, routing_mode: 'a_book', lp_name: 'LMAX', created_at: new Date(Date.now() - 7200000).toISOString(), filled_at: new Date(Date.now() - 7195000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-103', symbol: 'XAUUSD', direction: 'buy', status: 'filled', fill_price: 2340.80, requested_size: 1.0, filled_size: 1.0, remaining_size: 0, floating_pnl: 580.00, routing_mode: 'a_book', lp_name: 'Currenex', created_at: new Date(Date.now() - 5400000).toISOString(), filled_at: new Date(Date.now() - 5395000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-104', symbol: 'USDJPY', direction: 'buy', status: 'filled', fill_price: 154.650, requested_size: 8.0, filled_size: 8.0, remaining_size: 0, floating_pnl: -215.30, routing_mode: 'b_book', created_at: new Date(Date.now() - 1800000).toISOString(), filled_at: new Date(Date.now() - 1795000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-105', symbol: 'BTCUSD', direction: 'sell', status: 'filled', fill_price: 67320.00, requested_size: 0.25, filled_size: 0.25, remaining_size: 0, floating_pnl: 42.50, routing_mode: 'a_book', lp_name: 'B2C2', created_at: new Date(Date.now() - 900000).toISOString(), filled_at: new Date(Date.now() - 895000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-106', symbol: 'EURUSD', direction: 'sell', status: 'filled', fill_price: 1.08510, requested_size: 3.0, filled_size: 3.0, remaining_size: 0, floating_pnl: 67.20, routing_mode: 'hybrid', created_at: new Date(Date.now() - 600000).toISOString(), filled_at: new Date(Date.now() - 595000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-107', symbol: 'GBPJPY', direction: 'buy', status: 'filled', fill_price: 196.420, requested_size: 4.0, filled_size: 4.0, remaining_size: 0, floating_pnl: -890.00, routing_mode: 'b_book', created_at: new Date(Date.now() - 14400000).toISOString(), filled_at: new Date(Date.now() - 14395000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-108', symbol: 'AUDUSD', direction: 'buy', status: 'filled', fill_price: 0.66320, requested_size: 6.0, filled_size: 6.0, remaining_size: 0, floating_pnl: 180.00, routing_mode: 'a_book', lp_name: 'LMAX', created_at: new Date(Date.now() - 10800000).toISOString(), filled_at: new Date(Date.now() - 10795000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-109', symbol: 'NZDUSD', direction: 'sell', status: 'filled', fill_price: 0.60150, requested_size: 2.5, filled_size: 2.5, remaining_size: 0, floating_pnl: -55.80, routing_mode: 'b_book', created_at: new Date(Date.now() - 21600000).toISOString(), filled_at: new Date(Date.now() - 21595000).toISOString() },
+  { ...SEED_ORDERS[0], id: 'POS-110', symbol: 'USDCAD', direction: 'buy', status: 'filled', fill_price: 1.36240, requested_size: 7.0, filled_size: 7.0, remaining_size: 0, floating_pnl: 320.10, routing_mode: 'hybrid', created_at: new Date(Date.now() - 28800000).toISOString(), filled_at: new Date(Date.now() - 28795000).toISOString() },
+];
+
+const SEED_EXPOSURES: SymbolExposure[] = [
+  { symbol: 'EURUSD', net_position: -1.0, total_buy: 7.0, total_sell: 8.0, unrealized_pnl: 191.70, client_count: 14, risk_level: 'low', max_exposure_lots: 500, utilization_pct: 3.0, is_breached: false },
+  { symbol: 'GBPUSD', net_position: -5.0, total_buy: 12.0, total_sell: 17.0, unrealized_pnl: -310.00, client_count: 9, risk_level: 'medium', max_exposure_lots: 400, utilization_pct: 7.25, is_breached: false },
+  { symbol: 'XAUUSD', net_position: 3.0, total_buy: 8.0, total_sell: 5.0, unrealized_pnl: 580.00, client_count: 6, risk_level: 'medium', max_exposure_lots: 100, utilization_pct: 13.0, is_breached: false },
+  { symbol: 'USDJPY', net_position: 8.0, total_buy: 15.0, total_sell: 7.0, unrealized_pnl: -215.30, client_count: 11, risk_level: 'high', max_exposure_lots: 300, utilization_pct: 7.67, is_breached: false },
+  { symbol: 'BTCUSD', net_position: -0.25, total_buy: 1.5, total_sell: 1.75, unrealized_pnl: 42.50, client_count: 4, risk_level: 'low', max_exposure_lots: 50, utilization_pct: 3.5, is_breached: false },
+  { symbol: 'GBPJPY', net_position: 4.0, total_buy: 6.0, total_sell: 2.0, unrealized_pnl: -890.00, client_count: 3, risk_level: 'extreme', max_exposure_lots: 200, utilization_pct: 3.0, is_breached: false },
+];
+
+const SEED_ALERTS: SystemAlert[] = [
+  {
+    id: 'ALR-001',
+    severity: 'warning',
+    category: 'toxic_flow',
+    title: 'Toxic flow detected',
+    message: 'Client CLT-3015 has a toxic score of 58. Recent pattern: 12 consecutive winning scalps under 30s hold time.',
+    source: 'risk-engine',
+    target_type: 'client',
+    target_id: 'CLT-3015',
+    acknowledged: false,
+    acknowledged_by: null,
+    acknowledged_at: null,
+    auto_resolved: false,
+    created_at: new Date(Date.now() - 120000).toISOString(),
+  },
+  {
+    id: 'ALR-002',
+    severity: 'critical',
+    category: 'exposure_breach',
+    title: 'GBPJPY exposure elevated',
+    message: 'Net long 4.0 lots on GBPJPY with unrealized loss of -$890. Consider hedging or reducing.',
+    source: 'exposure-monitor',
+    target_type: 'symbol',
+    target_id: 'GBPJPY',
+    acknowledged: false,
+    acknowledged_by: null,
+    acknowledged_at: null,
+    auto_resolved: false,
+    created_at: new Date(Date.now() - 45000).toISOString(),
+  },
+  {
+    id: 'ALR-003',
+    severity: 'info',
+    category: 'lp_disconnect',
+    title: 'LP latency spike',
+    message: 'Currenex average latency increased to 85ms (baseline: 12ms). Monitor for execution quality degradation.',
+    source: 'lp-monitor',
+    target_type: null,
+    target_id: null,
+    acknowledged: false,
+    acknowledged_by: null,
+    acknowledged_at: null,
+    auto_resolved: false,
+    created_at: new Date(Date.now() - 20000).toISOString(),
+  },
+];
+
+// ---------------------------------------------------------------
+// Price feed simulation
+// ---------------------------------------------------------------
+
+const BASE_PRICES: Record<string, { bid: number; ask: number; spread: number }> = {
+  EURUSD:  { bid: 1.08440, ask: 1.08455, spread: 1.5 },
+  GBPUSD:  { bid: 1.27120, ask: 1.27140, spread: 2.0 },
+  XAUUSD:  { bid: 2342.30, ask: 2342.80, spread: 50.0 },
+  USDJPY:  { bid: 154.810, ask: 154.830, spread: 2.0 },
+  BTCUSD:  { bid: 67460.0, ask: 67490.0, spread: 3000 },
+  GBPJPY:  { bid: 196.400, ask: 196.440, spread: 4.0 },
+  AUDUSD:  { bid: 0.66310, ask: 0.66330, spread: 2.0 },
+  NZDUSD:  { bid: 0.60140, ask: 0.60160, spread: 2.0 },
+  USDCAD:  { bid: 1.36230, ask: 1.36260, spread: 3.0 },
+};
+
+function generatePriceTicks(): PriceTick[] {
+  return Object.entries(BASE_PRICES).map(([symbol, base]) => {
+    const jitter = (Math.random() - 0.5) * base.spread * 0.4;
+    const bid = +(base.bid + jitter * 0.0001).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
+    const ask = +(bid + base.spread * 0.0001).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
+    const mid = +((bid + ask) / 2).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
+    return {
+      symbol,
+      bid,
+      ask,
+      mid,
+      spread: +(ask - bid).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5),
+      volume: Math.floor(Math.random() * 500) + 50,
+      timestamp: Date.now(),
+      source: 'mock-feed',
+    };
+  });
+}
+
+// ---------------------------------------------------------------
+// initDealerData -- loads seed data and starts intervals
+// Returns a cleanup function to clear intervals
+// ---------------------------------------------------------------
+
+function initDealerData(): () => void {
+  const deskStore = useDealingDeskStore.getState();
+  const priceStore = usePriceFeedStore.getState();
+  const exposureStore = useExposureStore.getState();
+  const alertStore = useAlertStore.getState();
+
+  // 1. Load pending orders
+  for (const order of SEED_ORDERS) {
+    deskStore.addOrder(order);
+  }
+
+  // 2. Load open positions
+  for (const position of SEED_POSITIONS) {
+    deskStore.addPosition(position);
+  }
+
+  // 3. Load exposures
+  exposureStore.setAll(SEED_EXPOSURES);
+
+  // 4. Load alerts
+  for (const alert of SEED_ALERTS) {
+    alertStore.addAlert(alert);
+  }
+
+  // 5. Seed initial prices
+  priceStore.updatePrices(generatePriceTicks());
+
+  // 6. Start price feed (every 500ms)
+  const priceInterval = setInterval(() => {
+    usePriceFeedStore.getState().updatePrices(generatePriceTicks());
+  }, 500);
+
+  // 7. PnL recalculation interval (every 2s)
+  const pnlInterval = setInterval(() => {
+    const prices = usePriceFeedStore.getState().prices;
+    const positions = useDealingDeskStore.getState().openPositions;
+
+    for (const pos of positions) {
+      const tick = prices[pos.symbol];
+      if (!tick) continue;
+
+      const priceRef = pos.direction === 'buy' ? tick.bid : tick.ask;
+      const entryPrice = pos.fill_price ?? pos.requested_price ?? 0;
+      const diff = pos.direction === 'buy' ? priceRef - entryPrice : entryPrice - priceRef;
+      const pipMultiplier = pos.symbol.includes('JPY') ? 100 : pos.symbol === 'XAUUSD' ? 1 : pos.symbol === 'BTCUSD' ? 1 : 10000;
+      const pnl = +(diff * pipMultiplier * pos.filled_size * 10).toFixed(2);
+
+      if (Math.abs(pnl - pos.floating_pnl) > 0.01) {
+        useDealingDeskStore.getState().updateTrade({
+          ...pos,
+          floating_pnl: pnl,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  }, 2000);
+
+  // Return cleanup
+  return () => {
+    clearInterval(priceInterval);
+    clearInterval(pnlInterval);
+  };
+}
+
+// ===============================================================
+// Dealer Page Component
+// ===============================================================
+
+export default function DealerPage() {
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const blotterVisible = useDealingDeskStore((s) => s.blotterVisible);
+  const orders = useDealingDeskStore((s) => s.orders);
+  const selectedOrderId = useDealingDeskStore((s) => s.selectedOrderId);
+  const selectOrder = useDealingDeskStore((s) => s.selectOrder);
+  const removeOrder = useDealingDeskStore((s) => s.removeOrder);
+  const resetSession = useDealingDeskStore((s) => s.resetSession);
+
+  // Initialize seed data on mount
+  useEffect(() => {
+    cleanupRef.current = initDealerData();
+    return () => {
+      if (cleanupRef.current) cleanupRef.current();
+      resetSession();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hotkey handlers
+  const hotkeyHandlers = useCallback(() => {
+    const currentIdx = orders.findIndex((o) => o.id === selectedOrderId);
+
+    return {
+      accept: () => {
+        if (selectedOrderId) removeOrder(selectedOrderId);
+      },
+      requote: () => {
+        // Requote logic handled by ExecutionConsole
+      },
+      delay: () => {
+        // Delay logic handled by ExecutionConsole
+      },
+      reject: () => {
+        if (selectedOrderId) removeOrder(selectedOrderId);
+      },
+      force_close: () => {
+        // Force close handled by ExecutionConsole
+      },
+      select_prev: () => {
+        if (orders.length === 0) return;
+        const prevIdx = currentIdx <= 0 ? orders.length - 1 : currentIdx - 1;
+        selectOrder(orders[prevIdx].id);
+      },
+      select_next: () => {
+        if (orders.length === 0) return;
+        const nextIdx = currentIdx >= orders.length - 1 ? 0 : currentIdx + 1;
+        selectOrder(orders[nextIdx].id);
+      },
+      load_order: () => {
+        if (!selectedOrderId && orders.length > 0) {
+          selectOrder(orders[0].id);
+        }
+      },
+      clear: () => {
+        selectOrder(null);
+      },
+      toggle_book: () => {
+        // Handled by OpenBookMonitor
+      },
+    };
+  }, [orders, selectedOrderId, selectOrder, removeOrder])();
+
+  useDealerHotkeys(hotkeyHandlers);
+
+  return (
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
+      {/* Top Bar -- 56px fixed */}
+      <div className="h-14 flex-shrink-0">
+        <DealerTopBar />
+      </div>
+
+      {/* Main 3-zone row */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Order Queue -- 280px */}
+        <div className="w-[280px] flex-shrink-0 border-r border-white/5">
+          <OrderQueue />
+        </div>
+
+        {/* Centre: Execution Console -- flex-1 */}
+        <div className="flex-1 overflow-hidden">
+          <ExecutionConsole />
+        </div>
+
+        {/* Right: Open Book Monitor -- 320px */}
+        <div className="w-[320px] flex-shrink-0 border-l border-white/5">
+          <OpenBookMonitor />
+        </div>
+      </div>
+
+      {/* Bottom: Dealer Blotter -- 80px */}
+      {blotterVisible && (
+        <div className="h-20 flex-shrink-0 border-t border-white/5">
+          <DealerBlotter />
+        </div>
+      )}
+    </div>
+  );
+}

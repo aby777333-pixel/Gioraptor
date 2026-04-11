@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 interface Feature {
   title: string;
@@ -36,14 +39,13 @@ export default function FeaturePage({
       <nav className="border-b border-white/[0.06] bg-[#060D16]/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="GIO4X" style={{ height: 36 }} />
-            <span className="text-sm font-semibold text-[#7A8BA8]">RAPTOR</span>
+            <Logo height={36} theme="dark" />
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 text-sm text-[#7A8BA8] hover:text-white transition-colors">
               <ArrowLeft size={16} /> Home
             </Link>
-            <Link href="/auth/register" className="rounded-lg bg-[#0091D5] px-5 py-2 text-sm font-semibold hover:bg-[#007AB8] transition-all">
+            <Link href="/auth/register" className="rounded-lg bg-[#00B4D8] px-5 py-2 text-sm font-semibold hover:bg-[#007AB8] transition-all">
               Get Started
             </Link>
           </div>

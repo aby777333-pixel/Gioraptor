@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { TrendingUp, Building } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 function LoginForm() {
   const router = useRouter();
@@ -50,10 +51,10 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 32 }} />
+            <Logo height={32} theme="dark" />
           </Link>
           <div className="flex items-center justify-center gap-2 mb-3">
-            <TrendingUp className="h-5 w-5 text-[#0091D5]" />
+            <TrendingUp className="h-5 w-5 text-[#00B4D8]" />
             <h1 className="text-2xl font-bold text-white">Trader Login</h1>
           </div>
           <p className="text-sm text-zinc-500">Sign in to your trading account</p>
@@ -66,15 +67,15 @@ function LoginForm() {
           <div>
             <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-zinc-400">Email</label>
             <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="trader@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#0091D5]" />
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]" />
           </div>
           <div>
             <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-zinc-400">Password</label>
             <input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#0091D5]" />
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]" />
           </div>
           <button type="submit" disabled={loading}
-            className="w-full rounded-lg bg-[#0091D5] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#007AB8] disabled:opacity-50">
+            className="w-full rounded-lg bg-[#00B4D8] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#007AB8] disabled:opacity-50">
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
@@ -82,7 +83,7 @@ function LoginForm() {
         <div className="mt-6 text-center space-y-3">
           <p className="text-sm text-zinc-500">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="text-[#0091D5] hover:text-[#0091D5]/80 transition-colors">Create one</Link>
+            <Link href="/auth/register" className="text-[#00B4D8] hover:text-[#00B4D8]/80 transition-colors">Create one</Link>
           </p>
           <Link href="/auth/broker-login" className="flex items-center justify-center gap-2 text-xs text-[#F0A500] hover:text-[#D49000] transition-colors">
             <Building className="h-3 w-3" /> Broker Admin? Login here

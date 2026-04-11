@@ -34,6 +34,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import VoiceTrading from '@/components/trading/VoiceTrading';
 import AlertsPanel from '@/components/trading/alerts/AlertsPanel';
+import Logo from '@/components/Logo';
 import { useTradingStore } from '@/stores/trading';
 import { cn } from '@/lib/utils/format';
 import { createClient } from '@/lib/supabase/client';
@@ -241,12 +242,12 @@ export default function TopBar() {
             className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all hover:bg-[var(--bg-elevated)]"
             title="Back to Terminal"
           >
-            <ArrowLeft size={16} className="text-[#0091D5]" />
-            <img src="/logo.png" alt="GIO4X" style={{ height: 24 }} />
+            <ArrowLeft size={16} className="text-[var(--accent)]" />
+            <Logo height={24} theme={theme} />
           </Link>
         ) : (
           <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="GIO4X" style={{ height: 28 }} />
+            <Logo height={28} theme={theme} />
           </Link>
         )}
       </div>
@@ -312,7 +313,7 @@ export default function TopBar() {
                           : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-hover)]'
                       )}
                     >
-                      <span className={isActive ? 'text-[#0091D5]' : 'opacity-60'}>{item.icon}</span>
+                      <span className={isActive ? 'text-[var(--accent)]' : 'opacity-60'}>{item.icon}</span>
                       <div>
                         <div className="font-medium">{item.label}</div>
                         {item.desc && (
@@ -320,7 +321,7 @@ export default function TopBar() {
                         )}
                       </div>
                       {isActive && (
-                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#0091D5]" />
+                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                       )}
                     </Link>
                   );
@@ -379,11 +380,11 @@ export default function TopBar() {
             onClick={() => setAlertsPanelOpen(!alertsPanelOpen)}
             className="p-2 rounded hover:opacity-70 transition-opacity"
             title="Price Alerts"
-            style={alertsPanelOpen ? { color: '#0091D5' } : undefined}
+            style={alertsPanelOpen ? { color: 'var(--accent)' } : undefined}
           >
             <Bell size={15} className={alertsPanelOpen ? '' : 'opacity-50'} />
             {alertCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[9px] font-bold rounded-full" style={{ width: 16, height: 16, backgroundColor: '#0091D5', color: '#000' }}>
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[9px] font-bold rounded-full" style={{ width: 16, height: 16, backgroundColor: 'var(--accent)', color: '#000' }}>
                 {alertCount}
               </span>
             )}
@@ -396,7 +397,7 @@ export default function TopBar() {
           onClick={() => setVoicePanelOpen(!voicePanelOpen)}
           className="p-2 rounded hover:opacity-70 transition-opacity"
           title="Voice Trading"
-          style={voicePanelOpen ? { color: '#0091D5' } : undefined}
+          style={voicePanelOpen ? { color: 'var(--accent)' } : undefined}
         >
           <Mic size={15} className={voicePanelOpen ? '' : 'opacity-50'} />
         </button>
@@ -424,7 +425,7 @@ export default function TopBar() {
           <span className="opacity-60">Trader</span>
           <span className="font-mono font-medium">{accountNum}</span>
           {selectedAccount?.is_demo && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#0091D5', color: '#000' }}>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--accent)', color: '#000' }}>
               DEMO
             </span>
           )}
@@ -450,7 +451,7 @@ export default function TopBar() {
                 <div className="flex items-center gap-2">
                   <span className="font-mono">{acc.account_number}</span>
                   {acc.is_demo && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#0091D5', color: '#000' }}>DEMO</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--accent)', color: '#000' }}>DEMO</span>
                   )}
                 </div>
                 <span className="font-mono opacity-60">1:{acc.leverage}</span>
@@ -487,7 +488,7 @@ export default function TopBar() {
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all hover:bg-[var(--bg-elevated)]"
-                    style={{ color: pathname === item.href ? '#0091D5' : 'var(--text-secondary)' }}
+                    style={{ color: pathname === item.href ? 'var(--accent)' : 'var(--text-secondary)' }}
                   >
                     {item.icon}
                     <div>

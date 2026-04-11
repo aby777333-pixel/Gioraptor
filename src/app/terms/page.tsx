@@ -1,11 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#060D16] text-[#EAF0FA]">
       <nav className="border-b border-white/[0.06]">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-6">
-          <Link href="/" className="flex items-center gap-3"><img src="/logo.png" alt="GIO4X" style={{ height: 36 }} /><span className="text-sm font-semibold text-[#7A8BA8]">RAPTOR</span></Link>
+          <Link href="/" className="flex items-center gap-3"><Logo height={36} theme="dark" /></Link>
         </div>
       </nav>
       <div className="max-w-3xl mx-auto px-6 py-20">
@@ -22,7 +25,7 @@ export default function TermsPage() {
           <p><strong className="text-white">9. Governing Law</strong><br />These terms are governed by the laws of the jurisdiction in which GIO4X operates.</p>
           <p><strong className="text-white">10. Contact</strong><br />For questions regarding these terms, contact us at support@gio4x.com.</p>
         </div>
-        <div className="mt-12"><Link href="/" className="text-[#0091D5] text-sm hover:underline">Back to Home</Link></div>
+        <div className="mt-12"><Link href="/" className="text-[#00B4D8] text-sm hover:underline">Back to Home</Link></div>
       </div>
     </div>
   );

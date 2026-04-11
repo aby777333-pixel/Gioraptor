@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Building, ShieldAlert } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 export default function BrokerLoginPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function BrokerLoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 32 }} />
+            <Logo height={32} theme="dark" />
           </Link>
           <div className="flex items-center justify-center gap-2 mb-3">
             <Building className="h-5 w-5 text-[#F0A500]" />

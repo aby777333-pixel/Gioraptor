@@ -8,6 +8,7 @@ import AnimatedCounter from '@/components/landing/AnimatedCounter';
 import ScrollReveal from '@/components/landing/ScrollReveal';
 import RaptorAIOrb from '@/components/landing/NexusOrb';
 import MarketTicker from '@/components/landing/MarketTicker';
+import Logo from '@/components/Logo';
 
 /* ─── Data ─── */
 const features = [
@@ -20,30 +21,30 @@ const features = [
 ];
 
 const modules = [
-  { name: 'RAPTOR Core Engine', desc: 'Indigenous matching & execution', color: '#0091D5' },
+  { name: 'RAPTOR Core Engine', desc: 'Indigenous matching & execution', color: '#00B4D8' },
   { name: 'RAPTOR CRM', desc: 'Full lifecycle client management', color: '#00A5A8' },
   { name: 'RAPTOR Desk', desc: 'Institutional dealing workstation', color: '#009B4D' },
   { name: 'RAPTOR Price', desc: 'Spread construction & aggregation', color: '#F0A500' },
-  { name: 'RAPTOR Charts', desc: '155+ indicators, all chart types', color: '#0091D5' },
+  { name: 'RAPTOR Charts', desc: '155+ indicators, all chart types', color: '#00B4D8' },
   { name: 'RAPTOR Script', desc: 'TypeScript EA/indicator runtime', color: '#8b5cf6' },
   { name: 'RAPTOR AI', desc: 'Claude-powered intelligence layer', color: '#8b5cf6' },
   { name: 'Copy Trading', desc: 'Social & mirror trading engine', color: '#00A5A8' },
   { name: 'PAMM / MAM', desc: 'Investor fund management', color: '#009B4D' },
   { name: 'Prop Trading', desc: 'Challenge engine & funded accounts', color: '#F0A500' },
-  { name: 'IB Network', desc: 'Multi-tier affiliate management', color: '#0091D5' },
+  { name: 'IB Network', desc: 'Multi-tier affiliate management', color: '#00B4D8' },
   { name: 'Compliance Suite', desc: 'KYC/AML + regulatory reporting', color: '#FF4560' },
   { name: 'Payment Hub', desc: '40+ PSP connectors, crypto', color: '#00C896' },
   { name: 'LP Bridge', desc: 'FIX 4.4/5.0, smart routing', color: '#00A5A8' },
   { name: 'White Label', desc: 'Full rebrand + custom domain', color: '#F0A500' },
   { name: 'RAPTOR Intel', desc: 'Indigenous BI & analytics', color: '#009B4D' },
-  { name: 'RAPTOR Social', desc: 'Community, leaderboards, feed', color: '#0091D5' },
+  { name: 'RAPTOR Social', desc: 'Community, leaderboards, feed', color: '#00B4D8' },
   { name: 'RAPTOR Comply', desc: 'Responsible trading framework', color: '#FF4560' },
   { name: 'RAPTOR Connect', desc: 'MT5/cTrader migration bridge', color: '#7A8BA8' },
   { name: 'RAPTOR App', desc: 'iOS + Android native mobile', color: '#8b5cf6' },
 ];
 
 const architectureLayers = [
-  { label: 'Presentation', items: ['Next.js 16', 'React 19', 'TradingView Charts', 'Framer Motion'], color: '#0091D5' },
+  { label: 'Presentation', items: ['Next.js 16', 'React 19', 'TradingView Charts', 'Framer Motion'], color: '#00B4D8' },
   { label: 'Intelligence', items: ['RAPTOR AI (Claude)', 'Sentiment Engine', 'Pattern Recognition', 'Risk Scoring'], color: '#8b5cf6' },
   { label: 'Core Engine', items: ['Order Management', 'Position Engine', 'Matching Engine', 'Price Aggregator'], color: '#00A5A8' },
   { label: 'Data Layer', items: ['PostgreSQL + RLS', 'TimescaleDB', 'Redis Cache', 'Elasticsearch'], color: '#009B4D' },
@@ -65,8 +66,7 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#060D16]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="GIO4X Raptor" style={{ height: 36 }} />
-            <span className="text-sm font-semibold tracking-wide text-[#7A8BA8]">RAPTOR</span>
+            <Logo height={36} theme="dark" />
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm text-[#7A8BA8]">
             <a href="#features" className="transition-colors hover:text-white">Platform</a>
@@ -79,7 +79,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <Link href="/auth/broker-login" className="text-sm text-[#F0A500] transition-colors hover:text-[#D49000]">Broker Login</Link>
             <Link href="/auth/login" className="text-sm text-[#7A8BA8] transition-colors hover:text-white">Trader Login</Link>
-            <Link href="/auth/register" className="rounded-lg bg-[#0091D5] px-5 py-2 text-sm font-semibold transition-all hover:bg-[#007AB8] hover:shadow-lg hover:shadow-[#0091D5]/20">Get Started</Link>
+            <Link href="/auth/register" className="rounded-lg bg-[#00B4D8] px-5 py-2 text-sm font-semibold transition-all hover:bg-[#007AB8] hover:shadow-lg hover:shadow-[#00B4D8]/20">Get Started</Link>
           </div>
         </div>
       </nav>
@@ -97,9 +97,9 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#0091D5]/20 bg-[#0091D5]/[0.06] px-5 py-2 text-sm text-[#0091D5]"
+            className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#00B4D8]/20 bg-[#00B4D8]/[0.06] px-5 py-2 text-sm text-[#00B4D8]"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#0091D5] animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#00B4D8] animate-pulse" />
             GIO RAPTOR v3.0 TITAN — Broker-in-a-Box
           </motion.div>
 
@@ -129,7 +129,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.8 }}
-              className="block bg-gradient-to-r from-[#0082C8] via-[#00A5A8] to-[#009B4D] bg-clip-text text-transparent"
+              className="block bg-gradient-to-r from-[#00D4AA] via-[#00B4D8] to-[#0091B3] bg-clip-text text-transparent"
             >
               for Modern Brokerages
             </motion.span>
@@ -150,7 +150,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 1.1 }}
           >
-            <Link href="/auth/register" className="group flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto">
+            <Link href="/auth/register" className="group flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#00B4D8] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#00B4D8]/25 sm:w-auto">
               Launch Your Brokerage
               <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
             </Link>
@@ -234,20 +234,20 @@ export default function Home() {
             </ScrollReveal>
 
             <ScrollReveal delay={0.2} direction="right">
-              <div className="rounded-2xl border border-[#0091D5]/20 bg-gradient-to-br from-[#0091D5]/[0.04] to-transparent p-8 h-full">
+              <div className="rounded-2xl border border-[#00B4D8]/20 bg-gradient-to-br from-[#00B4D8]/[0.04] to-transparent p-8 h-full">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0091D5]/10 text-[#0091D5]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00B4D8]/10 text-[#00B4D8]">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#0091D5]">TIER 2 — For Traders (B2C)</h3>
+                    <h3 className="text-lg font-bold text-[#00B4D8]">TIER 2 — For Traders (B2C)</h3>
                     <p className="text-xs text-[#7A8BA8]">Professional trading experience</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {['Advanced Terminal', 'RAPTOR AI Copilot', 'Copy Trading', 'Prop Challenges', 'Smart Alerts', 'Trade Journal', 'Education Hub', 'Social Feed'].map((f) => (
                     <div key={f} className="flex items-center gap-2 text-sm text-[#7A8BA8]">
-                      <span className="h-1 w-1 rounded-full bg-[#0091D5] shrink-0" />{f}
+                      <span className="h-1 w-1 rounded-full bg-[#00B4D8] shrink-0" />{f}
                     </div>
                   ))}
                 </div>
@@ -287,7 +287,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="mb-16 text-center">
-              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">Core Capabilities</span>
+              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00B4D8]">Core Capabilities</span>
               <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Built for Institutional Performance</h2>
               <p className="mx-auto max-w-2xl text-[#7A8BA8] text-lg">Every component engineered for speed, reliability, and regulatory compliance at scale.</p>
             </div>
@@ -297,10 +297,10 @@ export default function Home() {
               <motion.div
                 key={feature.title}
                 variants={fadeUp}
-                className="group relative rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 transition-all duration-300 hover:border-[#0091D5]/20 hover:bg-[#0B1422]/80 backdrop-blur-sm"
+                className="group relative rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-8 transition-all duration-300 hover:border-[#00B4D8]/20 hover:bg-[#0B1422]/80 backdrop-blur-sm"
               >
                 <div className="absolute top-8 right-8 text-xs font-bold text-[#F0A500]/60 mono">{feature.stat}</div>
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#0091D5]/10 text-[#0091D5] transition-colors group-hover:bg-[#0091D5]/15">{feature.icon}</div>
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] transition-colors group-hover:bg-[#00B4D8]/15">{feature.icon}</div>
                 <h3 className="mb-2.5 text-lg font-semibold">{feature.title}</h3>
                 <p className="text-sm leading-relaxed text-[#7A8BA8]">{feature.description}</p>
               </motion.div>
@@ -325,7 +325,7 @@ export default function Home() {
                 </p>
                 <div className="space-y-4">
                   {[
-                    { title: 'Trade Copilot', desc: 'Pre-trade analysis, SL/TP suggestions, risk assessment on every order entry', color: '#0091D5' },
+                    { title: 'Trade Copilot', desc: 'Pre-trade analysis, SL/TP suggestions, risk assessment on every order entry', color: '#00B4D8' },
                     { title: 'Emotional Coach', desc: 'Detects overtrading, revenge trading, FOMO — intervenes compassionately', color: '#00C896' },
                     { title: 'Market Sentinel', desc: 'Real-time sentiment analysis, 55+ pattern detection, regime classification', color: '#F0A500' },
                     { title: 'Risk Guardian', desc: 'Predictive margin calls, toxic flow detection, fraud analysis for brokers', color: '#FF4560' },
@@ -503,13 +503,13 @@ class TrendFollowerPro extends RaptorEA {
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="text-center mb-14">
-              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">For Traders</span>
-              <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Everything a Trader Needs.<br /><span className="text-[#0091D5]">Nothing They Don&apos;t.</span></h2>
+              <span className="mb-4 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00B4D8]">For Traders</span>
+              <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-5xl">Everything a Trader Needs.<br /><span className="text-[#00B4D8]">Nothing They Don&apos;t.</span></h2>
             </div>
           </ScrollReveal>
           <motion.div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             {[
-              { title: 'RAPTOR Charts', desc: '15 chart types, 155+ indicators, 50+ drawing tools, 30+ timeframes', stat: '155+', color: '#0091D5', href: '/dashboard/raptor-charts' },
+              { title: 'RAPTOR Charts', desc: '15 chart types, 155+ indicators, 50+ drawing tools, 30+ timeframes', stat: '155+', color: '#00B4D8', href: '/dashboard/raptor-charts' },
               { title: 'NEXUS AI Copilot', desc: 'Pre-trade analysis, psychology coaching, weekly reports, voice mode', stat: 'AI', color: '#8b5cf6', href: '/dashboard/nexus' },
               { title: 'Script IDE', desc: 'TypeScript-native scripting with backtest engine and parameter optimization', stat: 'IDE', color: '#00A5A8', href: '/dashboard/script-ide' },
               { title: 'Copy Trading', desc: 'Follow verified providers with risk-adjusted allocation and auto-copy', stat: 'Social', color: '#009B4D', href: '/dashboard/copy-trading-v2' },
@@ -517,13 +517,13 @@ class TrendFollowerPro extends RaptorEA {
               { title: 'Social Trading', desc: 'Share trades, leaderboards, forums, live rooms, trading competitions', stat: 'Feed', color: '#00C896', href: '/dashboard/social' },
               { title: 'Smart Alerts', desc: 'Price, indicator, pattern, calendar, position, and news sentiment alerts', stat: '7ch', color: '#FF4560', href: '/dashboard/smart-alerts' },
               { title: 'Finance Portal', desc: 'Card, wire, crypto deposits. Tax summaries. Internal transfers. Statements', stat: 'Pay', color: '#F0A500', href: '/dashboard/finance' },
-              { title: 'Performance Analytics', desc: 'Equity curve, Sharpe, Sortino, Calmar, monthly heatmap, trade distribution', stat: '20+', color: '#0091D5', href: '/dashboard/analytics' },
+              { title: 'Performance Analytics', desc: 'Equity curve, Sharpe, Sortino, Calmar, monthly heatmap, trade distribution', stat: '20+', color: '#00B4D8', href: '/dashboard/analytics' },
               { title: 'RAPTOR Academy', desc: 'Courses, XP levels, badges, streaks, quizzes, AI tutor, paper trading', stat: 'XP', color: '#8b5cf6', href: '/dashboard/academy' },
               { title: 'Marketplace', desc: 'EAs, indicators, signal providers, plugins — free and paid', stat: 'Store', color: '#009B4D', href: '/marketplace/hub' },
               { title: 'EA Converter', desc: 'Upload MQL5 files — AI converts to RAPTOR Script in minutes', stat: 'MT5→', color: '#00A5A8', href: '/converter' },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp}>
-                <Link href={f.href} className="block rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-4 transition-all hover:bg-[#0B1422]/70 hover:border-[#0091D5]/20 group h-full">
+                <Link href={f.href} className="block rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-4 transition-all hover:bg-[#0B1422]/70 hover:border-[#00B4D8]/20 group h-full">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: f.color }}>{f.title}</span>
                     <span className="text-[10px] font-bold mono" style={{ color: f.color + '80' }}>{f.stat}</span>
@@ -542,12 +542,12 @@ class TrendFollowerPro extends RaptorEA {
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <ScrollReveal direction="left">
               <div>
-                <span className="mb-3 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#0091D5]">RAPTOR Charts</span>
+                <span className="mb-3 inline-block text-xs font-semibold uppercase tracking-[0.2em] text-[#00B4D8]">RAPTOR Charts</span>
                 <h2 className="mb-4 text-2xl font-bold tracking-tight sm:text-3xl">155+ Indigenous Indicators.<br/>15 Chart Types. 50+ Drawing Tools.</h2>
                 <p className="mb-5 text-sm text-[#7A8BA8] leading-relaxed">Every indicator is 100% RAPTOR-native TypeScript — no dependency on TradingView calculations. Plus 8 exclusive RAPTOR indicators and 5 NEXUS AI overlays.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {['SMA/EMA/DEMA/TEMA/HMA', 'RSI/Stochastic/CCI/MACD', 'Bollinger/ATR/Keltner', 'VWAP/OBV/Volume Profile', 'Ichimoku Cloud (full)', 'Supertrend/ADX/SAR', 'Fibonacci (7 types)', 'Elliott Wave + Harmonic'].map((g) => (
-                    <div key={g} className="flex items-center gap-1.5 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#0091D5] shrink-0"/>{g}</div>
+                    <div key={g} className="flex items-center gap-1.5 text-[10px] text-[#7A8BA8]"><span className="h-1 w-1 rounded-full bg-[#00B4D8] shrink-0"/>{g}</div>
                   ))}
                 </div>
               </div>
@@ -616,7 +616,7 @@ class TrendFollowerPro extends RaptorEA {
               { n: '90+', label: 'DB Tables' },
             ].map((s) => (
               <motion.div key={s.label} variants={fadeUp} className="text-center py-3">
-                <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0082C8] to-[#009B4D] bg-clip-text text-transparent mono">{s.n}</div>
+                <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#00D4AA] to-[#0091B3] bg-clip-text text-transparent mono">{s.n}</div>
                 <div className="text-[9px] text-[#7A8BA8] uppercase tracking-wider mt-0.5">{s.label}</div>
               </motion.div>
             ))}
@@ -638,7 +638,7 @@ class TrendFollowerPro extends RaptorEA {
             {[
               { title: 'White Label', desc: 'Your brand, your domain, your RAPTOR AI persona — full rebrand in minutes', color: '#F0A500' },
               { title: 'Risk Engine', desc: 'A/B-book routing, exposure monitoring, hedge desk, margin controls', color: '#FF4560' },
-              { title: 'Dealing Desk', desc: 'Position monitor, order flow, price engine, spread constructor', color: '#0091D5' },
+              { title: 'Dealing Desk', desc: 'Position monitor, order flow, price engine, spread constructor', color: '#00B4D8' },
               { title: 'Compliance', desc: 'KYC/AML, transaction monitoring, SAR filing, regulatory reports', color: '#00C896' },
               { title: 'CRM System', desc: '360° client profiles, pipeline management, communication hub', color: '#00A5A8' },
               { title: 'IB Network', desc: 'Multi-tier commissions, unlimited depth, IB portal, tracking links', color: '#009B4D' },
@@ -714,13 +714,13 @@ class TrendFollowerPro extends RaptorEA {
           <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
               { tier: 'Trader', price: 'Free', period: 'Forever for traders', features: ['Full trading terminal', 'RAPTOR AI copilot', 'Copy trading access', 'Mobile app', 'Standard support'], cta: 'Start Trading', ctaStyle: 'border border-white/10 hover:bg-white/[0.03]', highlight: false },
-              { tier: 'Broker', price: 'Custom', period: 'Per month, scaled', features: ['Full brokerage platform', 'White label + custom domain', 'Risk engine + dealing desk', 'CRM + compliance suite', 'LP bridge manager', 'RAPTOR AI for brokers', 'Priority support'], cta: 'Book Demo', ctaStyle: 'bg-[#0091D5] text-black hover:bg-[#007AB8]', highlight: true },
+              { tier: 'Broker', price: 'Custom', period: 'Per month, scaled', features: ['Full brokerage platform', 'White label + custom domain', 'Risk engine + dealing desk', 'CRM + compliance suite', 'LP bridge manager', 'RAPTOR AI for brokers', 'Priority support'], cta: 'Book Demo', ctaStyle: 'bg-[#00B4D8] text-black hover:bg-[#007AB8]', highlight: true },
               { tier: 'Enterprise', price: 'Contact', period: 'Custom agreement', features: ['Multi-entity management', 'Dedicated infrastructure', 'Custom integrations', 'SLA guarantees', 'Dedicated account team'], cta: 'Contact Sales', ctaStyle: 'border border-white/10 hover:bg-white/[0.03]', highlight: false },
             ].map((plan) => (
               <ScrollReveal key={plan.tier} delay={plan.highlight ? 0 : 0.1}>
-                <div className={`rounded-2xl ${plan.highlight ? 'border-[#0091D5]/30' : 'border-white/[0.06]'} border bg-[#0B1422]/60 p-8 text-left relative h-full flex flex-col`} style={plan.highlight ? { boxShadow: '0 0 40px rgba(0,145,213,0.08)' } : {}}>
-                  {plan.highlight && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-3 py-1 rounded-full bg-[#0091D5] text-black">MOST POPULAR</div>}
-                  <div className="text-xs font-bold text-[#0091D5] uppercase tracking-wider mb-2">{plan.tier}</div>
+                <div className={`rounded-2xl ${plan.highlight ? 'border-[#00B4D8]/30' : 'border-white/[0.06]'} border bg-[#0B1422]/60 p-8 text-left relative h-full flex flex-col`} style={plan.highlight ? { boxShadow: '0 0 40px rgba(0,145,213,0.08)' } : {}}>
+                  {plan.highlight && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-3 py-1 rounded-full bg-[#00B4D8] text-black">MOST POPULAR</div>}
+                  <div className="text-xs font-bold text-[#00B4D8] uppercase tracking-wider mb-2">{plan.tier}</div>
                   <div className="text-3xl font-bold mb-1">{plan.price}</div>
                   <div className="text-xs text-[#7A8BA8] mb-6">{plan.period}</div>
                   <div className="space-y-3 mb-8 flex-1">
@@ -741,7 +741,7 @@ class TrendFollowerPro extends RaptorEA {
         <div className="mx-auto max-w-3xl">
           <ScrollReveal>
             <div className="rounded-2xl border border-white/[0.06] bg-[#0B1422]/60 p-10 backdrop-blur-sm">
-              <div className="text-xs font-bold text-[#0091D5] uppercase tracking-wider mb-6">From the Desk of the CEO</div>
+              <div className="text-xs font-bold text-[#00B4D8] uppercase tracking-wider mb-6">From the Desk of the CEO</div>
               <h2 className="text-2xl font-bold mb-6">The Future of Trading Is Here</h2>
               <div className="space-y-4 text-sm text-[#7A8BA8] leading-relaxed">
                 <p>Dear Future Partner,</p>
@@ -752,7 +752,7 @@ class TrendFollowerPro extends RaptorEA {
               </div>
               <div className="mt-8 pt-6 border-t border-white/[0.06]">
                 <div className="text-sm font-semibold">Yours sincerely,</div>
-                <div className="text-sm text-[#0091D5] font-bold mt-1">Founder & CEO</div>
+                <div className="text-sm text-[#00B4D8] font-bold mt-1">Founder & CEO</div>
                 <div className="text-xs text-[#7A8BA8]">GIO4X RAPTOR Trading Platform</div>
               </div>
             </div>
@@ -768,11 +768,11 @@ class TrendFollowerPro extends RaptorEA {
             <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-5xl">
               Ready to Own
               <br />
-              <span className="bg-gradient-to-r from-[#0082C8] via-[#00A5A8] to-[#009B4D] bg-clip-text text-transparent">The Future of Brokerage?</span>
+              <span className="bg-gradient-to-r from-[#00D4AA] via-[#00B4D8] to-[#0091B3] bg-clip-text text-transparent">The Future of Brokerage?</span>
             </h2>
             <p className="mb-10 text-[#7A8BA8] text-lg">Whether you&apos;re a trader, fund manager, prop firm, or broker — RAPTOR scales with you.</p>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Link href="/auth/register" className="flex h-14 w-full items-center justify-center rounded-xl bg-[#0091D5] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#0091D5]/25 sm:w-auto">Create Free Account</Link>
+              <Link href="/auth/register" className="flex h-14 w-full items-center justify-center rounded-xl bg-[#00B4D8] px-10 text-base font-semibold transition-all hover:bg-[#007AB8] hover:shadow-xl hover:shadow-[#00B4D8]/25 sm:w-auto">Create Free Account</Link>
               <Link href="/terminal" className="flex h-14 w-full items-center justify-center rounded-xl border border-white/10 px-10 text-base font-medium text-[#7A8BA8] transition-all hover:border-white/20 hover:bg-white/[0.03] hover:text-white sm:w-auto">Explore Terminal</Link>
             </div>
           </ScrollReveal>
@@ -785,8 +785,7 @@ class TrendFollowerPro extends RaptorEA {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
             <div className="lg:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <img src="/logo.png" alt="GIO4X" style={{ height: 28 }} />
-                <span className="text-sm font-bold">RAPTOR</span>
+                <Logo height={28} theme="dark" />
               </div>
               <p className="text-xs text-[#7A8BA8] leading-relaxed mb-4 max-w-sm">The AI-native operating system for modern brokerages. Indigenous technology. 20+ integrated modules. RAPTOR AI intelligence. Zero legacy dependencies.</p>
               <div className="flex gap-3">

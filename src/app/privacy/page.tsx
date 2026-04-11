@@ -1,11 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#060D16] text-[#EAF0FA]">
       <nav className="border-b border-white/[0.06]">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-6">
-          <Link href="/" className="flex items-center gap-3"><img src="/logo.png" alt="GIO4X" style={{ height: 36 }} /><span className="text-sm font-semibold text-[#7A8BA8]">RAPTOR</span></Link>
+          <Link href="/" className="flex items-center gap-3"><Logo height={36} theme="dark" /></Link>
         </div>
       </nav>
       <div className="max-w-3xl mx-auto px-6 py-20">
@@ -21,7 +24,7 @@ export default function PrivacyPage() {
           <p><strong className="text-white">8. Updates</strong><br />This policy may be updated periodically. We will notify you of material changes via email or platform notification.</p>
           <p><strong className="text-white">9. Contact</strong><br />For privacy-related inquiries, contact our Data Protection Officer at privacy@gio4x.com.</p>
         </div>
-        <div className="mt-12"><Link href="/" className="text-[#0091D5] text-sm hover:underline">Back to Home</Link></div>
+        <div className="mt-12"><Link href="/" className="text-[#00B4D8] text-sm hover:underline">Back to Home</Link></div>
       </div>
     </div>
   );
