@@ -13,6 +13,10 @@ import CounterpartyWatch from '@/components/dealer/CounterpartyWatch';
 import DealerBlotter from '@/components/dealer/DealerBlotter';
 import NexusPanel from '@/components/dealer/NexusPanel';
 import HotkeyOverlay from '@/components/dealer/HotkeyOverlay';
+import DealerMediaPanel from '@/components/dealer/DealerMediaPanel';
+import AIAutoDealer from '@/components/dealer/AIAutoDealer';
+import HedgingPanel from '@/components/dealer/HedgingPanel';
+import SessionPnLChart from '@/components/dealer/SessionPnLChart';
 
 import { useDealerHotkeys } from '@/lib/hooks/useDealerHotkeys';
 import {
@@ -321,20 +325,41 @@ const BASE_PRICES: Record<string, { bid: number; ask: number; spread: number }> 
   AUDUSD:  { bid: 0.66310, ask: 0.66330, spread: 2.0 },
   NZDUSD:  { bid: 0.60140, ask: 0.60160, spread: 2.0 },
   USDCAD:  { bid: 1.36230, ask: 1.36260, spread: 3.0 },
+  EURGBP:  { bid: 0.85620, ask: 0.85640, spread: 2.0 },
+  EURJPY:  { bid: 166.450, ask: 166.475, spread: 2.5 },
+  USDCHF:  { bid: 0.88450, ask: 0.88470, spread: 2.0 },
+  XAGUSD:  { bid: 29.142, ask: 29.178, spread: 3.6 },
+  ETHUSD:  { bid: 3284.20, ask: 3285.80, spread: 160 },
+  US500:   { bid: 5842.30, ask: 5843.50, spread: 120 },
+  US30:    { bid: 42850.0, ask: 42855.0, spread: 500 },
+  NAS100:  { bid: 20480.0, ask: 20484.0, spread: 400 },
+  USOIL:   { bid: 78.42, ask: 78.48, spread: 6.0 },
 };
+
+const TWO_DECIMAL_SYMBOLS = new Set([
+  'XAUUSD', 'XAGUSD', 'BTCUSD', 'ETHUSD',
+  'US500', 'US30', 'NAS100', 'USOIL',
+]);
+
+function priceDecimals(symbol: string): number {
+  if (TWO_DECIMAL_SYMBOLS.has(symbol)) return 2;
+  if (symbol.includes('JPY')) return 3;
+  return 5;
+}
 
 function generatePriceTicks(): PriceTick[] {
   return Object.entries(BASE_PRICES).map(([symbol, base]) => {
+    const decimals = priceDecimals(symbol);
     const jitter = (Math.random() - 0.5) * base.spread * 0.4;
-    const bid = +(base.bid + jitter * 0.0001).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
-    const ask = +(bid + base.spread * 0.0001).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
-    const mid = +((bid + ask) / 2).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5);
+    const bid = +(base.bid + jitter * 0.0001).toFixed(decimals);
+    const ask = +(bid + base.spread * 0.0001).toFixed(decimals);
+    const mid = +((bid + ask) / 2).toFixed(decimals);
     return {
       symbol,
       bid,
       ask,
       mid,
-      spread: +(ask - bid).toFixed(symbol === 'XAUUSD' || symbol === 'BTCUSD' ? 2 : 5),
+      spread: +(ask - bid).toFixed(decimals),
       volume: Math.floor(Math.random() * 500) + 50,
       timestamp: Date.now(),
       source: 'mock-feed',
@@ -427,6 +452,8 @@ export default function DealerPage() {
   const nexusOpen = useNexusStore((s) => s.isOpen);
   const toggleNexus = useNexusStore((s) => s.togglePanel);
   const [hotkeyOverlayVisible, setHotkeyOverlayVisible] = useState(false);
+  const [mediaPanelOpen, setMediaPanelOpen] = useState(false);
+  const [hedgingOpen, setHedgingOpen] = useState(false);
 
   // Initialize seed data on mount
   useEffect(() => {
@@ -494,14 +521,48 @@ export default function DealerPage() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f] text-white">
-      {/* Top Bar -- 56px fixed */}
-      <div className="h-14 flex-shrink-0">
-        <DealerTopBar />
+      {/* Top Bar -- 56px fixed, includes AI Auto switch */}
+      <div className="h-14 flex-shrink-0 flex items-center">
+        <div className="flex-1">
+          <DealerTopBar />
+        </div>
+        <div className="flex-shrink-0 pr-3">
+          <AIAutoDealer />
+        </div>
       </div>
 
-      {/* Price Ticker -- 32px */}
-      <div className="flex-shrink-0" style={{ height: 32 }}>
-        <PriceTicker />
+      {/* Price Ticker -- 32px, with LIVE TV button at right end */}
+      <div className="flex-shrink-0 flex items-center" style={{ height: 32 }}>
+        <div className="flex-1 h-full overflow-hidden">
+          <PriceTicker />
+        </div>
+        <button
+          onClick={() => setHedgingOpen((v) => !v)}
+          className={`flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5 ${
+            hedgingOpen
+              ? 'bg-cyan-500/20 text-cyan-400'
+              : 'bg-white/5 text-white/40 hover:text-white/70'
+          }`}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          HEDGE
+        </button>
+        <button
+          onClick={() => setMediaPanelOpen((v) => !v)}
+          className={`flex-shrink-0 flex items-center gap-1 px-2.5 h-full text-[9px] font-bold tracking-wider transition border-l border-white/5 ${
+            mediaPanelOpen
+              ? 'bg-red-500/20 text-red-400'
+              : 'bg-white/5 text-white/40 hover:text-white/70'
+          }`}
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            <span className={`absolute inline-flex h-full w-full rounded-full ${mediaPanelOpen ? 'animate-ping bg-red-500 opacity-75' : 'bg-white/30'}`} />
+            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${mediaPanelOpen ? 'bg-red-500' : 'bg-white/30'}`} />
+          </span>
+          LIVE TV
+        </button>
       </div>
 
       {/* News Countdown Banner -- 48px, shows when event imminent */}
@@ -518,8 +579,9 @@ export default function DealerPage() {
         </div>
 
         {/* Centre: Execution Console -- flex-1 */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           <ExecutionConsole />
+          <HedgingPanel isOpen={hedgingOpen} onClose={() => setHedgingOpen(false)} />
         </div>
 
         {/* Right: Open Book Monitor + Counterparty Watch -- 320px */}
@@ -531,10 +593,13 @@ export default function DealerPage() {
         </div>
       </div>
 
-      {/* Bottom: Dealer Blotter -- 80px */}
+      {/* Bottom: Dealer Blotter -- 80px + sparkline */}
       {blotterVisible && (
-        <div className="h-20 flex-shrink-0 border-t border-white/5">
-          <DealerBlotter />
+        <div className="flex-shrink-0 border-t border-white/5">
+          <SessionPnLChart />
+          <div className="h-20">
+            <DealerBlotter />
+          </div>
         </div>
       )}
 
@@ -551,6 +616,12 @@ export default function DealerPage() {
       <HotkeyOverlay
         isOpen={hotkeyOverlayVisible}
         onClose={() => setHotkeyOverlayVisible(false)}
+      />
+
+      {/* Dealer Media Panel (Live TV + Video Chat) */}
+      <DealerMediaPanel
+        isOpen={mediaPanelOpen}
+        onClose={() => setMediaPanelOpen(false)}
       />
     </div>
   );

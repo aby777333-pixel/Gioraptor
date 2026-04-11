@@ -127,7 +127,7 @@ const navSections: NavSection[] = [
     label: 'Infrastructure',
     items: [
       { href: '/broker/integrations', label: 'Integrations', icon: Network },
-      { href: '/broker/connect', label: 'Migration', icon: Network },
+      { href: '/broker/connect', label: 'RAPTOR Connect', icon: Network },
       { href: '/broker/brand', label: 'Brand Studio', icon: Settings },
       { href: '/broker/mobile-apps', label: 'Mobile Apps', icon: Settings },
       { href: '/broker/raptor-app', label: 'RAPTOR App', icon: Settings },

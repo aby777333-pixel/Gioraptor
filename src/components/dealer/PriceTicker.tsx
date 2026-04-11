@@ -3,19 +3,23 @@
 import { useEffect, useRef } from 'react';
 import { usePriceFeedStore } from '@/stores/dealer';
 
-const TICKER_SYMBOLS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', 'BTCUSD', 'GBPJPY'];
+const TICKER_SYMBOLS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', 'BTCUSD', 'GBPJPY', 'ETHUSD', 'US500', 'USOIL', 'XAGUSD'];
+
+const TWO_DEC = new Set(['XAUUSD', 'XAGUSD', 'BTCUSD', 'ETHUSD', 'US500', 'US30', 'NAS100', 'USOIL']);
+
+function decimalsFor(symbol: string): number {
+  if (TWO_DEC.has(symbol)) return 2;
+  if (symbol.includes('JPY')) return 3;
+  return 5;
+}
 
 function formatBid(symbol: string, bid: number): string {
-  if (symbol === 'XAUUSD' || symbol === 'BTCUSD') return bid.toFixed(2);
-  if (symbol.includes('JPY')) return bid.toFixed(3);
-  return bid.toFixed(5);
+  return bid.toFixed(decimalsFor(symbol));
 }
 
 function formatChange(symbol: string, change: number): string {
   const sign = change >= 0 ? '+' : '';
-  if (symbol === 'XAUUSD' || symbol === 'BTCUSD') return `${sign}${change.toFixed(2)}`;
-  if (symbol.includes('JPY')) return `${sign}${change.toFixed(3)}`;
-  return `${sign}${change.toFixed(5)}`;
+  return `${sign}${change.toFixed(decimalsFor(symbol))}`;
 }
 
 export default function PriceTicker() {
