@@ -155,3 +155,104 @@ export interface NexusRiskAdvice {
   suggestedAction: 'hedge' | 'reduce' | 'monitor' | 'route_change';
   confidence: number;
 }
+
+// ─── Superprompt: Execution Decision (Section 2.3) ─────────
+
+export interface ExecutionDecision {
+  tradeId: string;
+  route: 'A_BOOK' | 'B_BOOK' | 'HYBRID';
+  hybridSplit?: number; // 0-100, percentage to A-book
+  reason: string;
+  confidence: number; // 0-100
+  simulatedBrokerPnL: number;
+  hedgeCost: number;
+  timestamp: Date;
+}
+
+// ─── Superprompt: Dealer Override (Section 3.6) ────────────
+
+export interface DealerOverride {
+  dealerId: string;
+  tradeId: string;
+  originalDecision: ExecutionDecision;
+  overriddenRoute: 'A_BOOK' | 'B_BOOK' | 'HYBRID' | 'REJECT';
+  reason: string;
+  timestamp: Date;
+  outcome?: 'PROFIT' | 'LOSS'; // filled post-trade close
+}
+
+// ─── Superprompt: Trade Prediction (Section 4.3) ──────────
+
+export interface TradePrediction {
+  tradeId: string;
+  winProbability: number;
+  brokerPnLIfBBook: number;
+  hedgeCostIfABook: number;
+  confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  volatilityFlag: boolean;
+}
+
+// ─── Superprompt: Auto-Trade Consent (Section 6.3) ────────
+
+export type AutoTradeStyle = 'scalping' | 'intraday' | 'swing';
+export type AutoTradeControlLevel = 'assistive' | 'balanced' | 'aggressive';
+
+export interface AutoTradeParameters {
+  maxRiskPerTrade: number; // percentage (e.g. 1 = 1%)
+  maxDailyLoss: number;   // percentage
+  style: AutoTradeStyle;
+  sessions: ('london' | 'new_york' | 'asia')[];
+  allowedSymbols: string[];
+  controlLevel: AutoTradeControlLevel;
+  pauseAfterConsecutiveLosses: number;
+  volatilityGuard: boolean;
+  newsFilter: boolean;
+}
+
+export interface AutoTradeConsent {
+  id: string;
+  traderId: string;
+  acceptedAt: string;
+  ipAddress: string | null;
+  parameters: AutoTradeParameters;
+  revokedAt: string | null;
+  isActive: boolean;
+}
+
+// ─── Superprompt: NEXUS Voice Layer (Section 7) ────────────
+
+export type NexusVoiceMode = 'silent' | 'assistive' | 'active_guidance' | 'full_voice';
+export type NexusVoicePersonality = 'calm_analyst' | 'sharp_trader' | 'minimal';
+export type NexusVoicePriority = 'P1' | 'P2' | 'P3';
+
+export interface NexusVoiceConfig {
+  mode: NexusVoiceMode;
+  personality: NexusVoicePersonality;
+  language: string;
+  volume: number; // 0-1
+}
+
+export interface NexusVoiceMessage {
+  text: string;
+  priority: NexusVoicePriority;
+  category: 'idle' | 'entry_good' | 'entry_late' | 'entry_risky' | 'running_neutral'
+    | 'profit_zone' | 'loss_danger' | 'critical_event' | 'auto_trade' | 'behavioral';
+  cooldownMs: number;
+}
+
+// ─── Superprompt: Scenario Simulation (Section 3.7) ───────
+
+export interface ScenarioSimulationRequest {
+  symbol: string;
+  priceChangePct: number;
+  timeframeSeconds: number;
+}
+
+export interface ScenarioSimulationResult {
+  brokerPnlImpact: number;
+  marginCascadeRisk: 'low' | 'medium' | 'high' | 'critical';
+  affectedClients: number;
+  stopOutsTriggered: number;
+  hedgeCoverage: number;
+  recommendation: string;
+}
