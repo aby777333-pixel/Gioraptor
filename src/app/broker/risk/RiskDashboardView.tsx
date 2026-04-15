@@ -174,6 +174,64 @@ export function RiskDashboardView({
           <EmptyState icon={ShieldAlert} title="All clear" description="No accounts near stop-out level." />
         )}
       </div>
+
+      {/* A/B Book Rules */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">A/B Book Routing Rules</h3>
+        <div className="rounded-xl border border-border bg-elevated overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-muted" style={{ background: 'var(--bg-surface)' }}>
+                <th className="px-4 py-2.5 text-left font-medium">Condition</th>
+                <th className="px-4 py-2.5 text-left font-medium">Route</th>
+                <th className="px-4 py-2.5 text-left font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { condition: 'Client risk score > 70', route: 'A-Book', reason: 'High-risk clients hedged with LP' },
+                { condition: 'Trade size > 5 lots', route: 'A-Book', reason: 'Large trades always go to LP' },
+                { condition: 'Client risk score < 40', route: 'B-Book', reason: 'Low-risk clients internalized' },
+                { condition: 'Toxic flow flagged', route: 'A-Book', reason: 'Never internalize toxic flow' },
+                { condition: 'News event within 5 min', route: 'A-Book', reason: 'Volatility protection' },
+                { condition: 'Everything else', route: 'B-Book', reason: 'Standard retail internalization' },
+              ].map((rule, i) => (
+                <tr key={i} className="border-b" style={{ borderColor: 'var(--border)' }}>
+                  <td className="px-4 py-2.5 font-medium text-foreground">{rule.condition}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      rule.route === 'A-Book' ? 'bg-[var(--accent-glow)] text-[var(--accent)]' : 'bg-surface text-secondary'
+                    }`}>{rule.route}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-secondary">{rule.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Daily Loss Tracker */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Daily P&amp;L Tracker (Broker Side)</h3>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border bg-elevated p-4 text-center">
+            <div className="text-[10px] text-muted uppercase tracking-wider mb-1">Today&apos;s P&amp;L</div>
+            <div className="text-xl mono font-bold text-profit">+$4,230</div>
+          </div>
+          <div className="rounded-xl border border-border bg-elevated p-4 text-center">
+            <div className="text-[10px] text-muted uppercase tracking-wider mb-1">Daily Loss Limit</div>
+            <div className="text-xl mono font-bold text-foreground">$50,000</div>
+          </div>
+          <div className="rounded-xl border border-border bg-elevated p-4 text-center">
+            <div className="text-[10px] text-muted uppercase tracking-wider mb-1">Utilization</div>
+            <div className="text-xl mono font-bold text-profit">8.5%</div>
+            <div className="mt-2 h-1.5 rounded-full bg-surface overflow-hidden">
+              <div className="h-full rounded-full bg-profit" style={{ width: '8.5%' }} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

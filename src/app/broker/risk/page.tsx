@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { RiskDashboardView } from './RiskDashboardView';
 
@@ -73,35 +72,13 @@ export default async function RiskPage() {
     .gt('margin_level', 0)
     .order('margin_level', { ascending: true });
 
-  const riskTabs = [
-    { href: '/broker/risk', label: 'Overview' },
-    { href: '/broker/risk/exposure', label: 'Exposure Monitor' },
-    { href: '/broker/risk/controls', label: 'Leverage & Spread Controls' },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Risk Dashboard</h1>
-        <p className="text-xs text-secondary">Broker exposure and margin monitoring</p>
+        <h1 className="text-xl font-semibold text-foreground">Risk Management</h1>
+        <p className="text-xs text-secondary">Exposure limits, A/B book rules, margin monitoring</p>
       </div>
 
-      {/* Sub-navigation */}
-      <nav className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
-        {riskTabs.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className="px-4 py-2 text-sm font-medium transition-colors rounded-t-md"
-            style={{
-              color: tab.href === '/broker/risk' ? 'var(--accent)' : 'var(--text-secondary)',
-              borderBottom: tab.href === '/broker/risk' ? '2px solid var(--accent)' : '2px solid transparent',
-            }}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
       <RiskDashboardView
         exposureMap={exposureMap}
         instruments={INSTRUMENTS}

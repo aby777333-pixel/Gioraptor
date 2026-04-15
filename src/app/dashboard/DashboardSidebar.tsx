@@ -6,103 +6,27 @@ import { useState } from 'react';
 import {
   LayoutDashboard,
   Monitor,
-  TrendingUp,
   Briefcase,
   History,
-  PieChart,
-  Copy,
-  Users,
-  Trophy,
-  Bell,
-  BookOpen,
-  Calendar,
-  Newspaper,
-  GraduationCap,
-  Radio,
-  Cpu,
   Wallet,
-  UserPlus,
   HeadphonesIcon,
   Settings,
-  ChevronDown,
-  ChevronRight,
+  Bell,
   PanelLeftClose,
   PanelLeft,
-  LogOut,
   Home,
   MoreHorizontal,
 } from 'lucide-react';
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-}
-
-interface NavSection {
-  label: string;
-  items: NavItem[];
-}
-
-const navSections: NavSection[] = [
-  {
-    label: 'Trade',
-    items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/dashboard/terminal', label: 'Terminal', icon: Monitor },
-      { href: '/dashboard/raptor-charts', label: 'Charts', icon: TrendingUp },
-      { href: '/dashboard/markets', label: 'Markets', icon: TrendingUp },
-      { href: '/dashboard/orders', label: 'Orders', icon: Briefcase },
-    ],
-  },
-  {
-    label: 'Portfolio',
-    items: [
-      { href: '/dashboard/positions', label: 'Positions', icon: Briefcase },
-      { href: '/dashboard/history', label: 'History', icon: History },
-      { href: '/dashboard/portfolio', label: 'Portfolio', icon: PieChart },
-      { href: '/dashboard/analytics', label: 'Analytics', icon: PieChart },
-      { href: '/dashboard/journal', label: 'Journal', icon: BookOpen },
-    ],
-  },
-  {
-    label: 'Invest',
-    items: [
-      { href: '/dashboard/copy-trading-v2', label: 'Copy Trading', icon: Copy },
-      { href: '/dashboard/social', label: 'Social', icon: Users },
-      { href: '/dashboard/pamm', label: 'PAMM', icon: Users },
-      { href: '/dashboard/prop-challenge', label: 'Prop Challenge', icon: Trophy },
-    ],
-  },
-  {
-    label: 'AI & Tools',
-    items: [
-      { href: '/dashboard/nexus', label: 'NEXUS AI', icon: Cpu },
-      { href: '/dashboard/smart-alerts', label: 'Smart Alerts', icon: Bell },
-      { href: '/dashboard/script-ide', label: 'Script IDE', icon: Cpu },
-      { href: '/converter', label: 'EA Converter', icon: Cpu },
-      { href: '/dashboard/signals', label: 'Signals', icon: Radio },
-      { href: '/marketplace/hub', label: 'Marketplace', icon: Radio },
-    ],
-  },
-  {
-    label: 'Learn',
-    items: [
-      { href: '/dashboard/academy', label: 'Academy', icon: GraduationCap },
-      { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
-      { href: '/dashboard/news', label: 'News', icon: Newspaper },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
-      { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
-      { href: '/dashboard/referrals', label: 'Referrals', icon: UserPlus },
-      { href: '/dashboard/support', label: 'Support', icon: HeadphonesIcon },
-      { href: '/dashboard/settings', label: 'Settings', icon: Settings },
-    ],
-  },
+// ─── 7 flat nav items. Essentials only. ─────────────────────
+const NAV_ITEMS = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/terminal', label: 'Terminal', icon: Monitor },
+  { href: '/dashboard/positions', label: 'Positions', icon: Briefcase },
+  { href: '/dashboard/history', label: 'History', icon: History },
+  { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/dashboard/support', label: 'Support', icon: HeadphonesIcon },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
 const mobileTabItems = [
@@ -110,7 +34,7 @@ const mobileTabItems = [
   { href: '/dashboard/terminal', label: 'Terminal', icon: Monitor },
   { href: '/dashboard/positions', label: 'Positions', icon: Briefcase },
   { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/dashboard/more', label: 'More', icon: MoreHorizontal },
+  { href: '/dashboard/settings', label: 'More', icon: MoreHorizontal },
 ];
 
 interface DashboardSidebarProps {
@@ -122,19 +46,10 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ userName, userEmail, userAvatar }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    navSections.forEach((s) => (initial[s.label] = true));
-    return initial;
-  });
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
     return pathname.startsWith(href);
-  };
-
-  const toggleSection = (label: string) => {
-    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
   };
 
   const initials = userName
@@ -151,14 +66,14 @@ export function DashboardSidebar({ userName, userEmail, userAvatar }: DashboardS
       {/* Desktop sidebar */}
       <aside
         className={`hidden md:flex h-full flex-col shrink-0 border-r transition-all duration-200 ${
-          collapsed ? 'w-16' : 'w-60'
+          collapsed ? 'w-16' : 'w-56'
         }`}
         style={{
           backgroundColor: 'var(--bg-primary)',
           borderColor: 'var(--border)',
         }}
       >
-        {/* Logo header */}
+        {/* Logo */}
         <div
           className="h-14 flex items-center px-4 shrink-0 gap-2.5"
           style={{ borderBottom: '1px solid var(--border)' }}
@@ -185,62 +100,38 @@ export function DashboardSidebar({ userName, userEmail, userAvatar }: DashboardS
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2 hide-scrollbar">
-          {navSections.map((section) => (
-            <div key={section.label} className="mb-1">
-              {!collapsed && (
-                <button
-                  onClick={() => toggleSection(section.label)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest hover:bg-white/[0.02] rounded transition-colors"
-                  style={{ color: 'var(--text-muted)' }}
+        {/* 7 flat nav items */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2">
+          <div className="space-y-0.5">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={collapsed ? item.label : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                    collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                  }`}
+                  style={{
+                    color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                    backgroundColor: active ? 'var(--accent-glow)' : undefined,
+                  }}
                 >
-                  {section.label}
-                  {openSections[section.label] ? (
-                    <ChevronDown size={12} />
-                  ) : (
-                    <ChevronRight size={12} />
-                  )}
-                </button>
-              )}
-              {(collapsed || openSections[section.label]) && (
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        title={collapsed ? item.label : undefined}
-                        className={`flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors ${
-                          collapsed ? 'justify-center px-2 py-2' : 'px-2.5 py-1.5'
-                        } ${
-                          active
-                            ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
-                            : 'hover:bg-white/[0.04]'
-                        }`}
-                        style={{
-                          color: active ? 'var(--accent)' : 'var(--text-secondary)',
-                          backgroundColor: active ? 'var(--accent-glow)' : undefined,
-                        }}
-                      >
-                        <Icon size={16} strokeWidth={active ? 2 : 1.5} />
-                        {!collapsed && item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+                  <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+                  {!collapsed && item.label}
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {/* User footer */}
         <div className="shrink-0 p-2" style={{ borderTop: '1px solid var(--border)' }}>
           <Link
             href="/dashboard/settings"
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/[0.04] transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.04] transition-colors"
           >
             {userAvatar ? (
               <img src={userAvatar} alt="" className="w-7 h-7 rounded-full shrink-0" />
@@ -256,9 +147,6 @@ export function DashboardSidebar({ userName, userEmail, userAvatar }: DashboardS
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                   {userName || userEmail}
-                </div>
-                <div className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                  Trader
                 </div>
               </div>
             )}
