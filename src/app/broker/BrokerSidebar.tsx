@@ -13,18 +13,23 @@ import {
   Bell,
   LogOut,
   Gauge,
+  Monitor,
+  Network,
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react';
 
-// ─── 7 core nav items. Flat. No sub-menus. ─────────────────
+// ─── Core nav items. Flat. No sub-menus. ───────────────────
 const NAV_ITEMS = [
   { href: '/broker/overview', label: 'Dashboard', icon: BarChart3 },
+  { href: '/terminal', label: 'Platform', icon: Monitor },
+  { href: '/dealer', label: 'Dealer', icon: Gauge },
   { href: '/broker/dealing-desk', label: 'Dealing Desk', icon: Gauge },
   { href: '/broker/risk', label: 'Risk', icon: ShieldAlert },
   { href: '/broker/clients', label: 'Clients', icon: Users },
   { href: '/broker/payments', label: 'Finance', icon: CreditCard },
   { href: '/broker/crm', label: 'CRM', icon: LayoutDashboard },
+  { href: '/broker/ib-management', label: 'IB & Affiliates', icon: Network },
   { href: '/broker/settings', label: 'Settings', icon: Settings },
 ];
 
