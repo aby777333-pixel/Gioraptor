@@ -59,6 +59,12 @@ const LIVE_CAPABLE_SYMBOLS = [
   'BTCUSD', 'ETHUSD',
 ];
 
+// Free Twelve Data tier allows 8 credits/min (1 credit per symbol). Fetching
+// all symbols in one call (14 credits) returns 429 and breaks live data, so
+// we round-robin through chunks of 7 — one chunk per fetch interval.
+const LIVE_FETCH_CHUNK_SIZE = 7;
+const LIVE_FETCH_INTERVAL_MS = 60_000;
+
 function gaussianRandom(): number {
   // Box-Muller transform for normally distributed random numbers
   let u = 0;
@@ -87,6 +93,9 @@ export class PriceEngine {
   /** Timestamp of last successful live data fetch */
   private lastLiveFetch = 0;
 
+  /** Round-robin index into chunked LIVE_CAPABLE_SYMBOLS */
+  private liveChunkIndex = 0;
+
   constructor() {
     for (const cfg of INSTRUMENTS) {
       this.configs.set(cfg.symbol, cfg);
@@ -110,10 +119,24 @@ export class PriceEngine {
   /**
    * Try to fetch real prices from Twelve Data and update the base mid prices.
    * Only fetches symbols that Twelve Data supports.
+   *
+   * Fetches one chunk (LIVE_FETCH_CHUNK_SIZE symbols) per call to stay within
+   * the 8-credit/min free-tier budget. Successive calls round-robin through
+   * the symbol list, so every symbol refreshes once per full cycle.
    */
   async fetchRealPrices(): Promise<boolean> {
     try {
-      const quotes = await fetchMultipleQuotes(LIVE_CAPABLE_SYMBOLS);
+      const totalChunks = Math.max(
+        1,
+        Math.ceil(LIVE_CAPABLE_SYMBOLS.length / LIVE_FETCH_CHUNK_SIZE)
+      );
+      const start = (this.liveChunkIndex % totalChunks) * LIVE_FETCH_CHUNK_SIZE;
+      const chunk = LIVE_CAPABLE_SYMBOLS.slice(start, start + LIVE_FETCH_CHUNK_SIZE);
+      this.liveChunkIndex = (this.liveChunkIndex + 1) % totalChunks;
+
+      if (chunk.length === 0) return this.isLiveData;
+
+      const quotes = await fetchMultipleQuotes(chunk);
       let updatedCount = 0;
 
       for (const [symbol, quote] of Object.entries(quotes)) {
@@ -140,7 +163,7 @@ export class PriceEngine {
       // Silent fail - will continue with simulated data
     }
 
-    return false;
+    return this.isLiveData;
   }
 
   /**
@@ -167,12 +190,15 @@ export class PriceEngine {
       callback(ticks);
     }, intervalMs);
 
-    // Try live data regardless of key check - if fetch succeeds, use live data
+    // Try live data regardless of key check. The chunked round-robin keeps
+    // every refresh within the free-tier credit budget, so we always start the
+    // recurring interval if the first call succeeded — subsequent chunks pick
+    // up the remaining symbols.
     this.fetchRealPrices().then(success => {
-      if (success) {
+      if (success && this.running && this.liveIntervalId === null) {
         this.liveIntervalId = setInterval(() => {
           this.fetchRealPrices();
-        }, 10_000);
+        }, LIVE_FETCH_INTERVAL_MS);
       }
     });
   }
