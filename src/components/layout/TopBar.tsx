@@ -305,6 +305,8 @@ export default function TopBar() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => setOpenMenu(null)}
                       className={cn(
                         'flex items-center gap-3 px-4 py-2.5 text-[12px] transition-all',
@@ -486,6 +488,8 @@ export default function TopBar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all hover:bg-[var(--bg-elevated)]"
                     style={{ color: pathname === item.href ? 'var(--accent)' : 'var(--text-secondary)' }}
