@@ -4,131 +4,148 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import Logo from '@/components/Logo';
+import AuthShell from '@/components/auth/AuthShell';
+import { Field, PasswordField } from '@/components/auth/Field';
+import { PrimaryButton, GoogleOAuthButton } from '@/components/auth/Buttons';
+import { InlineError } from '@/components/auth/InlineError';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  function fail(msg: string) {
+    setError(msg);
+    setLoading(false);
+    setShake(true);
+    window.setTimeout(() => setShake(false), 360);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    if (loading) return;
+    setError(null);
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    if (!agreed) {
+      fail('Please accept the risk disclosure and terms to continue.');
       return;
     }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (password !== confirm) {
+      fail('Passwords do not match.');
+      return;
+    }
+    if (password.length < 12) {
+      fail('Password must be at least 12 characters.');
       return;
     }
 
     setLoading(true);
-
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
 
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
+    if (signUpError) {
+      fail(signUpError.message);
       return;
     }
 
-    router.push('/terminal');
+    router.push('/auth/verify-email');
+  }
+
+  async function handleGoogle() {
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
+    if (oauthError) fail(oauthError.message);
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#060D16] px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-8">
-            <Logo height={32} theme="dark" />
-          </Link>
-          <h1 className="text-2xl font-bold text-white">Create Account</h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Get started with GIO4X Raptor trading platform
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-zinc-400">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]/50 focus:ring-1 focus:ring-[#00B4D8]/50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-zinc-400">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]/50 focus:ring-1 focus:ring-[#00B4D8]/50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-zinc-400">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]/50 focus:ring-1 focus:ring-[#00B4D8]/50"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-[#00B4D8] py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#00B4D8]/90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-zinc-500">
-          Already have an account?{' '}
-          <Link href="/auth/login" className="text-[#00B4D8] hover:text-[#00B4D8]/80 transition-colors">
-            Sign in
-          </Link>
+    <AuthShell>
+      <div className="mb-8">
+        <h1 className="text-[28px] font-light leading-tight" style={{ color: 'var(--g-text-primary)' }}>
+          Open an account
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--g-text-secondary)' }}>
+          Standard onboarding takes under five minutes. KYC follows on first deposit.
         </p>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className={`space-y-5 ${shake ? 'g-shake' : ''}`} noValidate>
+        <InlineError message={error} />
+
+        <Field
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+        />
+
+        <PasswordField
+          label="Password"
+          autoComplete="new-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="At least 12 characters"
+          showStrength
+          hint="Use a mix of letters, numbers, and symbols. 14+ characters recommended."
+        />
+
+        <PasswordField
+          label="Confirm password"
+          autoComplete="new-password"
+          required
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder="Repeat your password"
+        />
+
+        <label className="flex items-start gap-2.5 text-[13px] leading-snug" style={{ color: 'var(--g-text-secondary)' }}>
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-0.5 accent-[var(--g-accent)]"
+            style={{ width: 14, height: 14 }}
+          />
+          <span>
+            I have read and accept the{' '}
+            <Link href="/risk-disclosure" target="_blank" className="underline">risk disclosure</Link>,{' '}
+            <Link href="/terms" target="_blank" className="underline">terms</Link>, and{' '}
+            <Link href="/privacy" target="_blank" className="underline">privacy policy</Link>.
+          </span>
+        </label>
+
+        <PrimaryButton loading={loading}>Create account</PrimaryButton>
+
+        <div className="g-divider">or</div>
+
+        <GoogleOAuthButton onClick={handleGoogle}>Sign up with Google</GoogleOAuthButton>
+      </form>
+
+      <div className="mt-8 text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
+        Already have an account?{' '}
+        <Link href="/auth/login" className="hover:underline" style={{ color: 'var(--g-text-primary)' }}>
+          Sign in
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

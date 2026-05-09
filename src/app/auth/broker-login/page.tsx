@@ -4,37 +4,50 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Building, ShieldAlert } from 'lucide-react';
-import Logo from '@/components/Logo';
+import AuthShell from '@/components/auth/AuthShell';
+import { Field, PasswordField } from '@/components/auth/Field';
+import { PrimaryButton } from '@/components/auth/Buttons';
+import { InlineError } from '@/components/auth/InlineError';
+import { ShieldAlert } from 'lucide-react';
 
 export default function BrokerLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  function fail(msg: string) {
+    setError(msg);
+    setLoading(false);
+    setShake(true);
+    window.setTimeout(() => setShake(false), 360);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    if (loading) return;
+    setError(null);
     setLoading(true);
 
     const supabase = createClient();
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError(authError.message);
-      setLoading(false);
+      fail('Invalid credentials. Check your email and password.');
       return;
     }
 
-    // Verify this is a broker account
     if (data.user) {
-      const { data: profile } = await supabase.from('users').select('role').eq('id', data.user.id).single();
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
       if (profile?.role !== 'broker_admin' && profile?.role !== 'gio4x_admin') {
-        setError('This login is for broker administrators only. Traders should use the Trader Login.');
         await supabase.auth.signOut();
-        setLoading(false);
+        fail('This portal is for broker administrators only. Traders should use the trader login.');
         return;
       }
     }
@@ -43,51 +56,66 @@ export default function BrokerLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#060D16] px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <Logo height={32} theme="dark" />
-          </Link>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Building className="h-5 w-5 text-[#F0A500]" />
-            <h1 className="text-2xl font-bold text-white">Broker Admin Portal</h1>
-          </div>
-          <p className="text-sm text-zinc-500">Broker administration and management access</p>
-          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F0A500]/10 text-[#F0A500] text-[10px] font-medium">
-            <ShieldAlert className="h-3 w-3" /> B2B Access Only
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">{error}</div>
-          )}
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="admin@brokerage.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-[#F0A500] focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Enter your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-[#F0A500] focus:outline-none" />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full rounded-lg bg-[#F0A500] py-3 text-sm font-semibold text-black transition-colors hover:bg-[#D49000] disabled:opacity-50">
-            {loading ? 'Signing in...' : 'Sign In to Broker Portal'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center space-y-2">
-          <Link href="/auth/login" className="block text-xs text-zinc-500 hover:text-white transition-colors">
-            Looking for Trader Login?
-          </Link>
-          <Link href="/contact?type=broker" className="block text-xs text-[#F0A500] hover:text-[#D49000] transition-colors">
-            Apply for a Broker Account
-          </Link>
-        </div>
+    <AuthShell accent="gold" legalLine="B2B access only — for authorized broker administrators and partner staff.">
+      <div className="mb-2">
+        <span
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-[0.16em] font-medium"
+          style={{
+            background: 'rgba(240,165,0,0.1)',
+            color: '#F0A500',
+            border: '1px solid rgba(240,165,0,0.2)',
+          }}
+        >
+          <ShieldAlert size={11} /> B2B portal
+        </span>
       </div>
-    </div>
+
+      <div className="mb-8 mt-4">
+        <h1 className="text-[28px] font-light leading-tight" style={{ color: 'var(--g-text-primary)' }}>
+          Broker administration
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--g-text-secondary)' }}>
+          Access the operations console, dealing desk, and back-office tools.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className={`space-y-5 ${shake ? 'g-shake' : ''}`} noValidate>
+        <InlineError message={error} />
+
+        <Field
+          label="Work email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="admin@brokerage.com"
+        />
+
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••••••"
+        />
+
+        <PrimaryButton loading={loading}>Sign in to console</PrimaryButton>
+      </form>
+
+      <div className="mt-8 text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
+        <Link href="/auth/login" className="hover:underline block">
+          ← Trader login instead
+        </Link>
+        <Link
+          href="/contact?type=broker"
+          className="mt-2 hover:underline block"
+          style={{ color: '#F0A500' }}
+        >
+          Apply for a broker account →
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

@@ -1,41 +1,59 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { TrendingUp, Building } from 'lucide-react';
-import Logo from '@/components/Logo';
+import AuthShell from '@/components/auth/AuthShell';
+import { Field, PasswordField } from '@/components/auth/Field';
+import { PrimaryButton, GoogleOAuthButton } from '@/components/auth/Buttons';
+import { RememberMeToggle } from '@/components/auth/RememberMeToggle';
+import { InlineError } from '@/components/auth/InlineError';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [remember, setRemember] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const redirectTo = searchParams.get('redirect');
+  function fail(message: string) {
+    setError(message);
+    setLoading(false);
+    setShake(true);
+    window.setTimeout(() => setShake(false), 360);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    if (loading) return;
+    setError(null);
     setLoading(true);
 
     const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (authError) {
-      setError(authError.message);
-      setLoading(false);
+      // Generic message — never reveal which field is wrong.
+      fail('Invalid credentials. Check your email and password.');
       return;
     }
 
-    // Route based on role — traders to dashboard, brokers to command center
     if (data.user) {
-      const { data: profile } = await supabase.from('users').select('role').eq('id', data.user.id).single();
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
       const role = profile?.role ?? 'trader';
-
       if (role === 'broker_admin' || role === 'gio4x_admin') {
         router.push(redirectTo ?? '/broker/command-center');
       } else {
@@ -46,57 +64,93 @@ function LoginForm() {
     }
   }
 
+  async function handleGoogle() {
+    setError(null);
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${redirectTo ?? '/dashboard'}`,
+      },
+    });
+    if (oauthError) fail(oauthError.message);
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#060D16] px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <Logo height={32} theme="dark" />
-          </Link>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <TrendingUp className="h-5 w-5 text-[#00B4D8]" />
-            <h1 className="text-2xl font-bold text-white">Trader Login</h1>
-          </div>
-          <p className="text-sm text-zinc-500">Sign in to your trading account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">{error}</div>
-          )}
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-zinc-400">Email</label>
-            <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="trader@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]" />
-          </div>
-          <div>
-            <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-zinc-400">Password</label>
-            <input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#00B4D8]" />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full rounded-lg bg-[#00B4D8] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#007AB8] disabled:opacity-50">
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center space-y-3">
-          <p className="text-sm text-zinc-500">
-            Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="text-[#00B4D8] hover:text-[#00B4D8]/80 transition-colors">Create one</Link>
-          </p>
-          <Link href="/auth/broker-login" className="flex items-center justify-center gap-2 text-xs text-[#F0A500] hover:text-[#D49000] transition-colors">
-            <Building className="h-3 w-3" /> Broker Admin? Login here
-          </Link>
-        </div>
+    <AuthShell>
+      <div className="mb-8">
+        <h1
+          className="text-[28px] font-light leading-tight"
+          style={{ color: 'var(--g-text-primary)' }}
+        >
+          Welcome back
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--g-text-secondary)' }}>
+          Secure client access
+        </p>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className={`space-y-5 ${shake ? 'g-shake' : ''}`} noValidate>
+        <InlineError message={error} />
+
+        <Field
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="trader@example.com"
+        />
+
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••••••"
+        />
+
+        <div className="flex items-center justify-between">
+          <RememberMeToggle checked={remember} onChange={setRemember} />
+          <Link
+            href="/auth/forgot-password"
+            className="text-[13px] hover:underline"
+            style={{ color: 'var(--g-text-secondary)' }}
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        <PrimaryButton loading={loading}>Sign in to terminal</PrimaryButton>
+
+        <div className="g-divider">or</div>
+
+        <GoogleOAuthButton onClick={handleGoogle} />
+      </form>
+
+      <div className="mt-8 text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
+        New to GIO RAPTOR?{' '}
+        <Link href="/auth/register" className="hover:underline" style={{ color: 'var(--g-text-primary)' }}>
+          Open an account
+        </Link>
+        <span className="mx-2 opacity-40">·</span>
+        <Link
+          href="/auth/broker-login"
+          className="hover:underline"
+          style={{ color: 'var(--g-text-muted)' }}
+        >
+          Broker admin
+        </Link>
+      </div>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#060D16]"><div className="text-zinc-500 text-sm">Loading...</div></div>}>
+    <Suspense fallback={<div className="gentleman min-h-screen" />}>
       <LoginForm />
     </Suspense>
   );
