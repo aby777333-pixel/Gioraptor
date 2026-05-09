@@ -14,21 +14,20 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import CommandPalette from './CommandPalette';
-import NotificationDrawer, { type PortalNotification } from './NotificationDrawer';
+import NotificationDrawer from './NotificationDrawer';
 import AccountSelector from './AccountSelector';
+import { useNotifications } from './useNotifications';
 
 interface PortalTopBarProps {
   userName: string;
   userEmail: string;
 }
 
-const PLACEHOLDER_NOTIFS: PortalNotification[] = [];
-
 export default function PortalTopBar({ userName, userEmail }: PortalTopBarProps) {
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState<PortalNotification[]>(PLACEHOLDER_NOTIFS);
+  const { notifications, loading: notifLoading, unreadCount, markRead, markAllRead } = useNotifications();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +61,7 @@ export default function PortalTopBar({ userName, userEmail }: PortalTopBarProps)
     router.push('/auth/login');
   }
 
-  const unread = notifications.filter((n) => !n.read).length;
+  const unread = unreadCount;
   const initials = (userName ?? userEmail ?? 'U')
     .split(/\s+/)
     .map((s) => s[0])
@@ -231,7 +230,9 @@ export default function PortalTopBar({ userName, userEmail }: PortalTopBarProps)
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         notifications={notifications}
-        onMarkAllRead={() => setNotifications((list) => list.map((n) => ({ ...n, read: true })))}
+        loading={notifLoading}
+        onMarkAllRead={markAllRead}
+        onMarkRead={(id) => markRead([id])}
       />
     </>
   );

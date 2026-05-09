@@ -3,32 +3,27 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { X, Bell, CheckCheck } from 'lucide-react';
-
-interface PortalNotification {
-  id: string;
-  title: string;
-  body: string;
-  category: 'trading' | 'wallet' | 'kyc' | 'system' | 'ib';
-  createdAt: string;
-  read: boolean;
-}
+import { CATEGORY_LABELS, type PortalNotification } from '@/lib/notifications/types';
 
 /**
- * Slide-in notification drawer triggered by the topbar bell. The list
- * is in-memory placeholder data — Module 13 (full notification center)
- * will swap this for a Supabase Realtime channel against the
- * `notifications` table.
+ * Slide-in notification drawer triggered by the topbar bell. The
+ * notifications list is owned by the parent (via useNotifications)
+ * so the drawer stays a pure-presentational surface.
  */
 export default function NotificationDrawer({
   open,
   onClose,
   notifications,
+  loading,
   onMarkAllRead,
+  onMarkRead,
 }: {
   open: boolean;
   onClose: () => void;
   notifications: PortalNotification[];
+  loading: boolean;
   onMarkAllRead: () => void;
+  onMarkRead: (id: string) => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -38,6 +33,8 @@ export default function NotificationDrawer({
   }, [open, onClose]);
 
   if (!open) return null;
+
+  const recent = notifications.slice(0, 12);
 
   return (
     <div className="gentleman fixed inset-0 z-[200]" aria-modal>
@@ -87,20 +84,24 @@ export default function NotificationDrawer({
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {loading ? (
+            <div className="p-4 space-y-3">
+              {[0, 1, 2].map((i) => <SkeletonRow key={i} />)}
+            </div>
+          ) : recent.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center px-6 py-16">
               <Bell size={20} style={{ color: 'var(--g-text-muted)' }} />
               <div className="mt-3 text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
                 You&apos;re all caught up.
               </div>
               <div className="mt-1 text-[11px]" style={{ color: 'var(--g-text-muted)' }}>
-                We&apos;ll surface deposits, KYC updates, margin events, and IB commissions here.
+                Deposits, KYC updates, margin events, and IB commissions land here.
               </div>
             </div>
           ) : (
             <ul className="list-none m-0 p-0">
-              {notifications.map((n) => (
-                <NotificationRow key={n.id} item={n} />
+              {recent.map((n) => (
+                <NotificationRow key={n.id} item={n} onMarkRead={onMarkRead} />
               ))}
             </ul>
           )}
@@ -124,7 +125,13 @@ export default function NotificationDrawer({
   );
 }
 
-function NotificationRow({ item }: { item: PortalNotification }) {
+function NotificationRow({
+  item,
+  onMarkRead,
+}: {
+  item: PortalNotification;
+  onMarkRead: (id: string) => void;
+}) {
   return (
     <li
       className="px-4 py-3 border-b flex gap-3"
@@ -143,15 +150,58 @@ function NotificationRow({ item }: { item: PortalNotification }) {
       />
       <div className="min-w-0 flex-1">
         <div className="text-[13px]" style={{ color: 'var(--g-text-primary)' }}>{item.title}</div>
-        <div className="mt-0.5 text-[12px] leading-snug" style={{ color: 'var(--g-text-secondary)' }}>
-          {item.body}
-        </div>
-        <div className="mt-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'var(--g-text-muted)' }}>
-          {item.category} · {item.createdAt}
+        {item.body && (
+          <div className="mt-0.5 text-[12px] leading-snug" style={{ color: 'var(--g-text-secondary)' }}>
+            {item.body}
+          </div>
+        )}
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--g-text-muted)' }}>
+            {CATEGORY_LABELS[item.category]} · {formatRelative(item.created_at)}
+          </span>
+          {!item.read && (
+            <button
+              type="button"
+              onClick={() => onMarkRead(item.id)}
+              className="text-[10px] uppercase tracking-wider hover:underline"
+              style={{ color: 'var(--g-accent)' }}
+            >
+              Mark read
+            </button>
+          )}
         </div>
       </div>
     </li>
   );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex gap-3 py-2">
+      <div
+        className="g-skeleton shrink-0"
+        style={{ width: 6, height: 6, borderRadius: 6, marginTop: 6 }}
+      />
+      <div className="flex-1 space-y-2">
+        <div className="g-skeleton" style={{ height: 12, width: '70%' }} />
+        <div className="g-skeleton" style={{ height: 10, width: '90%' }} />
+      </div>
+    </div>
+  );
+}
+
+function formatRelative(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = Math.max(0, now - then);
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
 export type { PortalNotification };
