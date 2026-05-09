@@ -1,154 +1,146 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
-import { Copy, TrendingUp, Users, ShieldAlert, Search } from 'lucide-react';
-import { MiniSparkline } from '@/components/charts/MiniSparkline';
-import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { cn, formatPercent } from '@/lib/utils/format';
+import { useMemo, useState } from 'react';
+import { Search, ArrowUpDown } from 'lucide-react';
+import StrategyCard from '@/components/portal/copy/StrategyCard';
+import { getSeedStrategies } from '@/lib/copy/seed';
+import type { RiskScore } from '@/lib/copy/types';
 
-export default function CopyTradingPage() {
-  const router = useRouter();
-  const [strategies, setStrategies] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [riskFilter, setRiskFilter] = useState(10);
-  const [sortBy, setSortBy] = useState('total_return');
+type SortKey = 'roi_30d' | 'roi_all' | 'win_rate' | 'aum';
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: 'roi_30d',  label: '30d ROI' },
+  { id: 'roi_all',  label: 'All-time ROI' },
+  { id: 'win_rate', label: 'Win rate' },
+  { id: 'aum',      label: 'AUM' },
+];
 
-  useEffect(() => {
-    async function fetch() {
-      const { data } = await supabase
-        .from('copy_strategies')
-        .select('*')
-        .eq('is_active', true)
-        .order('total_return_pct', { ascending: false });
-      setStrategies(data ?? []);
-      setLoading(false);
-    }
-    fetch();
-  }, []);
+const RISK_FILTERS: { id: 'any' | RiskScore; label: string }[] = [
+  { id: 'any',         label: 'Any risk' },
+  { id: 'low',         label: 'Low' },
+  { id: 'medium',      label: 'Medium' },
+  { id: 'high',        label: 'High' },
+  { id: 'aggressive',  label: 'Aggressive' },
+];
 
-  const filtered = strategies
-    .filter((s) => ((s.risk_score as number) ?? 0) <= riskFilter)
-    .sort((a, b) => {
-      if (sortBy === 'total_return') return ((b.total_return_pct as number) ?? 0) - ((a.total_return_pct as number) ?? 0);
-      if (sortBy === 'followers') return ((b.followers_count as number) ?? 0) - ((a.followers_count as number) ?? 0);
-      if (sortBy === 'risk') return ((a.risk_score as number) ?? 0) - ((b.risk_score as number) ?? 0);
-      return 0;
-    });
+export default function CopyTradingLeaderboard() {
+  const allStrategies = useMemo(() => getSeedStrategies(), []);
+  const [sort, setSort] = useState<SortKey>('roi_30d');
+  const [risk, setRisk] = useState<'any' | RiskScore>('any');
+  const [query, setQuery] = useState('');
 
-  const riskColor = (score: number) => {
-    if (score <= 3) return 'text-profit bg-profit/15';
-    if (score <= 6) return 'text-gold bg-gold/15';
-    return 'text-loss bg-loss/15';
-  };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allStrategies
+      .filter((s) => (risk === 'any' ? true : s.risk === risk))
+      .filter((s) => (q ? `${s.name} ${s.tagline}`.toLowerCase().includes(q) : true))
+      .sort((a, b) => {
+        switch (sort) {
+          case 'roi_30d':  return b.roi_30d - a.roi_30d;
+          case 'roi_all':  return b.roi_all - a.roi_all;
+          case 'win_rate': return b.win_rate - a.win_rate;
+          case 'aum':      return Number(b.aum_usd) - Number(a.aum_usd);
+        }
+      });
+  }, [allStrategies, sort, risk, query]);
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <div className="rounded-xl border border-accent/20 bg-gradient-to-r from-accent/5 to-transparent p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Copy className="h-6 w-6 text-accent" />
-          <h1 className="text-xl font-bold text-foreground">Copy Top Traders Automatically</h1>
-        </div>
-        <p className="text-sm text-secondary max-w-xl">
-          Browse proven strategies from top traders. Copy their trades in real-time with customizable risk management.
+    <div className="max-w-6xl mx-auto">
+      <header className="mb-6">
+        <h1 className="text-[22px] font-light m-0" style={{ color: 'var(--g-text-primary)' }}>
+          Copy trading
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--g-text-secondary)' }}>
+          Mirror approved strategy providers proportionally or with a fixed lot. You stay in
+          control — pause or stop any copy at any time.
         </p>
-      </div>
+      </header>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-secondary">Max Risk Score:</label>
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <div
+          className="flex items-center gap-2 px-3 rounded-md flex-1 min-w-[200px]"
+          style={{
+            background: 'var(--g-bg-surface)',
+            border: '1px solid var(--g-border-soft)',
+            height: 38,
+          }}
+        >
+          <Search size={13} style={{ color: 'var(--g-text-muted)' }} />
           <input
-            type="range"
-            min={1}
-            max={10}
-            value={riskFilter}
-            onChange={(e) => setRiskFilter(Number(e.target.value))}
-            className="w-32 accent-[var(--accent)]"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search strategies"
+            className="flex-1 bg-transparent outline-none text-[13px]"
+            style={{ color: 'var(--g-text-primary)' }}
           />
-          <span className="text-xs mono text-foreground">{riskFilter}/10</span>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-secondary">Sort by:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground outline-none focus:border-accent"
-          >
-            <option value="total_return">Total Return</option>
-            <option value="followers">Followers</option>
-            <option value="risk">Risk (Low to High)</option>
-          </select>
-        </div>
+        <Picker label="Sort" icon={<ArrowUpDown size={13} />} value={sort} onChange={(v) => setSort(v as SortKey)} options={SORT_OPTIONS} />
+        <Picker label="Risk" value={risk} onChange={(v) => setRisk(v as RiskScore | 'any')} options={RISK_FILTERS} />
       </div>
 
-      {loading ? (
-        <LoadingSkeleton variant="card" count={3} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Copy}
-          title="No strategies available"
-          description="No copy trading strategies match your filters."
-        />
+      {filtered.length === 0 ? (
+        <div
+          className="rounded-xl px-6 py-12 text-center"
+          style={{
+            background: 'var(--g-bg-surface)',
+            border: '1px solid var(--g-border-hair)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+        >
+          <div className="text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
+            No strategies match these filters.
+          </div>
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((s) => {
-            const sparkData = Array.from({ length: 20 }, (_, i) => {
-              const base = (s.total_return_pct as number) ?? 10;
-              return base * 0.5 + (i / 20) * base * 0.5 + (Math.random() - 0.4) * base * 0.1;
-            });
-
-            return (
-              <div key={s.id as string} className="rounded-xl border border-border bg-elevated p-4 flex flex-col gap-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{s.name as string}</h3>
-                    <p className="text-[10px] text-muted mt-0.5 line-clamp-2">{s.description as string}</p>
-                  </div>
-                  <MiniSparkline data={sparkData} width={70} height={28} color="var(--accent)" />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-[10px] text-muted">Return</p>
-                    <p className={cn('mono text-xs font-bold', (s.total_return_pct as number) >= 0 ? 'text-profit' : 'text-loss')}>
-                      {formatPercent((s.total_return_pct as number) ?? 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted">Max DD</p>
-                    <p className="mono text-xs font-medium text-loss">{((s.max_drawdown_pct as number) ?? 0).toFixed(1)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted">Followers</p>
-                    <p className="text-xs font-medium text-foreground">{(s.followers_count as number) ?? 0}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', riskColor((s.risk_score as number) ?? 5))}>
-                    Risk {s.risk_score as number}/10
-                  </span>
-                  <button
-                    onClick={() => router.push(`/dashboard/copy-trading/${s.id}`)}
-                    className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/80 transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filtered.map((s) => <StrategyCard key={s.id} strategy={s} />)}
         </div>
       )}
+
+      <p className="mt-6 text-[11px] text-center" style={{ color: 'var(--g-text-muted)' }}>
+        Strategy data shown is from approved providers. Past performance is not indicative of
+        future returns. Copy trading carries the same risks as direct trading.
+      </p>
+    </div>
+  );
+}
+
+function Picker({
+  label,
+  value,
+  onChange,
+  options,
+  icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; label: string }[];
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 rounded-md"
+      style={{
+        background: 'var(--g-bg-surface)',
+        border: '1px solid var(--g-border-soft)',
+        height: 38,
+      }}
+    >
+      {icon && <span style={{ color: 'var(--g-text-muted)' }}>{icon}</span>}
+      <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--g-text-muted)' }}>
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent text-[13px] outline-none"
+        style={{ color: 'var(--g-text-primary)' }}
+      >
+        {options.map((o) => (
+          <option key={o.id} value={o.id} style={{ background: '#16161A' }}>{o.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
