@@ -1,81 +1,137 @@
+// ═══════════════════════════════════════════════════════════════
+// GIO RAPTOR — Wallet Deposit API
+// POST: Register a deposit intent. Inserts a `client_transactions`
+// row in `pending` state and returns the human-readable reference
+// the user pays against.
+// All money math runs through Decimal — no JS Number for currency.
+// ═══════════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import Decimal from 'decimal.js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { METHOD_MIN, METHOD_MAX, computeDeposit, SUPPORTED_CURRENCIES } from '@/lib/wallet/money';
+
+const DepositSchema = z.object({
+  method: z.enum(['bank_wire', 'card', 'upi', 'crypto', 'local', 'voucher']),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Amount must be a positive decimal with at most 2 fractional digits.'),
+  currency: z.enum(SUPPORTED_CURRENCIES),
+  network: z.string().optional(),
+  receipt_url: z.string().optional(),
+});
+
+type DepositInput = z.infer<typeof DepositSchema>;
+
+interface DepositResult {
+  reference: string;
+  status: 'pending';
+  estimated_eta: string;
+}
 
 export async function POST(request: NextRequest) {
+  // 1. Auth — RLS would also enforce this on insert, but we surface a
+  //    clean 401 instead of a generic Postgres error.
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return jsonErr('Unauthorized', 401);
+
+  // 2. Validate input.
+  let body: unknown;
   try {
-    const supabase = await createServerSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { amount, currency, payment_method, account_id } = body;
-
-    // Validate required fields
-    if (!amount || !currency || !payment_method) {
-      return NextResponse.json(
-        { error: 'Amount, currency, and payment method are required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate amount
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
-    }
-
-    if (numAmount < 10) {
-      return NextResponse.json({ error: 'Minimum deposit amount is $10' }, { status: 400 });
-    }
-
-    if (numAmount > 100000) {
-      return NextResponse.json({ error: 'Maximum single deposit is $100,000. Contact support for larger amounts.' }, { status: 400 });
-    }
-
-    // Validate currency
-    const allowedCurrencies = ['USD', 'EUR', 'GBP', 'AUD', 'JPY', 'CHF', 'BTC', 'ETH', 'USDT'];
-    if (!allowedCurrencies.includes(currency)) {
-      return NextResponse.json({ error: `Currency must be one of: ${allowedCurrencies.join(', ')}` }, { status: 400 });
-    }
-
-    // Validate payment method
-    const allowedMethods = ['bank_wire', 'credit_card', 'debit_card', 'crypto', 'skrill', 'neteller'];
-    if (!allowedMethods.includes(payment_method)) {
-      return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
-    }
-
-    // Create transaction record
-    const { data: transaction, error: txError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        account_id: account_id || null,
-        type: 'deposit',
-        amount: numAmount,
-        currency,
-        payment_method,
-        status: 'pending',
-        reference: `DEP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      })
-      .select()
-      .single();
-
-    if (txError) {
-      return NextResponse.json({ error: 'Failed to create deposit record' }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      transaction,
-      message: 'Deposit request created successfully. Processing time depends on payment method.',
-    }, { status: 201 });
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return jsonErr('Invalid JSON body', 400);
   }
+  const parsed = DepositSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonErr(parsed.error.issues[0]?.message ?? 'Invalid input', 400);
+  }
+  const input: DepositInput = parsed.data;
+
+  const amount = new Decimal(input.amount);
+  const min = METHOD_MIN[input.method] ?? new Decimal('0');
+  const max = METHOD_MAX[input.method] ?? new Decimal('1000000');
+  if (amount.lessThan(min)) {
+    return jsonErr(`Minimum deposit for this method is ${min.toFixed(2)} ${input.currency}.`, 400);
+  }
+  if (amount.greaterThan(max)) {
+    return jsonErr(`Maximum deposit for this method is ${max.toFixed(2)} ${input.currency}.`, 400);
+  }
+
+  // 3. Resolve / create the matching client_wallet row so the ledger entry has a parent.
+  const { data: existingWallet } = await supabase
+    .from('client_wallets')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('currency', input.currency)
+    .maybeSingle();
+
+  let walletId = existingWallet?.id as string | undefined;
+  if (!walletId) {
+    const { data: created, error: insertErr } = await supabase
+      .from('client_wallets')
+      .insert({ user_id: user.id, currency: input.currency, balance: 0, locked_balance: 0, is_active: true })
+      .select('id')
+      .single();
+    if (insertErr) return jsonErr('Failed to create wallet for currency.', 500);
+    walletId = created.id as string;
+  }
+
+  // 4. Build the reference + fee breakdown.
+  const reference = buildReference(input.method);
+  const { fee } = computeDeposit(input.method, input.amount);
+
+  // 5. Insert the pending ledger entry.
+  const { error: txErr } = await supabase
+    .from('client_transactions')
+    .insert({
+      user_id: user.id,
+      wallet_id: walletId,
+      type: 'deposit',
+      amount: amount.toFixed(2),
+      currency: input.currency,
+      method: input.method,
+      status: 'pending',
+      reference,
+      psp_reference: null,
+      fee,
+      notes: input.network ? `Network: ${input.network}` : null,
+    });
+
+  if (txErr) {
+    return jsonErr('Failed to record deposit. Please retry or contact support.', 500);
+  }
+
+  return jsonOk<DepositResult>({
+    reference,
+    status: 'pending',
+    estimated_eta: estimatedEta(input.method),
+  });
+}
+
+function buildReference(method: string): string {
+  const prefix = method.slice(0, 3).toUpperCase();
+  const ts = Date.now().toString(36).toUpperCase().slice(-6);
+  const rand = Math.random().toString(36).toUpperCase().slice(-4);
+  return `GR-DEP-${prefix}-${ts}${rand}`;
+}
+
+function estimatedEta(method: string): string {
+  switch (method) {
+    case 'bank_wire': return '1–3 business days';
+    case 'card':      return 'Instant';
+    case 'upi':       return 'Instant';
+    case 'crypto':    return '10–30 minutes after network confirmations';
+    case 'local':     return 'Varies by region';
+    case 'voucher':   return 'Instant';
+    default:          return 'Varies';
+  }
+}
+
+function jsonOk<T>(data: T, status = 200) {
+  return NextResponse.json({ ok: true, data }, { status });
+}
+
+function jsonErr(error: string, status = 400) {
+  return NextResponse.json({ ok: false, error }, { status });
 }
