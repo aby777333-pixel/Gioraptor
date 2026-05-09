@@ -1,144 +1,143 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Users, DollarSign, TrendingUp, Lock } from 'lucide-react';
-import { MiniSparkline } from '@/components/charts/MiniSparkline';
-import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Modal } from '@/components/ui/Modal';
-import { cn, formatCurrency, formatPercent } from '@/lib/utils/format';
+import { useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import ManagerCard from '@/components/portal/pamm/ManagerCard';
+import { getSeedManagers } from '@/lib/pamm/seed';
+import type { RiskScore } from '@/lib/copy/types';
 
-export default function PammPage() {
-  const [funds, setFunds] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [investModal, setInvestModal] = useState<Record<string, unknown> | null>(null);
-  const [investAmount, setInvestAmount] = useState('');
+type SortKey = 'roi_ytd' | 'roi_all' | 'aum' | 'sharpe';
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: 'roi_ytd', label: 'ROI YTD' },
+  { id: 'roi_all', label: 'ROI all-time' },
+  { id: 'aum',     label: 'AUM' },
+  { id: 'sharpe',  label: 'Sharpe' },
+];
 
-  useEffect(() => {
-    async function fetch() {
-      const { data } = await supabase
-        .from('pamm_funds')
-        .select('*')
-        .eq('is_active', true)
-        .order('total_return_pct', { ascending: false });
-      setFunds(data ?? []);
-      setLoading(false);
-    }
-    fetch();
-  }, []);
+const RISK_FILTERS: { id: 'any' | RiskScore; label: string }[] = [
+  { id: 'any',         label: 'Any risk' },
+  { id: 'low',         label: 'Low' },
+  { id: 'medium',      label: 'Medium' },
+  { id: 'high',        label: 'High' },
+  { id: 'aggressive',  label: 'Aggressive' },
+];
+
+export default function PammListPage() {
+  const all = useMemo(() => getSeedManagers(), []);
+  const [sort, setSort] = useState<SortKey>('roi_ytd');
+  const [risk, setRisk] = useState<'any' | RiskScore>('any');
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return all
+      .filter((m) => (risk === 'any' ? true : m.risk === risk))
+      .filter((m) => (q ? `${m.name} ${m.bio} ${m.manager_name}`.toLowerCase().includes(q) : true))
+      .sort((a, b) => {
+        switch (sort) {
+          case 'roi_ytd': return b.roi_ytd - a.roi_ytd;
+          case 'roi_all': return b.roi_all - a.roi_all;
+          case 'aum':     return Number(b.aum_usd) - Number(a.aum_usd);
+          case 'sharpe':  return b.sharpe - a.sharpe;
+        }
+      });
+  }, [all, sort, risk, query]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">PAMM Funds</h1>
-          <p className="text-xs text-secondary mt-0.5">Invest in professionally managed trading accounts</p>
+    <div className="max-w-6xl mx-auto">
+      <header className="mb-6">
+        <h1 className="text-[22px] font-light m-0" style={{ color: 'var(--g-text-primary)' }}>
+          PAMM / managed accounts
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--g-text-secondary)' }}>
+          Allocate to vetted managers running discretionary or systematic strategies. Monthly NAV
+          strikes, lockup periods, and high-water marks apply per manager.
+        </p>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <div
+          className="flex items-center gap-2 px-3 rounded-md flex-1 min-w-[200px]"
+          style={{
+            background: 'var(--g-bg-surface)',
+            border: '1px solid var(--g-border-soft)',
+            height: 38,
+          }}
+        >
+          <Search size={13} style={{ color: 'var(--g-text-muted)' }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search managers"
+            className="flex-1 bg-transparent outline-none text-[13px]"
+            style={{ color: 'var(--g-text-primary)' }}
+          />
         </div>
+        <Picker label="Sort" value={sort} onChange={(v) => setSort(v as SortKey)} options={SORT_OPTIONS} />
+        <Picker label="Risk" value={risk} onChange={(v) => setRisk(v as RiskScore | 'any')} options={RISK_FILTERS} />
       </div>
 
-      {loading ? (
-        <LoadingSkeleton variant="card" count={4} />
-      ) : funds.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No PAMM funds available"
-          description="PAMM investment opportunities will appear here when managers create new funds."
-        />
+      {filtered.length === 0 ? (
+        <div
+          className="rounded-xl px-6 py-12 text-center"
+          style={{
+            background: 'var(--g-bg-surface)',
+            border: '1px solid var(--g-border-hair)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+        >
+          <div className="text-[13px]" style={{ color: 'var(--g-text-secondary)' }}>
+            No managers match these filters.
+          </div>
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {funds.map((f) => {
-            const sparkData = Array.from({ length: 15 }, (_, i) => {
-              const base = (f.nav as number) ?? 100;
-              return base * 0.9 + (i / 15) * base * 0.1 + (Math.random() - 0.4) * base * 0.03;
-            });
-
-            return (
-              <div key={f.id as string} className="rounded-xl border border-border bg-elevated p-4 flex flex-col gap-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{f.name as string}</h3>
-                    <p className="text-[10px] text-muted">Managed by {f.manager_name as string}</p>
-                  </div>
-                  <MiniSparkline data={sparkData} width={70} height={28} color="var(--profit)" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5 text-muted" />
-                    <div>
-                      <p className="text-[10px] text-muted">AUM</p>
-                      <p className="font-medium text-foreground">{formatCurrency((f.aum as number) ?? 0)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-3.5 w-3.5 text-muted" />
-                    <div>
-                      <p className="text-[10px] text-muted">NAV</p>
-                      <p className="mono font-medium text-foreground">{((f.nav as number) ?? 100).toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-3.5 w-3.5 text-profit" />
-                    <div>
-                      <p className="text-[10px] text-muted">Return</p>
-                      <p className={cn('mono font-bold', ((f.total_return_pct as number) ?? 0) >= 0 ? 'text-profit' : 'text-loss')}>
-                        {formatPercent((f.total_return_pct as number) ?? 0)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-3.5 w-3.5 text-muted" />
-                    <div>
-                      <p className="text-[10px] text-muted">Lock-up</p>
-                      <p className="font-medium text-foreground">{(f.lockup_period_days as number) ?? 30} days</p>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setInvestModal(f)}
-                  className="w-full rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent/80 transition-colors"
-                >
-                  Invest
-                </button>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filtered.map((m) => <ManagerCard key={m.id} manager={m} />)}
         </div>
       )}
 
-      {/* Invest Modal */}
-      <Modal
-        isOpen={!!investModal}
-        onClose={() => { setInvestModal(null); setInvestAmount(''); }}
-        title={`Invest in ${investModal?.name ?? ''}`}
+      <p className="mt-6 text-[11px] text-center" style={{ color: 'var(--g-text-muted)' }}>
+        All managers shown have been onboarded and approved by the partner ops team. Past
+        performance does not guarantee future returns.
+      </p>
+    </div>
+  );
+}
+
+function Picker({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; label: string }[];
+}) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 rounded-md"
+      style={{
+        background: 'var(--g-bg-surface)',
+        border: '1px solid var(--g-border-soft)',
+        height: 38,
+      }}
+    >
+      <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--g-text-muted)' }}>
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-transparent text-[13px] outline-none"
+        style={{ color: 'var(--g-text-primary)' }}
       >
-        <div className="space-y-4">
-          <p className="text-xs text-secondary">
-            Minimum investment: {formatCurrency((investModal?.min_investment as number) ?? 100)}.
-            Lock-up period: {(investModal?.lockup_period_days as number) ?? 30} days.
-          </p>
-          <div>
-            <label className="block text-xs font-medium text-secondary mb-1">Investment Amount (USD)</label>
-            <input
-              type="number"
-              value={investAmount}
-              onChange={(e) => setInvestAmount(e.target.value)}
-              placeholder="Enter amount"
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
-            />
-          </div>
-          <button className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent/80 transition-colors btn-glow">
-            Confirm Investment
-          </button>
-        </div>
-      </Modal>
+        {options.map((o) => (
+          <option key={o.id} value={o.id} style={{ background: '#16161A' }}>{o.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
