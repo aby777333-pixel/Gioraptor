@@ -34,13 +34,11 @@ export default function QuickActionRow({
         href="/dashboard/wallet/transfer"
         icon={<ArrowLeftRight size={16} />}
         label="Internal transfer"
-        muted
       />
       <PrimaryAction
         href="/dashboard/wallet/convert"
         icon={<Repeat size={16} />}
         label="Convert"
-        muted
       />
     </div>
   );

@@ -73,3 +73,47 @@ export function computeDeposit(method: string, amount: string | number) {
     net: net.toFixed(2),
   };
 }
+
+/**
+ * Indicative spot rates against USD — used by the wallet overview, the
+ * withdraw large-transaction check, and the currency Convert flow.
+ * When a real /api/fx/spot endpoint is wired, every call site reads
+ * from there instead of this table.
+ */
+export const FX_TO_USD: Record<string, Decimal> = {
+  USD:  new Decimal('1'),
+  EUR:  new Decimal('1.08'),
+  GBP:  new Decimal('1.27'),
+  INR:  new Decimal('0.012'),
+  USDT: new Decimal('1'),
+};
+
+/** Convert spread per leg, applied symmetrically (15bps each side). */
+export const FX_SPREAD = new Decimal('0.0015');
+
+/**
+ * Quote a currency conversion. Applies the spread to whichever side is
+ * wider so the user always sees a slightly worse-than-mid rate (the
+ * platform pockets the spread). Pure Decimal math — no JS Number.
+ */
+export function quoteConvert(from: string, to: string, amount: string | number) {
+  if (from === to) {
+    const d = new Decimal(amount || 0);
+    return { rate: '1.0000', from_amount: d.toFixed(2), to_amount: d.toFixed(2), spread_bps: 0 };
+  }
+  const fromUsd = FX_TO_USD[from] ?? null;
+  const toUsd   = FX_TO_USD[to] ?? null;
+  if (!fromUsd || !toUsd) {
+    return null;
+  }
+  const mid = fromUsd.div(toUsd);
+  const adjusted = mid.times(new Decimal(1).minus(FX_SPREAD));
+  const fromAmt = new Decimal(amount || 0);
+  const toAmt = fromAmt.times(adjusted);
+  return {
+    rate: adjusted.toFixed(6),
+    from_amount: fromAmt.toFixed(2),
+    to_amount: toAmt.toFixed(2),
+    spread_bps: Math.round(FX_SPREAD.times(10000).toNumber()),
+  };
+}
