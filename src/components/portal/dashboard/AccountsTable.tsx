@@ -33,7 +33,7 @@ export default function AccountsTable({ accounts }: { accounts: PortalAccountRow
       title="Trading accounts"
       trailing={
         <Link
-          href="/dashboard/positions"
+          href="/dashboard/accounts/new"
           className="text-[11px] px-2.5 py-1 rounded transition-colors hover:bg-white/[0.04] inline-flex items-center gap-1"
           style={{ color: 'var(--g-accent)', border: '1px solid rgba(220,38,38,0.25)' }}
         >
@@ -48,7 +48,7 @@ export default function AccountsTable({ accounts }: { accounts: PortalAccountRow
             No trading accounts yet
           </div>
           <Link
-            href="/dashboard/positions"
+            href="/dashboard/accounts/new"
             className="inline-block mt-3 text-[12px]"
             style={{ color: 'var(--g-accent)' }}
           >

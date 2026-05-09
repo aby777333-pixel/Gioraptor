@@ -75,7 +75,7 @@ export default function AccountSelector() {
   if (accounts.length === 0) {
     return (
       <Link
-        href="/dashboard/positions"
+        href="/dashboard/accounts/new"
         className="flex items-center gap-2 px-3 h-9 rounded-md text-[12px] transition-colors hover:bg-white/[0.04]"
         style={{
           color: 'var(--g-text-secondary)',
@@ -163,7 +163,7 @@ export default function AccountSelector() {
           </ul>
           <div className="border-t my-1" style={{ borderColor: 'var(--g-border-hair)' }} />
           <Link
-            href="/dashboard/positions"
+            href="/dashboard/accounts/new"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-[12px] transition-colors hover:bg-white/[0.04]"
             style={{ color: 'var(--g-text-secondary)' }}

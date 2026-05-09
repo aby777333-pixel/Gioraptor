@@ -33,7 +33,7 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { href: '/dashboard',                 label: 'Dashboard',     icon: LayoutDashboard },
   { href: '/dashboard/wallet',          label: 'Wallet',        icon: Wallet },
-  { href: '/dashboard/positions',       label: 'Accounts',      icon: Briefcase },
+  { href: '/dashboard/accounts',        label: 'Accounts',      icon: Briefcase },
   { href: '/dashboard/copy-trading',    label: 'Copy Trading',  icon: Users },
   { href: '/dashboard/pamm',            label: 'PAMM',          icon: PieChart },
   { href: '/dashboard/referrals',       label: 'IB Network',    icon: Network },
