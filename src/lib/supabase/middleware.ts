@@ -27,7 +27,8 @@ const PUBLIC_PATHS = [
 ];
 
 // Prefixes that are always public (e.g. /auth/*, /features/*, /blog/*)
-const PUBLIC_PREFIXES = ['/auth/', '/features/', '/blog/', '/developer/', '/education/'];
+// /r/ is the IB referral landing — must be reachable without auth
+const PUBLIC_PREFIXES = ['/auth/', '/features/', '/blog/', '/developer/', '/education/', '/r/'];
 
 // Protected route prefixes that require authentication
 const PROTECTED_PREFIXES = ['/dashboard', '/broker', '/admin', '/onboarding', '/converter', '/terminal'];
