@@ -11,3 +11,13 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Funnel everything to the new unified GIO4X trader area.
+# The old standalone Raptor portal at this URL is being retired —
+# requests are 301'd to the new monorepo trader area so bookmarks and
+# referral links keep working.
+[[redirects]]
+  from = "/*"
+  to = "https://zippy-piroshki-21aa30.netlify.app/:splat"
+  status = 301
+  force = true
