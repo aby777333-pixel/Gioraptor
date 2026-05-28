@@ -20,7 +20,7 @@ import {
 const ITEMS = [
   { href: '/dashboard',           label: 'Home',     icon: Home },
   { href: '/dashboard/wallet',    label: 'Wallet',   icon: Wallet },
-  { href: '/terminal',            label: 'Trade',    icon: TrendingUp, external: true },
+  { href: 'https://zippy-piroshki-21aa30.netlify.app', label: 'Trade', icon: TrendingUp, external: true },
   { href: '/dashboard/support',   label: 'Support',  icon: Headphones },
   { href: '/dashboard/profile',   label: 'Profile',  icon: User },
 ] as const;

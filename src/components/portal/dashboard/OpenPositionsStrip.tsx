@@ -108,7 +108,7 @@ export default function OpenPositionsStrip({
             No open positions
           </div>
           <Link
-            href="/terminal"
+            href="https://zippy-piroshki-21aa30.netlify.app"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block mt-3 text-[12px]"

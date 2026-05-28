@@ -122,13 +122,13 @@ export default function PortalSidebar() {
         <NavList items={SECONDARY_NAV} collapsed={collapsed} isActive={isActive} />
       </nav>
 
-      {/* Footer — open trading terminal in new tab */}
+      {/* Footer — open the trading hub (new app) in a new tab */}
       <div
         className="shrink-0 p-2 border-t"
         style={{ borderColor: 'var(--g-border-hair)' }}
       >
         <Link
-          href="/terminal"
+          href="https://zippy-piroshki-21aa30.netlify.app"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors"

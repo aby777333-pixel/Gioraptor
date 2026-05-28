@@ -115,7 +115,7 @@ export default function AccountsTable({ accounts }: { accounts: PortalAccountRow
                   <Td align="right">
                     <div className="flex justify-end gap-1">
                       <Action
-                        href="/terminal"
+                        href="https://zippy-piroshki-21aa30.netlify.app"
                         external
                         title="Trade"
                         icon={<TrendingUp size={13} />}

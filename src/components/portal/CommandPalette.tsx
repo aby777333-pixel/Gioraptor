@@ -24,7 +24,7 @@ const STATIC_ITEMS: PaletteItem[] = [
   { id: 'go-profile',       label: 'KYC & Profile',            group: 'Navigate', href: '/dashboard/profile' },
   { id: 'go-support',       label: 'Support',                  group: 'Navigate', href: '/dashboard/support' },
   { id: 'go-settings',      label: 'Settings',                 group: 'Navigate', href: '/dashboard/settings' },
-  { id: 'open-terminal',    label: 'Open trading terminal',    group: 'Actions',  href: '/terminal',          hint: 'opens new tab' },
+  { id: 'open-terminal',    label: 'Open trading terminal',    group: 'Actions',  href: 'https://zippy-piroshki-21aa30.netlify.app', hint: 'opens new tab' },
   { id: 'deposit',          label: 'Deposit funds',            group: 'Actions',  href: '/dashboard/wallet',  hint: 'go to wallet' },
 ];
 
@@ -64,7 +64,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   function run(item: PaletteItem) {
     onClose();
     if (item.href) {
-      const isExternal = item.href === '/terminal';
+      const isExternal = item.href.startsWith('http');
       if (isExternal) {
         window.open(item.href, '_blank', 'noopener,noreferrer');
       } else {

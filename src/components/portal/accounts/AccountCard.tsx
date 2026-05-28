@@ -137,7 +137,7 @@ export default function AccountCard({
           Leverage 1:{account.leverage} · {account.currency}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 justify-end">
-          <ActionLink href="/terminal" external icon={<TrendingUp size={13} />}>Trade</ActionLink>
+          <ActionLink href="https://zippy-piroshki-21aa30.netlify.app" external icon={<TrendingUp size={13} />}>Trade</ActionLink>
           <ActionLink href={`/dashboard/wallet/deposit?ccy=${account.currency}`} icon={<ArrowDownToLine size={13} />}>Deposit</ActionLink>
           <ActionLink href={`/dashboard/wallet/transfer`} icon={<ArrowLeftRight size={13} />}>Transfer</ActionLink>
           {onLeverageChange && (
