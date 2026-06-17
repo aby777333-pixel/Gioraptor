@@ -74,8 +74,8 @@ const menuCategories: MenuCategory[] = [
     label: 'Invest',
     icon: <Users size={14} />,
     items: [
-      { href: '/dashboard/copy-trading', icon: <Users size={14} />, label: 'Copy Trading', desc: 'Follow top traders' },
-      { href: '/dashboard/pamm', icon: <PieChart size={14} />, label: 'PAMM / MAM', desc: 'Managed accounts' },
+      { href: 'https://zippy-piroshki-21aa30.netlify.app/copy', icon: <Users size={14} />, label: 'Copy Trading', desc: 'Follow top traders' },
+      { href: 'https://zippy-piroshki-21aa30.netlify.app/pamm', icon: <PieChart size={14} />, label: 'PAMM / MAM', desc: 'Managed accounts' },
       { href: '/dashboard/prop', icon: <Wallet size={14} />, label: 'Prop Trading', desc: 'Funded challenges' },
       { href: '/dashboard/referrals', icon: <Users size={14} />, label: 'IB / Referrals', desc: 'Earn commissions' },
     ],
