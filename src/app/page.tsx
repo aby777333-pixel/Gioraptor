@@ -512,7 +512,7 @@ class TrendFollowerPro extends RaptorEA {
               { title: 'RAPTOR Charts', desc: '15 chart types, 155+ indicators, 50+ drawing tools, 30+ timeframes', stat: '155+', color: '#00B4D8', href: '/dashboard/raptor-charts' },
               { title: 'NEXUS AI Copilot', desc: 'Pre-trade analysis, psychology coaching, weekly reports, voice mode', stat: 'AI', color: '#8b5cf6', href: '/dashboard/nexus' },
               { title: 'Script IDE', desc: 'TypeScript-native scripting with backtest engine and parameter optimization', stat: 'IDE', color: '#00A5A8', href: '/dashboard/script-ide' },
-              { title: 'Copy Trading', desc: 'Follow verified providers with risk-adjusted allocation and auto-copy', stat: 'Social', color: '#009B4D', href: '/dashboard/copy-trading-v2' },
+              { title: 'Copy Trading', desc: 'Follow verified providers with risk-adjusted allocation and auto-copy', stat: 'Social', color: '#009B4D', href: 'https://zippy-piroshki-21aa30.netlify.app/copy' },
               { title: 'Prop Challenges', desc: '1-phase, 2-phase, instant funding with live progress gauges and scaling', stat: 'Funded', color: '#F0A500', href: '/dashboard/prop-challenge' },
               { title: 'Social Trading', desc: 'Share trades, leaderboards, forums, live rooms, trading competitions', stat: 'Feed', color: '#00C896', href: '/dashboard/social' },
               { title: 'Smart Alerts', desc: 'Price, indicator, pattern, calendar, position, and news sentiment alerts', stat: '7ch', color: '#FF4560', href: '/dashboard/smart-alerts' },
@@ -523,7 +523,7 @@ class TrendFollowerPro extends RaptorEA {
               { title: 'EA Converter', desc: 'Upload MQL5 files — AI converts to RAPTOR Script in minutes', stat: 'MT5→', color: '#00A5A8', href: '/converter' },
             ].map((f) => (
               <motion.div key={f.title} variants={fadeUp}>
-                <Link href={f.href} className="block rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-4 transition-all hover:bg-[#0B1422]/70 hover:border-[#00B4D8]/20 group h-full">
+                <Link href={f.href} target={f.href.startsWith('http') ? '_blank' : undefined} rel={f.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="block rounded-xl border border-white/[0.06] bg-[#0B1422]/40 p-4 transition-all hover:bg-[#0B1422]/70 hover:border-[#00B4D8]/20 group h-full">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: f.color }}>{f.title}</span>
                     <span className="text-[10px] font-bold mono" style={{ color: f.color + '80' }}>{f.stat}</span>
@@ -802,13 +802,13 @@ class TrendFollowerPro extends RaptorEA {
                   { label: 'RAPTOR Charts', href: '/dashboard/raptor-charts' },
                   { label: 'NEXUS AI Copilot', href: '/dashboard/nexus' },
                   { label: 'Script IDE', href: '/dashboard/script-ide' },
-                  { label: 'Copy Trading', href: '/dashboard/copy-trading-v2' },
+                  { label: 'Copy Trading', href: 'https://zippy-piroshki-21aa30.netlify.app/copy' },
                   { label: 'Prop Challenges', href: '/dashboard/prop-challenge' },
                   { label: 'Social Trading', href: '/dashboard/social' },
                   { label: 'Marketplace', href: '/marketplace/hub' },
                   { label: 'EA Converter', href: '/converter' },
                 ].map((l) => (
-                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
+                  <Link key={l.label} href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>
@@ -825,7 +825,7 @@ class TrendFollowerPro extends RaptorEA {
                   { label: 'Partners', href: '/partners' },
                   { label: 'Contact Sales', href: '/contact?type=broker' },
                 ].map((l) => (
-                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
+                  <Link key={l.label} href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>
@@ -840,7 +840,7 @@ class TrendFollowerPro extends RaptorEA {
                   { label: 'System Status', href: '/status' },
                   { label: 'About Us', href: '/about' },
                 ].map((l) => (
-                  <Link key={l.label} href={l.href} className="block hover:text-white transition-colors">{l.label}</Link>
+                  <Link key={l.label} href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="block hover:text-white transition-colors">{l.label}</Link>
                 ))}
               </div>
             </div>

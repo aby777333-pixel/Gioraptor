@@ -23,6 +23,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  external?: boolean;
 }
 
 /**
@@ -34,8 +35,8 @@ const PRIMARY_NAV: NavItem[] = [
   { href: '/dashboard',                 label: 'Dashboard',     icon: LayoutDashboard },
   { href: '/dashboard/wallet',          label: 'Wallet',        icon: Wallet },
   { href: '/dashboard/accounts',        label: 'Accounts',      icon: Briefcase },
-  { href: '/dashboard/copy-trading',    label: 'Copy Trading',  icon: Users },
-  { href: '/dashboard/pamm',            label: 'PAMM',          icon: PieChart },
+  { href: 'https://zippy-piroshki-21aa30.netlify.app/copy', label: 'Copy Trading',  icon: Users,    external: true },
+  { href: 'https://zippy-piroshki-21aa30.netlify.app/pamm', label: 'PAMM',          icon: PieChart, external: true },
   { href: '/dashboard/referrals',       label: 'IB Network',    icon: Network },
 ];
 
@@ -179,6 +180,8 @@ function NavList({
           <li key={item.href}>
             <Link
               href={item.href}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener noreferrer' : undefined}
               title={collapsed ? item.label : undefined}
               className="flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors"
               style={{
