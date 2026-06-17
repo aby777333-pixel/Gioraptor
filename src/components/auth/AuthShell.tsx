@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Logo from '@/components/Logo';
-import MarketAmbience from './MarketAmbience';
+import AuthBrandPanel from './AuthBrandPanel';
 
 /**
  * AuthShell — split-screen layout used by every page in /auth/*.
@@ -80,9 +80,8 @@ export default function AuthShell({
             'radial-gradient(ellipse at top right, rgba(255,255,255,0.025) 0%, transparent 60%), var(--g-bg-void)',
           borderColor: 'var(--g-border-hair)',
         }}
-        aria-hidden="true"
       >
-        <MarketAmbience />
+        <AuthBrandPanel />
       </aside>
     </div>
   );
