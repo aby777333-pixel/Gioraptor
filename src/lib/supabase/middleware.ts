@@ -151,7 +151,10 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtectedPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
-    url.searchParams.set('redirect', pathname);
+    // Preserve the full original target including its query string (e.g. the
+    // ?account=<number> deep-link from the portal's "Open in Raptor") so it
+    // survives the login round-trip.
+    url.searchParams.set('redirect', pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
@@ -180,8 +183,12 @@ export async function updateSession(request: NextRequest) {
     const defaultPath = redirectTo || getDefaultPathForRole(role);
 
     const url = request.nextUrl.clone();
-    url.pathname = defaultPath;
-    url.searchParams.delete('redirect');
+    // defaultPath may carry a query string (e.g. /terminal?account=...).
+    // Split it so pathname/search are set correctly rather than encoding the
+    // "?" into the pathname.
+    const [destPath, destQuery] = defaultPath.split('?');
+    url.pathname = destPath;
+    url.search = destQuery ? `?${destQuery}` : '';
     return NextResponse.redirect(url);
   }
 
