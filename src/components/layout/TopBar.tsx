@@ -180,8 +180,18 @@ export default function TopBar() {
 
         if (mapped.length > 0) {
           setAccounts(mapped);
-          setSelectedAccount(mapped[0]);
-          setActiveAccountId(mapped[0].id);
+          // If the portal opened us with ?account=<number> (the "Open in
+          // Raptor" deep-link), pre-select that account instead of the first.
+          let initial = mapped[0];
+          try {
+            const wanted = new URLSearchParams(window.location.search).get('account');
+            if (wanted) {
+              const match = mapped.find((a) => a.account_number === wanted);
+              if (match) initial = match;
+            }
+          } catch { /* no window / bad params — fall back to first */ }
+          setSelectedAccount(initial);
+          setActiveAccountId(initial.id);
         }
       } catch {
         const fallback: TradingAccount[] = [
