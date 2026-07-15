@@ -42,15 +42,55 @@ function series(bars: OHLCVBar[]) {
   };
 }
 
-/** 9/21 EMA trend + pullback re-entry (EMA Pullback, Kondacheval, Profit Predator). */
+/**
+ * Faithful 9/21 EMA pullback (EMA_Pullback_EA / Kondacheval_EA source):
+ *   BUY  = uptrend(EMA9>EMA21) && low<=EMA9 && close>=EMA21 && bullish candle
+ *   SELL = downtrend             && high>=EMA9 && close<=EMA21 && bearish candle
+ * Falls back to the trend bias so the EA holds a position between pullbacks.
+ */
 const stratEmaPullback: Strategy = (bars) => {
   const { closes } = series(bars);
-  const e9 = last(ema(closes, 9));
-  const e21 = last(ema(closes, 21));
-  const c = closes[closes.length - 1];
+  const e9arr = ema(closes, 9);
+  const e21arr = ema(closes, 21);
+  const i = bars.length - 1;
+  const e9 = e9arr[i]; const e21 = e21arr[i];
+  const b = bars[i];
   if (e9 == null || e21 == null) return null;
-  if (e9 > e21 && c > e21) return 'BUY';
-  if (e9 < e21 && c < e21) return 'SELL';
+  const uptrend = e9 > e21;
+  const downtrend = e9 < e21;
+  const bullPullback = uptrend && b.low <= e9 && b.close >= e21 && b.close > b.open;
+  const bearPullback = downtrend && b.high >= e9 && b.close <= e21 && b.close < b.open;
+  if (bullPullback) return 'BUY';
+  if (bearPullback) return 'SELL';
+  // Between pullbacks, stay aligned with the EMA trend.
+  if (uptrend && b.close > e21) return 'BUY';
+  if (downtrend && b.close < e21) return 'SELL';
+  return null;
+};
+
+/** RSI + MACD momentum (ProHybridTrendReversal source: rsi>=min && macdMain>signal). */
+const stratRsiMacdMomentum: Strategy = (bars) => {
+  const { closes } = series(bars);
+  const r = last(rsi(closes, 14));
+  const m = macd(closes, 12, 26, 9);
+  const i = closes.length - 1;
+  const line = m.macd[i]; const signal = m.signal[i];
+  if (r == null || line == null || signal == null) return null;
+  if (r >= 50 && line > signal) return 'BUY';
+  if (r <= 50 && line < signal) return 'SELL';
+  return null;
+};
+
+/** RSI-driven adaptive engine (Profit Predator source: RSI bands + trend). */
+const stratRsiAdaptive: Strategy = (bars) => {
+  const { closes } = series(bars);
+  const r = last(rsi(closes, 14));
+  const e50 = last(ema(closes, 50));
+  const c = closes[closes.length - 1];
+  if (r == null || e50 == null) return null;
+  // Momentum with trend: RSI leaving the midline in the trend direction.
+  if (r > 52 && c > e50) return 'BUY';
+  if (r < 48 && c < e50) return 'SELL';
   return null;
 };
 
@@ -177,10 +217,10 @@ const STRATEGIES: Record<string, Strategy> = {
   '05b87485-7f6f-46f4-b522-8f51fc90f704': stratSslChannel,    // LNL GIO
   'fd4b518d-c248-4889-92a5-c50394556571': stratSarFlip,       // Naughty Girl v1.1
   'be1030dc-47fa-4b9a-a176-8368ff8332f5': stratKalmanTrend,   // Padayappa
-  '8717afe9-36dd-4ada-824d-07f2fed0c9eb': stratTrendReversal, // Paruthiveeran
+  '8717afe9-36dd-4ada-824d-07f2fed0c9eb': stratTrendReversal, // Paruthiveeran (LinReg+Kalman+ADX)
   '6fb4b3e9-20e4-45cd-b3e8-911d01036a14': stratPattern,       // Pattern GIO
-  'd85d1178-de66-4ed4-8349-39a98c5edc7d': stratEmaPullback,   // Profit Predator v1.0
-  '8cd15b06-2e6c-4e40-bbe8-1c33e7471bbf': stratTrendReversal, // Pro Hybrid Trend Reversal
+  'd85d1178-de66-4ed4-8349-39a98c5edc7d': stratRsiAdaptive,   // Profit Predator v1.0 (RSI+stoch)
+  '8cd15b06-2e6c-4e40-bbe8-1c33e7471bbf': stratRsiMacdMomentum, // Pro Hybrid (RSI+MACD)
   '5792de3d-317f-4fb3-a6f0-b69f7b47be71': stratSarFlip,       // SAR VI v1.1
   '2c83500d-ffa7-4a28-9f0e-deaa07fcd347': stratSslChannel,    // SSL Hybrid
   'bbaec02d-b5e9-45c0-a44a-e91433a120d9': stratIchimoku,      // SuperIchi Annamalai
