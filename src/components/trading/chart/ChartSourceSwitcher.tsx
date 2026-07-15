@@ -17,7 +17,9 @@ import TradingViewPanel from './TradingViewPanel';
 import { EA_LIBRARY, type EAConfig } from './ChartToolbar';
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
+import { EARuntime, type EAStats } from '@/lib/trading/ea-engine';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
+import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
 type ChartSource = 'tradingview' | 'raptor';
 
@@ -36,13 +38,61 @@ export default function ChartSourceSwitcher({
   isLiveData?: boolean;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
-  const { activeSymbol } = useTradingStore();
+  const { activeSymbol, prices, activeAccountId, triggerRefresh } = useTradingStore();
 
   // ── EA attach lifecycle ─────────────────────────
   const [attachedEAs, setAttachedEAs] = useState<AttachedEA[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [eaMenuOpen, setEaMenuOpen] = useState(false);
+  const [eaStats, setEaStats] = useState<Record<string, EAStats>>({});
   const eaMenuRef = useRef<HTMLDivElement>(null);
+
+  // ── EA runtime: strategies evaluate on platform bars and trade
+  //    through place_market_order, regardless of which chart is shown ──
+  const ohlcvRef = useRef<OHLCVBuilder | null>(ohlcvBuilder);
+  ohlcvRef.current = ohlcvBuilder;
+  const pricesRef = useRef(prices);
+  pricesRef.current = prices;
+  const accountRef = useRef(activeAccountId);
+  accountRef.current = activeAccountId;
+
+  const runtimeRef = useRef<EARuntime | null>(null);
+  if (!runtimeRef.current) {
+    runtimeRef.current = new EARuntime({
+      getBars: (symbol: string, resolution: Resolution) =>
+        ohlcvRef.current ? ohlcvRef.current.getAllBars(symbol, resolution) : [],
+      getTick: (symbol: string) => {
+        const t = pricesRef.current[symbol];
+        return t ? { bid: t.bid, ask: t.ask } : undefined;
+      },
+      getAccountId: () => accountRef.current ?? null,
+      onStats: (key, stats) => setEaStats((prev) => ({ ...prev, [key]: stats })),
+      onRefresh: () => triggerRefresh(),
+    });
+  }
+
+  // Keep runtime instances in sync with the attached EA list.
+  useEffect(() => {
+    const runtime = runtimeRef.current!;
+    const wanted = new Map(attachedEAs.map((a) => [`${a.strategyId}-${a.symbol}`, a]));
+    for (const [key, a] of wanted) {
+      if (!runtime.has(key)) {
+        const lib = EA_LIBRARY.find((e) => e.id === a.strategyId);
+        runtime.attach(key, a.strategyId, a.name, a.symbol, lib?.timeframes ?? ['15m']);
+      }
+    }
+    // Detach removed instances (position stays open for the trader to manage).
+    for (const key of runtime.keys()) {
+      if (!wanted.has(key)) runtime.detach(key);
+    }
+  }, [attachedEAs]);
+
+  // Evaluate on every price tick (bar-close gated inside the runtime).
+  useEffect(() => {
+    runtimeRef.current?.onTick();
+  }, [prices]);
+
+  useEffect(() => () => runtimeRef.current?.detachAll(), []);
 
   useEffect(() => {
     let active = true;
@@ -280,6 +330,15 @@ export default function ChartSourceSwitcher({
               >
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: '#00C27A' }} />
                 {a.name}
+                {(() => {
+                  const s = eaStats[`${a.strategyId}-${a.symbol}`];
+                  if (!s || s.trades === 0) return <span className="text-white/30">· scanning</span>;
+                  return (
+                    <span style={{ color: s.direction === 'SELL' ? '#FF5252' : '#00C27A' }}>
+                      · {s.direction} · {s.trades} trade{s.trades > 1 ? 's' : ''}
+                    </span>
+                  );
+                })()}
                 <button
                   onClick={() => detachEA(a)}
                   className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
