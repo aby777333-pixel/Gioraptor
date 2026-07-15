@@ -24,6 +24,9 @@ export default function TerminalPage() {
   const { ohlcvBuilder, isLiveData } = usePriceEngine();
   const { setOrderDirection } = useTradingStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  // Right panel prices come from the RAPTOR feed — hide it while the
+  // TradingView (real data) chart is displayed to avoid mismatched quotes.
+  const [chartSource, setChartSource] = useState<'tradingview' | 'raptor'>('tradingview');
 
   // ── Resizable positions panel ──
   const [panelHeight, setPanelHeight] = useState(240);
@@ -106,7 +109,7 @@ export default function TerminalPage() {
         style={{
           display: 'grid',
           gridTemplateRows: `1fr auto ${panelHeight}px 30px`,
-          gridTemplateColumns: '240px 1fr 280px',
+          gridTemplateColumns: chartSource === 'tradingview' ? '240px 1fr' : '240px 1fr 280px',
         }}
       >
         {/* Watchlist - left sidebar (hidden on mobile) */}
@@ -116,13 +119,16 @@ export default function TerminalPage() {
 
         {/* ChartPanel - center */}
         <div className="overflow-hidden" style={{ gridColumn: 'span 1' }}>
-          <ChartSourceSwitcher ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
+          <ChartSourceSwitcher ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} onSourceChange={setChartSource} />
         </div>
 
-        {/* Right Panel (hidden on mobile) */}
-        <div className="border-l border-[var(--border)] overflow-hidden hidden xl:block">
-          <RightPanel />
-        </div>
+        {/* Right Panel (hidden on mobile; hidden entirely on the TradingView tab
+            because its quotes come from the RAPTOR feed) */}
+        {chartSource !== 'tradingview' && (
+          <div className="border-l border-[var(--border)] overflow-hidden hidden xl:block">
+            <RightPanel />
+          </div>
+        )}
 
         {/* ── Drag handle ── */}
         <div

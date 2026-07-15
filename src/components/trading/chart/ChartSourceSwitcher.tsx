@@ -33,12 +33,19 @@ interface AttachedEA {
 export default function ChartSourceSwitcher({
   ohlcvBuilder,
   isLiveData = false,
+  onSourceChange,
 }: {
   ohlcvBuilder: OHLCVBuilder | null;
   isLiveData?: boolean;
+  onSourceChange?: (source: 'tradingview' | 'raptor') => void;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
   const { activeSymbol, prices, activeAccountId, triggerRefresh } = useTradingStore();
+
+  useEffect(() => {
+    onSourceChange?.(source);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source]);
 
   // ── EA attach lifecycle ─────────────────────────
   const [attachedEAs, setAttachedEAs] = useState<AttachedEA[]>([]);
