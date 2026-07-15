@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import Watchlist from '@/components/trading/watchlist/Watchlist';
-import ChartPanel from '@/components/trading/chart/ChartPanel';
+import ChartSourceSwitcher from '@/components/trading/chart/ChartSourceSwitcher';
 import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
 import RightPanel from '@/components/trading/RightPanel';
@@ -116,7 +116,7 @@ export default function TerminalPage() {
 
         {/* ChartPanel - center */}
         <div className="overflow-hidden" style={{ gridColumn: 'span 1' }}>
-          <ChartPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
+          <ChartSourceSwitcher ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} />
         </div>
 
         {/* Right Panel (hidden on mobile) */}
