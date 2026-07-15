@@ -101,21 +101,6 @@ export default function TerminalWidgetsPage() {
           />
         </Panel>
 
-        <Panel title="AAPL Fundamentals">
-          <TVWidget
-            widget="financials"
-            height={550}
-            config={{ symbol: 'NASDAQ:AAPL', colorTheme: 'dark', displayMode: 'regular', isTransparent: false, largeChartUrl: '', locale: 'en', width: '100%', height: '100%' }}
-          />
-        </Panel>
-        <Panel title="Technical Analysis — AAPL">
-          <TVWidget
-            widget="technical-analysis"
-            height={550}
-            config={{ interval: '1D', width: '100%', height: '100%', isTransparent: false, symbol: 'NASDAQ:AAPL', showIntervalTabs: true, displayMode: 'single', colorTheme: 'dark', locale: 'en' }}
-          />
-        </Panel>
-
         <Panel title="Top Stories">
           <TVWidget
             widget="timeline"
