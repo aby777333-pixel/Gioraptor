@@ -65,7 +65,7 @@ const LAYOUTS: { label: string; value: LayoutType; icon: React.ReactNode }[] = [
 
 // ─── EA / Robot definitions ───────────────────────────────────────
 
-interface EAConfig {
+export interface EAConfig {
   id: string; name: string; description: string;
   pairs: string[]; timeframes: string[];
   type: 'scalper' | 'trend' | 'reversal' | 'hybrid' | 'grid' | 'hedge' | 'martingale';
@@ -75,7 +75,7 @@ interface EAConfig {
 // Real EA library imported from the owner's MQL5 collection
 // ("EA BACK UP JULY 2026"). Descriptions come from each EA's source header.
 // The id doubles as ea_instances.strategy_id when attached to a chart.
-const EA_LIBRARY: EAConfig[] = [
+export const EA_LIBRARY: EAConfig[] = [
   { id: '1da5f188-c659-4843-b91d-4fdc003002dc', name: 'Bad Boy v3.0', description: 'Confirmed trend-reversal engine: flip-trades only on major reversals, signal-synced with the BadBoy indicator.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['15m','1H'], type: 'reversal', rating: 4.7, status: 'available' },
   { id: '24fa1777-47b0-48bd-af9a-2044d1010a70', name: 'BLUEBIRD', description: 'Kalman Trend Levels EA: rides adaptive Kalman trend bands with dynamic risk management.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.5, status: 'available' },
   { id: 'f689e46f-b6b2-4be8-9ed8-978ef2147d4e', name: 'BOLCD v1.0', description: 'Bollinger Bands + MACD confluence: buys lower-band MACD cross-ups, sells upper-band cross-downs. Middle-band TP, ATR trailing, partial close.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['15m','1H'], type: 'reversal', rating: 4.6, status: 'available' },
