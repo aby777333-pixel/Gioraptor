@@ -87,6 +87,7 @@ const menuCategories: MenuCategory[] = [
       { href: '/dashboard/alerts', icon: <Bell size={14} />, label: 'Alerts', desc: 'Price & event alerts' },
       { href: '/dashboard/calendar', icon: <Calendar size={14} />, label: 'Calendar', desc: 'Economic calendar' },
       { href: '/dashboard/news', icon: <Newspaper size={14} />, label: 'News', desc: 'Market news feed' },
+      { href: '/terminal/widgets', icon: <Grid3X3 size={14} />, label: 'Market Widgets', desc: 'TradingView widget suite' },
       { href: '/terminal/heatmap', icon: <Grid3X3 size={14} />, label: 'Heatmap', desc: 'Market heatmap' },
       { href: '/dashboard/education', icon: <Brain size={14} />, label: 'Education', desc: 'Learn to trade' },
       { href: '/dashboard/support', icon: <Settings size={14} />, label: 'Support', desc: 'Help & tickets' },
