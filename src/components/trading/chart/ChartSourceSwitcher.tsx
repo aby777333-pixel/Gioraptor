@@ -21,7 +21,12 @@ export default function ChartSourceSwitcher({
   const [source, setSource] = useState<ChartSource>('tradingview');
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div
+      className="flex h-full w-full flex-col"
+      // EA drag-and-drop lands on the RAPTOR chart's drop zone; the TradingView
+      // iframe would swallow the drop, so flip tabs as soon as a drag enters.
+      onDragEnter={() => { if (source === 'tradingview') setSource('raptor'); }}
+    >
       {/* Source tabs */}
       <div
         className="flex shrink-0 items-center gap-1 border-b px-2"

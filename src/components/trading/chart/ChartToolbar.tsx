@@ -68,23 +68,43 @@ const LAYOUTS: { label: string; value: LayoutType; icon: React.ReactNode }[] = [
 interface EAConfig {
   id: string; name: string; description: string;
   pairs: string[]; timeframes: string[];
-  type: 'scalper' | 'trend' | 'grid' | 'hedge' | 'martingale';
+  type: 'scalper' | 'trend' | 'reversal' | 'hybrid' | 'grid' | 'hedge' | 'martingale';
   rating: number; status: string;
 }
 
-const MOCK_EAS: EAConfig[] = [
-  { id: 'ea-001', name: 'RAPTOR Scalper Pro', description: 'High-frequency scalping EA using price action and momentum. Targets 5-15 pip moves with tight stop losses.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['1m','5m'], type: 'scalper', rating: 4.8, status: 'available' },
-  { id: 'ea-002', name: 'GoldRush V3', description: 'Specialized gold trading robot using Ichimoku Cloud + RSI divergence. Optimized for XAUUSD volatility.', pairs: ['XAUUSD'], timeframes: ['15m','1H'], type: 'trend', rating: 4.5, status: 'available' },
-  { id: 'ea-003', name: 'Grid Master FX', description: 'Grid trading system with dynamic spacing. Auto-adjusts grid levels based on ATR and market regime.', pairs: ['EURUSD','AUDUSD','NZDUSD'], timeframes: ['1H','4H'], type: 'grid', rating: 4.2, status: 'available' },
-  { id: 'ea-004', name: 'Trend Rider AI', description: 'AI-powered trend following using ADX, EMA crossover, and MACD confirmation. Holds positions for days.', pairs: ['GBPUSD','EURJPY','GBPJPY','US30'], timeframes: ['4H','1D'], type: 'trend', rating: 4.6, status: 'available' },
-  { id: 'ea-005', name: 'Hedge Shield', description: 'Hedging EA that opens opposing positions to limit drawdown. Uses correlation analysis between pairs.', pairs: ['EURUSD','USDCHF','EURGBP'], timeframes: ['1H','4H'], type: 'hedge', rating: 4.1, status: 'available' },
-  { id: 'ea-006', name: 'Crypto Sniper Bot', description: 'Designed for BTC/ETH. Uses volume profile + order flow imbalance to catch breakout moves.', pairs: ['BTCUSD','ETHUSD'], timeframes: ['5m','15m'], type: 'scalper', rating: 4.3, status: 'available' },
-  { id: 'ea-007', name: 'Index Momentum Pro', description: 'Trades US30, NAS100, SPX500 using Bollinger Band squeezes and momentum bursts during session opens.', pairs: ['US30','NAS100','SPX500'], timeframes: ['15m','1H'], type: 'trend', rating: 4.7, status: 'available' },
-  { id: 'ea-008', name: 'Oil Trader V2', description: 'Crude oil specialist using supply/demand zones and inventory data. Works on USOIL and UKOIL.', pairs: ['USOIL','UKOIL'], timeframes: ['1H','4H'], type: 'trend', rating: 4.0, status: 'available' },
+// Real EA library imported from the owner's MQL5 collection
+// ("EA BACK UP JULY 2026"). Descriptions come from each EA's source header.
+// The id doubles as ea_instances.strategy_id when attached to a chart.
+const EA_LIBRARY: EAConfig[] = [
+  { id: '1da5f188-c659-4843-b91d-4fdc003002dc', name: 'Bad Boy v3.0', description: 'Confirmed trend-reversal engine: flip-trades only on major reversals, signal-synced with the BadBoy indicator.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['15m','1H'], type: 'reversal', rating: 4.7, status: 'available' },
+  { id: '24fa1777-47b0-48bd-af9a-2044d1010a70', name: 'BLUEBIRD', description: 'Kalman Trend Levels EA: rides adaptive Kalman trend bands with dynamic risk management.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.5, status: 'available' },
+  { id: 'f689e46f-b6b2-4be8-9ed8-978ef2147d4e', name: 'BOLCD v1.0', description: 'Bollinger Bands + MACD confluence: buys lower-band MACD cross-ups, sells upper-band cross-downs. Middle-band TP, ATR trailing, partial close.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['15m','1H'], type: 'reversal', rating: 4.6, status: 'available' },
+  { id: 'c11d80f8-c68a-42fc-8ada-04055df910a4', name: 'EMA Pullback', description: '9/21 EMA pullback system: buys uptrend pullbacks into the EMA zone with swing-based stops and risk-based sizing.', pairs: ['EURUSD','GBPUSD','AUDUSD'], timeframes: ['15m','1H'], type: 'trend', rating: 4.8, status: 'available' },
+  { id: 'b042aa5e-3cec-44c3-914d-ccae0bc4740c', name: 'Fibonacci Bands', description: 'Fibonacci Bands (BigBeluga) strategy converted from Pine Script; band-touch entries with trend filtering.', pairs: ['EURUSD','XAUUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.2, status: 'available' },
+  { id: '7a5eb3b5-ff39-4559-a057-050386a820f0', name: 'Gentleman', description: 'Automated trend-reversal system with range-market avoidance, driven by the Gentleman indicator.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['1H'], type: 'reversal', rating: 4.6, status: 'available' },
+  { id: '3fcc4545-7c16-497b-bed1-f6afc0d18f37', name: 'GIOLINEREG V1', description: 'LinReg Candles EA with SL-multiplier recovery: 5-entry recovery ladder with auto reset and on-chart panel.', pairs: ['EURUSD','GBPUSD'], timeframes: ['15m','1H'], type: 'martingale', rating: 4.3, status: 'available' },
+  { id: '2d99660e-4168-4457-bc2d-5f121bd02a62', name: 'Gulliver', description: 'Trades the Gulliver trend indicator via iCustom with adaptive risk sizing.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['1H','4H'], type: 'trend', rating: 4.4, status: 'available' },
+  { id: 'bf858c10-157f-40f1-915a-ceb23d6d162e', name: 'Ichimokuthadi', description: 'Advanced Ichimoku Cloud engine: auto-adaptive across all timeframes, majors and gold.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['15m','1H','4H'], type: 'trend', rating: 4.5, status: 'available' },
+  { id: '88bbb135-579c-418c-8795-23f6970b306b', name: 'Karakattakaran', description: 'Advanced Kalman trend engine: auto-adaptive across all timeframes, all pairs and gold.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['15m','1H','4H'], type: 'trend', rating: 4.6, status: 'available' },
+  { id: '1a2a7591-b872-489e-afe9-ecae05f676d9', name: 'Kondacheval v1.1', description: 'Professional trend-pullback EA (EMA-zone entries) with martingale lot recovery on SL and reset on TP.', pairs: ['EURUSD','GBPUSD'], timeframes: ['15m','1H'], type: 'martingale', rating: 4.4, status: 'available' },
+  { id: 'a1cc822a-87d9-4c24-9735-8311402b3601', name: 'Linegration V-02', description: 'LinReg candle-colour engine: green flips long, red flips short, with opposite-signal exits.', pairs: ['EURUSD'], timeframes: ['15m','1H'], type: 'trend', rating: 4.1, status: 'available' },
+  { id: 'c6dd62fa-6d15-4d8e-b577-f93642e75b0a', name: 'Linegration V-01', description: 'LinReg Candles + signal-line crossover entries, converted from TradingView Pine Script.', pairs: ['EURUSD'], timeframes: ['15m','1H'], type: 'trend', rating: 4.0, status: 'available' },
+  { id: '05b87485-7f6f-46f4-b522-8f51fc90f704', name: 'LNL GIO', description: 'Trades L&L Trend System stop-line flips.', pairs: ['EURUSD','GBPUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.2, status: 'available' },
+  { id: 'fd4b518d-c248-4889-92a5-c50394556571', name: 'Naughty Girl v1.1', description: 'SAR scalping expert: SAR flip + EMA trend + RSI filter, SAR-based trailing stop and partial close.', pairs: ['EURUSD','GBPUSD'], timeframes: ['1m','5m'], type: 'scalper', rating: 4.5, status: 'available' },
+  { id: 'be1030dc-47fa-4b9a-a176-8368ff8332f5', name: 'Padayappa', description: 'Kalman Trend Levels EA built on the BigBeluga concept: adaptive trend-level entries.', pairs: ['EURUSD','XAUUSD'], timeframes: ['1H'], type: 'trend', rating: 4.3, status: 'available' },
+  { id: '8717afe9-36dd-4ada-824d-07f2fed0c9eb', name: 'Paruthiveeran', description: 'Trend-reversal engine combining LinReg candles, Kalman filter and ADX; auto-detects scalp, day-trade or positional mode.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['5m','1H','4H'], type: 'hybrid', rating: 4.7, status: 'available' },
+  { id: '6fb4b3e9-20e4-45cd-b3e8-911d01036a14', name: 'Pattern GIO', description: 'Trades 16 classical chart-pattern signals: head & shoulders, wedges, triangles, double tops and more.', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['1H','4H'], type: 'hybrid', rating: 4.4, status: 'available' },
+  { id: 'd85d1178-de66-4ed4-8349-39a98c5edc7d', name: 'Profit Predator v1.0', description: '5-engine adaptive EA: auto-scalps M1-M5, swing-trades M15-M30, day-trades H1 and above.', pairs: ['EURUSD','GBPUSD','XAUUSD'], timeframes: ['1m','15m','1H'], type: 'hybrid', rating: 4.8, status: 'available' },
+  { id: '8cd15b06-2e6c-4e40-bbe8-1c33e7471bbf', name: 'Pro Hybrid Trend Reversal', description: 'Hybrid trend-reversal system combining multiple confirmation engines.', pairs: ['EURUSD','GBPUSD'], timeframes: ['1H'], type: 'reversal', rating: 4.2, status: 'available' },
+  { id: '5792de3d-317f-4fb3-a6f0-b69f7b47be71', name: 'SAR VI v1.1', description: 'Parabolic SAR trend + Vortex indicator cross confirmation (777 Capital Markets build).', pairs: ['EURUSD','GBPUSD','USDJPY'], timeframes: ['15m','1H'], type: 'trend', rating: 4.4, status: 'available' },
+  { id: '2c83500d-ffa7-4a28-9f0e-deaa07fcd347', name: 'SSL Hybrid', description: 'Automated NNFX SSL Hybrid system, ported from Mihkel00 Pine Script.', pairs: ['EURUSD','GBPUSD','AUDUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.5, status: 'available' },
+  { id: 'bbaec02d-b5e9-45c0-a44a-e91433a120d9', name: 'SuperIchi Annamalai', description: 'SuperIchi candle-colour + cloud-filter trading engine (Annamalai build).', pairs: ['EURUSD','XAUUSD'], timeframes: ['1H'], type: 'trend', rating: 4.3, status: 'available' },
+  { id: '7e6cedd9-6e9f-4a33-b2b6-838c647edff2', name: 'SuperIchi', description: 'Trading engine built on the LuxAlgo SuperIchi indicator logic.', pairs: ['EURUSD','XAUUSD'], timeframes: ['1H','4H'], type: 'trend', rating: 4.3, status: 'available' },
+  { id: '8be4d74d-e25d-4a9e-b596-66c7d226cb3a', name: 'Walter Vetrivel', description: 'Day & positional trend EA: LinReg + Kalman + EMA200 bias + ADX + session time filter.', pairs: ['EURUSD','GBPUSD'], timeframes: ['1H','1D'], type: 'hybrid', rating: 4.6, status: 'available' },
 ];
 
 const EA_TYPE_COLORS: Record<string, string> = {
-  scalper: '#FF9800', trend: '#00C27A', grid: '#0091D5', hedge: '#AB47BC', martingale: '#FF5252',
+  scalper: '#FF9800', trend: '#00C27A', reversal: '#E040FB', hybrid: '#FFD700', grid: '#0091D5', hedge: '#AB47BC', martingale: '#FF5252',
 };
 
 // ─── Portal Dropdown ──────────────────────────────────────────────
@@ -292,13 +312,13 @@ export default function ChartToolbar({
       <PortalDropdown anchorRef={eaRef} open={openDropdown === 'ea'} onClose={close} width={360} maxHeight={500}>
         <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span className="text-[12px] font-semibold text-white">Expert Advisors</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5' }}>{MOCK_EAS.length} available</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5' }}>{EA_LIBRARY.length} available</span>
         </div>
         <div className="text-[9px] px-3 py-1.5" style={{ color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           Drag and drop an EA onto the chart to activate it
         </div>
         <div className="py-1">
-          {MOCK_EAS.map((ea) => (
+          {EA_LIBRARY.map((ea) => (
             <div key={ea.id} draggable
               onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify(ea)); e.dataTransfer.effectAllowed = 'copy'; }}
               className="px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors hover:bg-[rgba(255,255,255,0.04)]"

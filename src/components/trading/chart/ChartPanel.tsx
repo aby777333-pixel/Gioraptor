@@ -44,6 +44,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
+import { createClient } from '@/lib/supabase/client';
 import { formatPrice } from '@/lib/utils/format';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { TF_TO_RESOLUTION } from '@/lib/trading/ohlcv-builder';
@@ -313,6 +314,93 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
 
   // OHLC overlay
   const [ohlcValues, setOhlcValues] = useState<{ open: number; high: number; low: number; close: number; } | null>(null);
+
+  // ── Attached EAs (persisted to ea_instances) ─────
+  interface AttachedEA { instanceId: string | null; strategyId: string; name: string; symbol: string }
+  const [attachedEAs, setAttachedEAs] = useState<AttachedEA[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('ea_instances')
+          .select('id, strategy_id, name, parameters, status')
+          .eq('status', 'running');
+        if (active && data) {
+          setAttachedEAs(
+            data.map((r) => ({
+              instanceId: r.id as string,
+              strategyId: r.strategy_id as string,
+              name: (r.name as string) ?? 'EA',
+              symbol: ((r.parameters as Record<string, unknown> | null)?.symbol as string) ?? '',
+            }))
+          );
+        }
+      } catch { /* signed-out — chart still works, attachments stay local */ }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const showEAToast = useCallback((text: string) => {
+    const div = document.createElement('div');
+    div.className = 'fixed top-20 right-4 z-[9999] px-4 py-3 rounded-lg text-sm font-semibold';
+    div.style.cssText = 'background:#0091D5;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+    div.textContent = text;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 3000);
+  }, []);
+
+  const handleEADrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    let ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[] };
+    try { ea = JSON.parse(e.dataTransfer.getData('text/plain')); } catch { return; }
+    if (!ea?.name || !ea?.id) return;
+    if (attachedEAs.some((a) => a.strategyId === ea.id && a.symbol === activeSymbol)) {
+      showEAToast(`EA "${ea.name}" is already running on ${activeSymbol}`);
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('no session');
+      const { data: accts } = await supabase
+        .from('trading_accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1);
+      const accountId = accts?.[0]?.id as string | undefined;
+      if (!accountId) throw new Error('no account');
+      const { data: inst, error } = await supabase
+        .from('ea_instances')
+        .insert({
+          account_id: accountId,
+          strategy_id: ea.id,
+          name: ea.name,
+          parameters: { symbol: activeSymbol, pairs: ea.pairs ?? [], timeframes: ea.timeframes ?? [] },
+          status: 'running',
+          mode: 'live',
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      setAttachedEAs((prev) => [...prev, { instanceId: inst.id as string, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol }]);
+      showEAToast(`EA "${ea.name}" attached to ${activeSymbol} — running`);
+    } catch {
+      // Signed-out / no account: keep the attachment local so the UI still works.
+      setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol }]);
+      showEAToast(`EA "${ea.name}" attached to ${activeSymbol}`);
+    }
+  }, [attachedEAs, activeSymbol, showEAToast]);
+
+  const detachEA = useCallback(async (a: AttachedEA) => {
+    setAttachedEAs((prev) => prev.filter((x) => !(x.strategyId === a.strategyId && x.symbol === a.symbol)));
+    if (a.instanceId) {
+      try { await createClient().from('ea_instances').delete().eq('id', a.instanceId); } catch { /* noop */ }
+    }
+  }, []);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -907,20 +995,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
             className="relative"
             style={{ backgroundColor: '#060D16', zIndex: 1 }}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-            onDrop={(e) => {
-              e.preventDefault();
-              try {
-                const ea = JSON.parse(e.dataTransfer.getData('text/plain'));
-                if (ea?.name) {
-                  const div = document.createElement('div');
-                  div.className = 'fixed top-20 right-4 z-[9999] px-4 py-3 rounded-lg text-sm font-semibold';
-                  div.style.cssText = 'background:#0091D5;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
-                  div.textContent = `EA "${ea.name}" attached to chart`;
-                  document.body.appendChild(div);
-                  setTimeout(() => div.remove(), 3000);
-                }
-              } catch { /* noop */ }
-            }}
+            onDrop={handleEADrop}
           >
             <div ref={chartContainerRef} className="absolute inset-0" />
 
@@ -941,6 +1016,29 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
                 onUpdateParams={handleIndicatorParamsUpdate}
                 onClose={() => setShowIndicatorPanel(false)}
               />
+            )}
+
+            {/* Attached EA chips */}
+            {attachedEAs.filter((a) => a.symbol === activeSymbol).length > 0 && (
+              <div className="absolute top-2 left-2 z-20 flex max-w-[60%] flex-wrap gap-1.5">
+                {attachedEAs.filter((a) => a.symbol === activeSymbol).map((a) => (
+                  <div
+                    key={`${a.strategyId}-${a.symbol}`}
+                    className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono"
+                    style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(0,194,122,0.3)', color: '#00C27A' }}
+                  >
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: '#00C27A' }} />
+                    {a.name}
+                    <button
+                      onClick={() => detachEA(a)}
+                      className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                      title="Detach EA"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
 
             {currentTick && (
