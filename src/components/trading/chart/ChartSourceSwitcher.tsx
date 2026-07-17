@@ -221,6 +221,54 @@ export default function ChartSourceSwitcher({
     }
   }, [activeSymbol, lot, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
 
+  // Batch-close open positions (all / profitable / losing) via the real order
+  // service. Closing a BUY sells at bid; closing a SELL buys at ask.
+  const closeBatch = useCallback(async (mode: 'all' | 'profit' | 'loss') => {
+    const acct = accountRef.current;
+    if (!acct) { showEAToast('Select a trading account first'); return; }
+    setPlacing(true);
+    try {
+      const positions = (await orderService.getOpenPositions(acct)) as Array<{ id: string; symbol: string; direction: string; open_price: number; current_price: number | null; floating_pnl: number | null }>;
+      let targets = positions;
+      if (mode === 'profit') targets = positions.filter((p) => Number(p.floating_pnl) > 0);
+      else if (mode === 'loss') targets = positions.filter((p) => Number(p.floating_pnl) < 0);
+      if (!targets.length) { showEAToast('No matching positions to close'); return; }
+      if (confirmTrade && !window.confirm(`Close ${targets.length} position(s)${mode !== 'all' ? ` (${mode})` : ''}?`)) return;
+      let closed = 0;
+      for (const p of targets) {
+        const t = pricesRef.current[p.symbol];
+        const cp = p.direction === 'BUY' ? (t?.bid ?? p.current_price ?? p.open_price) : (t?.ask ?? p.current_price ?? p.open_price);
+        try { await orderService.closePosition(p.id, Number(cp)); closed++; } catch { /* may already be closed */ }
+      }
+      showEAToast(`✓ Closed ${closed}/${targets.length} position(s)`);
+      triggerRefresh();
+    } catch (err) {
+      showEAToast(`Close failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPlacing(false);
+    }
+  }, [confirmTrade, showEAToast, triggerRefresh]);
+
+  // Cancel all pending orders on the active account.
+  const cancelAllPending = useCallback(async () => {
+    const acct = accountRef.current;
+    if (!acct) { showEAToast('Select a trading account first'); return; }
+    setPlacing(true);
+    try {
+      const orders = (await orderService.getPendingOrders(acct)) as Array<{ id: string }>;
+      if (!orders.length) { showEAToast('No pending orders'); return; }
+      if (confirmTrade && !window.confirm(`Cancel ${orders.length} pending order(s)?`)) return;
+      let n = 0;
+      for (const o of orders) { try { await orderService.cancelOrder(o.id); n++; } catch { /* skip */ } }
+      showEAToast(`✓ Cancelled ${n} pending order(s)`);
+      triggerRefresh();
+    } catch (err) {
+      showEAToast(`Cancel failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPlacing(false);
+    }
+  }, [confirmTrade, showEAToast, triggerRefresh]);
+
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
   const attachEA = useCallback(async (ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[]; strategyKind?: string; custom?: boolean }) => {
@@ -411,6 +459,33 @@ export default function ChartSourceSwitcher({
                   <input type="checkbox" checked={confirmTrade} onChange={(e) => setConfirmTrade(e.target.checked)} className="accent-[#0091D5]" />
                   Confirm before execution
                 </label>
+
+                {/* Manage open positions / pending orders */}
+                <div className="mt-2 border-t border-white/[0.06] pt-2">
+                  <div className="mb-1.5 text-[9px] uppercase tracking-wide text-white/30">Manage positions</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => closeBatch('all')} disabled={placing}
+                      className="rounded-md py-1.5 text-[10px] font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      Close All
+                    </button>
+                    <button onClick={() => closeBatch('profit')} disabled={placing}
+                      className="rounded-md py-1.5 text-[10px] font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(0,194,122,0.12)', color: '#00C27A', border: '1px solid rgba(0,194,122,0.3)' }}>
+                      Close Profit
+                    </button>
+                    <button onClick={() => closeBatch('loss')} disabled={placing}
+                      className="rounded-md py-1.5 text-[10px] font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(193,18,31,0.12)', color: '#FF5252', border: '1px solid rgba(193,18,31,0.3)' }}>
+                      Close Loss
+                    </button>
+                    <button onClick={cancelAllPending} disabled={placing}
+                      className="rounded-md py-1.5 text-[10px] font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      Cancel Pending
+                    </button>
+                  </div>
+                </div>
               </div>
             );
           })()}
