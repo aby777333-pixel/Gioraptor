@@ -23,6 +23,7 @@ import { orderService } from '@/lib/trading/order-service';
 import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from './EAPropertiesModal';
 import StrategyTesterModal from './StrategyTesterModal';
 import AlertsMenu from './AlertsMenu';
+import WatchlistMenu from './WatchlistMenu';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -46,7 +47,7 @@ export default function ChartSourceSwitcher({
   onSourceChange?: (source: 'tradingview' | 'raptor') => void;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
-  const { activeSymbol, prices, activeAccountId, triggerRefresh } = useTradingStore();
+  const { activeSymbol, prices, activeAccountId, triggerRefresh, setActiveSymbol } = useTradingStore();
 
   // Merged EA library (built-in + uploaded custom) + upload flow for the TV menu.
   const { all: eaList, fileInputRef, handleFile, remove: removeCustom } = useEALibrary();
@@ -455,7 +456,7 @@ export default function ChartSourceSwitcher({
           }}
         >
           <span style={{ fontSize: 9 }}>{algoOn ? '🟢' : '🔴'}</span>
-          Algo {algoOn ? 'ON' : 'OFF'}
+          <span className="hidden lg:inline">Algo </span>{algoOn ? 'ON' : 'OFF'}
         </button>
 
         {/* QuickTrade one-click panel — works over both charts */}
@@ -470,7 +471,7 @@ export default function ChartSourceSwitcher({
               border: '1px solid rgba(41,171,226,0.35)',
             }}
           >
-            <Zap size={12} /> Trade <ChevronDown size={10} />
+            <Zap size={12} /> <span className="hidden xl:inline">Trade</span> <ChevronDown size={10} />
           </button>
           {quickOpen && (() => {
             const t = prices[activeSymbol];
@@ -557,6 +558,9 @@ export default function ChartSourceSwitcher({
             );
           })()}
         </div>
+
+        {/* Watchlist — switches the active symbol for both charts */}
+        <WatchlistMenu activeSymbol={activeSymbol} prices={prices} setActiveSymbol={setActiveSymbol} />
 
         {/* Price alerts — shared header, works over both charts */}
         <AlertsMenu activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />

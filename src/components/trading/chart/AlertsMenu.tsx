@@ -111,7 +111,7 @@ export default function AlertsMenu({
         className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
         style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
       >
-        <Bell size={12} /> Alerts{activeCount > 0 ? ` (${activeCount})` : ''} <ChevronDown size={10} />
+        <Bell size={12} /> <span className="hidden xl:inline">Alerts</span>{activeCount > 0 ? ` (${activeCount})` : ''} <ChevronDown size={10} />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 w-[280px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
