@@ -45,8 +45,14 @@ export interface RaptorCandle {
 
 const FINNHUB_KEY = process.env.FINNHUB_API_KEY || '';
 const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY || '';
+const EODHD_KEY = process.env.EODHD_API_KEY || '';
 const MARKETSTACK_KEY = process.env.MARKETSTACK_API_KEY || '';
+const NEWSDATA_KEY = process.env.NEWSDATA_API_KEY || '';
 const INDIAN_API = process.env.INDIAN_STOCK_API_URL || '';
+// Stored for completeness / health; bulk & enterprise gateways are not called
+// from the serverless feed (see feedHealth notes).
+const MASSIVE_KEY_ID = process.env.MASSIVE_ACCESS_KEY_ID || '';
+const APIMARKET_KEY = process.env.APIMARKET_KEY || '';
 
 // ── Symbol resolution ────────────────────────────────────────────
 // Map a canonical Raptor symbol to each provider's ticker + asset class.
@@ -57,6 +63,8 @@ interface Resolved {
   finnhub?: string;   // Finnhub ticker (US stocks / BINANCE:xxx crypto)
   twelve?: string;    // Twelve Data ticker (e.g. EUR/USD)
   binance?: string;   // Binance spot pair
+  eodhd?: string;     // EODHD code (e.g. AAPL.US / EURUSD.FOREX / BTC-USD.CC / NSEI.INDX)
+  marketstack?: string; // marketstack symbol (US equities)
 }
 
 const FOREX: Record<string, string> = {
@@ -90,17 +98,23 @@ const INDICES: Record<string, string> = {
   NIKKEI225: '^N225', UK100: '^FTSE', GER40: '^GDAXI', FRA40: '^FCHI', US30: '^DJI', NAS100: '^IXIC',
 };
 
+// EODHD index codes for Indian indices (equities need a paid India add-on, so
+// only the indices that resolve on the current plan are mapped).
+const INDIA_EODHD: Record<string, string> = {
+  NIFTY50: 'NSEI.INDX', SENSEX: 'BSESN.INDX', BANKNIFTY: 'NSEBANK.INDX',
+};
+
 export function resolveSymbol(raw: string): Resolved {
   const s = raw.toUpperCase().replace('/', '').replace('_', '');
-  if (FOREX[s]) return { asset: 'forex', currency: s.slice(3, 6), yahoo: FOREX[s], twelve: `${s.slice(0, 3)}/${s.slice(3, 6)}` };
-  if (CRYPTO[s]) return { asset: 'crypto', currency: 'USD', yahoo: CRYPTO[s], finnhub: `BINANCE:${s}`, binance: s };
-  if (US_STOCKS.includes(s)) return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, twelve: s };
-  if (INDIA[s]) return { asset: 'india', currency: 'INR', yahoo: INDIA[s].yahoo };
+  if (FOREX[s]) return { asset: 'forex', currency: s.slice(3, 6), yahoo: FOREX[s], twelve: `${s.slice(0, 3)}/${s.slice(3, 6)}`, eodhd: `${s}.FOREX` };
+  if (CRYPTO[s]) return { asset: 'crypto', currency: 'USD', yahoo: CRYPTO[s], finnhub: `BINANCE:${s}`, binance: s, eodhd: `${s.replace(/USDT$/, '')}-USD.CC` };
+  if (US_STOCKS.includes(s)) return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, twelve: s, eodhd: `${s}.US`, marketstack: s };
+  if (INDIA[s]) return { asset: 'india', currency: 'INR', yahoo: INDIA[s].yahoo, eodhd: INDIA_EODHD[s] };
   if (INDIA_MCX[s]) return { asset: 'commodity', currency: 'USD', yahoo: INDIA_MCX[s] };
   if (COMMODITIES[s]) return { asset: 'commodity', currency: 'USD', yahoo: COMMODITIES[s] };
   if (INDICES[s]) return { asset: 'index', currency: 'USD', yahoo: INDICES[s] };
-  // Unknown → try as a US equity ticker on Yahoo.
-  return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s };
+  // Unknown → try as a US equity ticker on Yahoo/EODHD.
+  return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, eodhd: `${s}.US` };
 }
 
 // ── Provider adapters (each returns a partial quote or null) ──────
@@ -160,15 +174,32 @@ async function yahooQuote(r: Resolved): Promise<PartialQuote> {
   return { price, prev_close: prev, source: 'yahoo' };
 }
 
+async function eodhdQuote(r: Resolved): Promise<PartialQuote> {
+  if (!EODHD_KEY || !r.eodhd) return null;
+  const d = await jget(`https://eodhd.com/api/real-time/${encodeURIComponent(r.eodhd)}?api_token=${EODHD_KEY}&fmt=json`);
+  if (!d || typeof d.close !== 'number' || d.close === 0) return null;
+  const prev = typeof d.previousClose === 'number' ? d.previousClose : d.close;
+  return { price: d.close, prev_close: prev, source: 'eodhd' };
+}
+
+async function marketstackQuote(r: Resolved): Promise<PartialQuote> {
+  if (!MARKETSTACK_KEY || !r.marketstack) return null;
+  const d = await jget(`https://api.marketstack.com/v1/eod/latest?access_key=${MARKETSTACK_KEY}&symbols=${r.marketstack}`);
+  const row = d?.data?.[0];
+  if (!row || typeof row.close !== 'number') return null;
+  return { price: row.close, prev_close: row.open ?? row.close, source: 'marketstack' };
+}
+
 // ── Public API ───────────────────────────────────────────────────
 export async function getQuote(rawSymbol: string): Promise<RaptorQuote | null> {
   const r = resolveSymbol(rawSymbol);
   // Provider preference by asset class, then universal fallbacks.
   const chain: (() => Promise<PartialQuote>)[] =
-    r.asset === 'crypto' ? [() => binanceQuote(r), () => finnhubQuote(r), () => yahooQuote(r)]
-    : r.asset === 'stock' ? [() => finnhubQuote(r), () => yahooQuote(r), () => twelveQuote(r)]
-    : r.asset === 'forex' ? [() => yahooQuote(r), () => twelveQuote(r)]
-    : [() => yahooQuote(r), () => twelveQuote(r)];
+    r.asset === 'crypto' ? [() => binanceQuote(r), () => eodhdQuote(r), () => finnhubQuote(r), () => yahooQuote(r)]
+    : r.asset === 'stock' ? [() => finnhubQuote(r), () => eodhdQuote(r), () => yahooQuote(r), () => twelveQuote(r), () => marketstackQuote(r)]
+    : r.asset === 'forex' ? [() => eodhdQuote(r), () => yahooQuote(r), () => twelveQuote(r)]
+    : r.asset === 'india' ? [() => eodhdQuote(r), () => yahooQuote(r)]
+    : [() => yahooQuote(r), () => eodhdQuote(r), () => twelveQuote(r)];
 
   let q: PartialQuote = null;
   for (const step of chain) {
@@ -234,15 +265,43 @@ export async function getCandles(rawSymbol: string, tf = '1h', bars = 200): Prom
   return out.slice(-bars);
 }
 
+export interface NewsItem {
+  title: string;
+  source: string;
+  url: string;
+  published: string;
+  summary?: string;
+}
+
+// Real financial news via newsdata.io (used by the News & Sentiment agent).
+export async function getNews(query = '', limit = 10): Promise<NewsItem[]> {
+  if (!NEWSDATA_KEY) return [];
+  const q = query ? `&q=${encodeURIComponent(query)}` : '&category=business';
+  const d = await jget(`https://newsdata.io/api/1/news?apikey=${NEWSDATA_KEY}&language=en${q}`);
+  const rows: any[] = d?.results || [];
+  return rows.slice(0, limit).map((a) => ({
+    title: a.title,
+    source: a.source_id || a.source_name || 'news',
+    url: a.link,
+    published: a.pubDate || '',
+    summary: a.description || undefined,
+  }));
+}
+
 export function feedHealth() {
   return {
     providers: [
-      { name: 'finnhub', configured: !!FINNHUB_KEY, scope: 'US equities + crypto' },
+      { name: 'finnhub', configured: !!FINNHUB_KEY, scope: 'US equities + crypto (real-time)' },
+      { name: 'eodhd', configured: !!EODHD_KEY, scope: 'US equities + forex + crypto + world indices' },
       { name: 'twelvedata', configured: !!TWELVEDATA_KEY, scope: 'forex + equities + indices' },
       { name: 'yahoo', configured: true, scope: 'universal backbone (no key)' },
       { name: 'binance', configured: true, scope: 'crypto spot + klines (no key)' },
       { name: 'marketstack', configured: !!MARKETSTACK_KEY, scope: 'EOD equities' },
+      { name: 'newsdata', configured: !!NEWSDATA_KEY, scope: 'financial news + sentiment' },
       { name: 'indian_stock_api', configured: !!INDIAN_API, scope: 'NSE/BSE (self-hosted)' },
+      { name: 'apimarket_yahoo', configured: !!APIMARKET_KEY, scope: 'Yahoo proxy (endpoint pending)' },
+      { name: 'massive_flatfiles', configured: !!MASSIVE_KEY_ID, scope: 'bulk historical flat files (S3, offline backfill)' },
+      { name: 'bloomberg', configured: false, scope: 'gateway required (BLPAPI / enterprise)' },
       { name: 'fxcm_forexconnect', configured: false, scope: 'gateway required (native SDK)' },
       { name: 'fxcm_fix', configured: false, scope: 'gateway required (FIX 4.4 socket)' },
     ],
