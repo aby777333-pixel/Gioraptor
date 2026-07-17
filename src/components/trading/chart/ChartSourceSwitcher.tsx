@@ -82,6 +82,17 @@ export default function ChartSourceSwitcher({
   const [confirmTrade, setConfirmTrade] = useState(true);
   const [placing, setPlacing] = useState(false);
   const quickRef = useRef<HTMLDivElement>(null);
+  // Per-EA enable/disable (independent of the global Algo switch). Keyed by
+  // `${strategyId}-${symbol}` — the same key the runtime + eaStats use. Missing = on.
+  const [eaEnabled, setEaEnabled] = useState<Record<string, boolean>>({});
+  const toggleEA = useCallback((a: AttachedEA) => {
+    const key = `${a.strategyId}-${a.symbol}`;
+    setEaEnabled((prev) => {
+      const next = !(prev[key] ?? true);
+      runtimeRef.current?.setInstanceEnabled(key, next);
+      return { ...prev, [key]: next };
+    });
+  }, []);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -606,15 +617,19 @@ export default function ChartSourceSwitcher({
             toolbar (the TradingView tab has its own controls row up top). */}
         {symbolEAs.length > 0 && (
           <div className="absolute bottom-2 z-30 flex max-w-[70%] flex-wrap gap-1.5" style={{ left: 56 }}>
-            {symbolEAs.map((a) => (
+            {symbolEAs.map((a) => {
+              const on = eaEnabled[`${a.strategyId}-${a.symbol}`] ?? true;
+              const accent = on ? '#00C27A' : 'rgba(255,255,255,0.35)';
+              return (
               <div
                 key={`${a.instanceId ?? a.strategyId}-${a.symbol}`}
                 className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono"
-                style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(0,194,122,0.3)', color: '#00C27A' }}
+                style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: `1px solid ${on ? 'rgba(0,194,122,0.3)' : 'rgba(255,255,255,0.15)'}`, color: accent }}
               >
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: '#00C27A' }} />
+                <span className={`h-1.5 w-1.5 rounded-full ${on ? 'animate-pulse' : ''}`} style={{ backgroundColor: accent }} />
                 {a.name}
                 {(() => {
+                  if (!on) return <span className="text-white/30">· paused</span>;
                   const s = eaStats[`${a.strategyId}-${a.symbol}`];
                   if (!s || s.trades === 0) return <span className="text-white/30">· scanning</span>;
                   return (
@@ -623,6 +638,15 @@ export default function ChartSourceSwitcher({
                     </span>
                   );
                 })()}
+                {/* Per-EA ON/OFF (independent of the global Algo switch) */}
+                <button
+                  onClick={() => toggleEA(a)}
+                  className="ml-0.5 rounded px-1 text-[8px] font-bold uppercase transition-colors"
+                  style={{ backgroundColor: on ? 'rgba(0,194,122,0.15)' : 'rgba(255,255,255,0.08)', color: accent, border: `1px solid ${on ? 'rgba(0,194,122,0.35)' : 'rgba(255,255,255,0.2)'}` }}
+                  title={on ? 'EA is ON — click to disable' : 'EA is OFF — click to enable'}
+                >
+                  {on ? 'ON' : 'OFF'}
+                </button>
                 <button
                   onClick={() => detachEA(a)}
                   className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
@@ -631,7 +655,8 @@ export default function ChartSourceSwitcher({
                   ×
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

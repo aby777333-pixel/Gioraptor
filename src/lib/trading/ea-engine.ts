@@ -269,6 +269,7 @@ interface InstanceState {
   direction: EARegime;
   trades: number;
   busy: boolean;
+  enabled: boolean;   // per-EA on/off, independent of the global Algo switch
 }
 
 export interface EARuntimeDeps {
@@ -314,12 +315,23 @@ export class EARuntime {
     const resolution = TF_TO_RES[tf] ?? '15';
     const inst: InstanceState = {
       key, strategyId, strategyKind, name, symbol, resolution,
-      lastBarTime: 0, positionId: null, direction: null, trades: 0, busy: false,
+      lastBarTime: 0, positionId: null, direction: null, trades: 0, busy: false, enabled: true,
     };
     this.instances.set(key, inst);
     // Enter immediately if the strategy already has an active regime — but only
-    // when Algo Trading is globally enabled.
-    if (this.globalEnabled) void this.evaluate(inst, true);
+    // when Algo Trading is globally enabled AND this EA is enabled.
+    if (this.globalEnabled && inst.enabled) void this.evaluate(inst, true);
+  }
+
+  isInstanceEnabled(key: string): boolean {
+    return this.instances.get(key)?.enabled ?? false;
+  }
+
+  setInstanceEnabled(key: string, on: boolean) {
+    const inst = this.instances.get(key);
+    if (!inst) return;
+    inst.enabled = on;
+    if (on && this.globalEnabled) void this.evaluate(inst, true);
   }
 
   detach(key: string) {
@@ -335,6 +347,7 @@ export class EARuntime {
     // Global Algo Trading OFF → pause all automated evaluation/orders.
     if (!this.globalEnabled) return;
     for (const inst of this.instances.values()) {
+      if (!inst.enabled) continue; // per-EA switch is OFF
       void this.evaluate(inst, false);
     }
   }
