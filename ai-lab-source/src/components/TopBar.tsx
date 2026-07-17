@@ -1,4 +1,5 @@
-import { Bell, Wifi, WifiOff, Power, ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, Wifi, WifiOff, Power, ArrowLeft, Loader2 } from 'lucide-react';
 import { useStore } from '../store';
 import type { TradingMode } from '../types';
 
@@ -8,13 +9,35 @@ const MODES: { key: TradingMode; label: string }[] = [
   { key: 'live', label: 'Live' },
 ];
 
+type FeedState = { status: 'checking' | 'live' | 'down'; count: number };
+
 export function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
-  const connected = useStore((s) => s.connected);
   const setKillModal = useStore((s) => s.setKillModal);
   const toasts = useStore((s) => s.toasts);
   const pushToast = useStore((s) => s.pushToast);
+
+  // Market-data feed health from the Raptor Market API. This is what "live"
+  // means for the lab — real quotes flow over REST. (The old WebSocket push is
+  // simulated client-side and not a data source.)
+  const [feed, setFeed] = useState<FeedState>({ status: 'checking', count: 0 });
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const r = await fetch('/api/market/health');
+        const d = r.ok ? await r.json() : null;
+        const up = (d?.providers || []).filter((p: { configured: boolean }) => p.configured).length;
+        if (alive) setFeed({ status: up > 0 ? 'live' : 'down', count: up });
+      } catch {
+        if (alive) setFeed({ status: 'down', count: 0 });
+      }
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
 
   return (
     <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-border bg-card/60 backdrop-blur-md z-30">
@@ -60,17 +83,27 @@ export function TopBar() {
           ))}
         </div>
 
-        {/* Connection status */}
+        {/* Market-data feed status */}
         <div
           className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${
-            connected
+            feed.status === 'live'
               ? 'text-success border-success/40 bg-success/10'
-              : 'text-danger border-danger/40 bg-danger/10'
+              : feed.status === 'checking'
+                ? 'text-subtext border-border bg-bg'
+                : 'text-warning border-warning/40 bg-warning/10'
           }`}
-          title={connected ? 'WebSocket connected' : 'Reconnecting…'}
+          title={
+            feed.status === 'live'
+              ? `Raptor Market API live — ${feed.count} data providers active (Finnhub, EODHD, Yahoo, Binance…). Real quotes over REST.`
+              : feed.status === 'checking'
+                ? 'Checking the market data feed…'
+                : 'Market data feed unavailable — falling back to simulated ticks.'
+          }
         >
-          {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-          {connected ? 'Live' : 'Offline'}
+          {feed.status === 'live' ? <Wifi size={14} /> : feed.status === 'checking' ? <Loader2 size={14} className="animate-spin" /> : <WifiOff size={14} />}
+          <span className="hidden sm:inline">
+            {feed.status === 'live' ? 'Live Data' : feed.status === 'checking' ? 'Checking…' : 'Feed down'}
+          </span>
         </div>
 
         {/* Notifications */}
