@@ -22,6 +22,7 @@ import { EARuntime, type EAStats, type EAInfo, type StrategyKind } from '@/lib/t
 import { orderService } from '@/lib/trading/order-service';
 import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from './EAPropertiesModal';
 import StrategyTesterModal from './StrategyTesterModal';
+import AlertsMenu from './AlertsMenu';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -556,6 +557,9 @@ export default function ChartSourceSwitcher({
             );
           })()}
         </div>
+
+        {/* Price alerts — shared header, works over both charts */}
+        <AlertsMenu activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
 
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>
