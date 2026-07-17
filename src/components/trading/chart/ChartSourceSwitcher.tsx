@@ -28,6 +28,7 @@ import TimeframeBar from './TimeframeBar';
 import TemplatesMenu from './TemplatesMenu';
 import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
+import RaptorScriptMenu from './RaptorScriptMenu';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -577,6 +578,9 @@ export default function ChartSourceSwitcher({
 
         {/* DOM — click-to-trade price ladder (real order service, both charts) */}
         <DomLadder activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
+
+        {/* Raptor Script — custom indicator editor; plots on the RAPTOR chart */}
+        <RaptorScriptMenu onEnsureRaptor={() => setSource('raptor')} />
 
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>

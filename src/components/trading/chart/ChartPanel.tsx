@@ -52,6 +52,7 @@ import {
 import { useTradingStore } from '@/stores/trading';
 import { formatPrice } from '@/lib/utils/format';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
+import type { OHLCVBar } from '@/types/trading';
 import { TF_TO_RESOLUTION } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 import IndicatorPanel, {
@@ -435,6 +436,15 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const lastBarTimeRef = useRef<number>(0);
   const lastCrosshairPriceRef = useRef<number | null>(null);
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<'Line'> | ISeriesApi<'Histogram'>>>(new Map());
+  // Raptor Script (§5): user-authored script + its plotted line series.
+  const scriptSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  // Seed from localStorage so a saved script survives reloads AND is applied even
+  // when the RAPTOR chart mounts after the editor's apply-event fired (tab switch).
+  const userScriptRef = useRef<string | null>(
+    typeof window !== 'undefined'
+      ? (() => { try { return localStorage.getItem('raptor_user_script'); } catch { return null; } })()
+      : null,
+  );
 
   // ─── Indicator handlers ──────────────────────────
 
@@ -895,6 +905,61 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     }
   }, [activeIndicators, indicatorParams, cleanupIndicatorSeries, getOrCreateLineSeries, getOrCreateHistSeries]);
 
+  // ─── Raptor Script engine (§5) ───────────────────
+  // Evaluates the user's script against the real bar series and plots the lines
+  // it emits via plot(). Re-runs on every data load so plots stay live. The
+  // script is sandboxed to the provided series + indicator helpers (no globals).
+  const clearScriptSeries = useCallback(() => {
+    const chart = chartRef.current;
+    for (const [, s] of scriptSeriesRef.current) { if (chart) { try { chart.removeSeries(s); } catch { /* noop */ } } }
+    scriptSeriesRef.current.clear();
+  }, []);
+
+  const runUserScript = useCallback((bars: OHLCVBar[]) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    clearScriptSeries();
+    const code = userScriptRef.current;
+    if (!code || bars.length === 0) return;
+    const close = bars.map((b) => b.close);
+    const high = bars.map((b) => b.high);
+    const low = bars.map((b) => b.low);
+    const openArr = bars.map((b) => b.open);
+    const volume = bars.map((b) => b.volume);
+    const t = bars.map((b) => b.time as Time);
+    const n = bars.length;
+    const COLORS = ['#0091D5', '#F5A623', '#7ED321', '#BD10E0', '#50E3C2', '#FF5252'];
+    const plots: { series: (number | null)[]; color: string }[] = [];
+    const plot = (series: (number | null)[], opts?: { color?: string }) => {
+      if (Array.isArray(series)) plots.push({ series, color: opts?.color || COLORS[plots.length % COLORS.length] });
+    };
+    const highest = (arr: number[], p: number) => arr.map((_, i) => (i < p - 1 ? null : Math.max(...arr.slice(i - p + 1, i + 1))));
+    const lowest = (arr: number[], p: number) => arr.map((_, i) => (i < p - 1 ? null : Math.min(...arr.slice(i - p + 1, i + 1))));
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(
+        'close', 'high', 'low', 'open', 'volume', 'plot',
+        'sma', 'ema', 'rsi', 'macd', 'atr', 'bb', 'kama', 'kalman', 'momentum', 'highest', 'lowest', 'Math',
+        `"use strict";\n${code}`,
+      );
+      fn(close, high, low, openArr, volume, plot, sma, ema, rsi, macd, atr, bollingerBands, kama, kalmanFilter, momentum, highest, lowest, Math);
+      plots.forEach((p, pi) => {
+        const s = chart.addSeries(LineSeries, { color: p.color, lineWidth: 2, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false });
+        const data: LineData[] = [];
+        for (let i = 0; i < n && i < p.series.length; i++) {
+          const v = p.series[i];
+          if (v != null && isFinite(v)) data.push({ time: t[i], value: v });
+        }
+        s.setData(data);
+        scriptSeriesRef.current.set(`script_${pi}`, s);
+      });
+      window.dispatchEvent(new CustomEvent('raptor-script-result', { detail: { ok: true, plots: plots.length } }));
+    } catch (e) {
+      clearScriptSeries();
+      window.dispatchEvent(new CustomEvent('raptor-script-result', { detail: { ok: false, error: e instanceof Error ? e.message : String(e) } }));
+    }
+  }, [clearScriptSeries]);
+
   // ─── Load chart data ─────────────────────────────
 
   const loadChartData = useCallback(() => {
@@ -935,11 +1000,28 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const lows = allBars.map((b) => b.low);
     const volumes = allBars.map((b) => b.volume);
     applyIndicators(times, closes, highs, lows, volumes);
+    runUserScript(allBars);
 
     chartRef.current?.timeScale().scrollToRealTime();
-  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, chartType, replayActive, replayIndex]);
+  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, runUserScript, chartType, replayActive, replayIndex]);
 
   useEffect(() => { loadChartData(); }, [loadChartData]);
+
+  // Apply / clear a script pushed from the shared Script editor.
+  useEffect(() => {
+    const onApply = (e: Event) => {
+      const d = (e as CustomEvent<{ code?: string }>).detail;
+      userScriptRef.current = d?.code ?? null;
+      loadChartData();
+    };
+    const onClear = () => { userScriptRef.current = null; clearScriptSeries(); };
+    window.addEventListener('raptor-apply-script', onApply);
+    window.addEventListener('raptor-clear-script', onClear);
+    return () => {
+      window.removeEventListener('raptor-apply-script', onApply);
+      window.removeEventListener('raptor-clear-script', onClear);
+    };
+  }, [loadChartData, clearScriptSeries]);
 
   // Live tick updates
   useEffect(() => {
