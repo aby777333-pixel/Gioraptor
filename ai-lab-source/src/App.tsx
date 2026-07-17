@@ -10,10 +10,14 @@ import Pipeline from './pages/Pipeline';
 import Builder from './pages/Builder';
 import Strategies from './pages/Strategies';
 import Portfolio from './pages/Portfolio';
+import Analytics from './pages/Analytics';
 import Research from './pages/Research';
 import Positions from './pages/Positions';
 import Markets from './pages/Markets';
 import Connections from './pages/Connections';
+import Risk from './pages/Risk';
+import Alerts from './pages/Alerts';
+import Roles from './pages/Roles';
 import Audit from './pages/Audit';
 import Settings from './pages/Settings';
 
@@ -39,10 +43,14 @@ export default function App() {
               <Route path="/builder" element={<Builder />} />
               <Route path="/strategies" element={<Strategies />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/research" element={<Research />} />
               <Route path="/positions" element={<Positions />} />
               <Route path="/markets" element={<Markets />} />
               <Route path="/connections" element={<Connections />} />
+              <Route path="/risk" element={<Risk />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/roles" element={<Roles />} />
               <Route path="/audit" element={<Audit />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>

@@ -1,11 +1,21 @@
-import { useState } from 'react';
-import { KeyRound, ShieldCheck, Plug, Check, Globe, Boxes, Building2, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { KeyRound, ShieldCheck, Plug, Check, Globe, Boxes, Building2, Lock, Network, Radio } from 'lucide-react';
 import { Card, SectionTitle, Badge, StatusDot } from '../components/ui';
 import { useStore } from '../store';
 import { api } from '../api/client';
 import {
   WORLD_EXCHANGES, CRYPTO_VENUES, BROKERS_PLATFORMS, ASSET_CLASSES, INDIA_SEGMENTS,
 } from '../data/coverage';
+
+// Raptor ecosystem surfaces the lab integrates with / can deploy to.
+const RAPTOR_MODULES = [
+  'Trader Terminal', 'Mobile App', 'Web Platform', 'Dealer Module', 'Risk Management',
+  'Copy Trading', 'CRM', 'Client Portal', 'Admin Portal', 'Tech Hub',
+  'Liquidity & Bridge', 'A/B/Hybrid Book', 'Spreads & Markups', 'Wallets', 'Compliance',
+];
+const DEPLOY_TARGETS = [
+  'Demo accounts', 'Paper accounts', 'Approved live accounts', 'Copy-trading groups', 'Managed / PAMM accounts',
+];
 
 type ConnKind = 'broker' | 'exchange' | 'data';
 
@@ -25,6 +35,12 @@ export default function Connections() {
           and never appear in logs, exports or agent messages. <span className="text-warning">Demo — no real
           connections are made.</span>
         </p>
+      </div>
+
+      {/* Raptor ecosystem + live data-feed health */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RaptorEcosystem />
+        <DataFeeds />
       </div>
 
       {/* Secure connection vault */}
@@ -95,6 +111,70 @@ export default function Connections() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function RaptorEcosystem() {
+  return (
+    <Card>
+      <SectionTitle right={<Network size={14} className="text-primary" />}>Raptor Ecosystem</SectionTitle>
+      <p className="text-[11px] text-subtext mb-2">
+        The lab maps into the GIO Raptor stack. Tech Hub changes (symbols, spreads, markups, execution
+        rules, permissions, risk limits) flow through to the lab.
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {RAPTOR_MODULES.map((m) => (
+          <span key={m} className="badge border border-primary/30 text-primary bg-primary/5">{m}</span>
+        ))}
+      </div>
+      <div className="text-[10px] font-bold uppercase tracking-wide text-subtext mb-1.5">Deployment targets</div>
+      <div className="flex flex-wrap gap-1.5">
+        {DEPLOY_TARGETS.map((t) => (
+          <span key={t} className="badge border border-border text-text/80 bg-bg">{t}</span>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <Badge status="PAPER"><StatusDot status="running" /> Tech Hub sync: subscribed</Badge>
+      </div>
+    </Card>
+  );
+}
+
+interface Provider { name: string; configured: boolean; scope: string }
+
+function DataFeeds() {
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/market/health')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d?.providers) { setProviders(d.providers); setLoaded(true); } })
+      .catch(() => { /* health unavailable — leave empty */ });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <Card>
+      <SectionTitle right={<Radio size={14} className="text-primary" />}>Data-Feed Status</SectionTitle>
+      {!loaded ? (
+        <p className="text-xs text-subtext">Querying the Raptor Market API…</p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {providers.map((p) => (
+            <div key={p.name} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <StatusDot status={p.configured ? 'complete' : 'idle'} />
+                <span className="font-mono">{p.name}</span>
+              </div>
+              <span className="text-subtext truncate ml-2 text-right">{p.scope}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-subtext mt-2">Live from <span className="font-mono">/api/market/health</span> — the unified Raptor Market API.</p>
+    </Card>
   );
 }
 
