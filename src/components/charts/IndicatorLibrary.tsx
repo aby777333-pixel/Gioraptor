@@ -15,6 +15,8 @@ const CATEGORY_ICONS: Record<IndicatorCategory, React.ReactNode> = {
   volatility: <BarChart3 className="h-3.5 w-3.5" />,
   volume: <Layers className="h-3.5 w-3.5" />,
   channel: <BarChart3 className="h-3.5 w-3.5" />,
+  market_structure: <Layers className="h-3.5 w-3.5" />,
+  statistical: <Sparkles className="h-3.5 w-3.5" />,
   raptor_exclusive: <Zap className="h-3.5 w-3.5" />,
   nexus_ai: <Brain className="h-3.5 w-3.5" />,
 };

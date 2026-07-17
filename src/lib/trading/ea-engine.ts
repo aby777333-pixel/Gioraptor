@@ -283,8 +283,19 @@ const EA_LOT = 0.01;
 
 export class EARuntime {
   private instances = new Map<string, InstanceState>();
+  // Global Algo Trading switch. When OFF, no EA evaluation or automated orders
+  // occur (OnTick pauses); manual trading via the order ticket is unaffected.
+  private globalEnabled = true;
 
   constructor(private deps: EARuntimeDeps) {}
+
+  isGlobalEnabled(): boolean {
+    return this.globalEnabled;
+  }
+
+  setGlobalEnabled(on: boolean) {
+    this.globalEnabled = on;
+  }
 
   has(key: string): boolean {
     return this.instances.has(key);
@@ -306,8 +317,9 @@ export class EARuntime {
       lastBarTime: 0, positionId: null, direction: null, trades: 0, busy: false,
     };
     this.instances.set(key, inst);
-    // Enter immediately if the strategy already has an active regime.
-    void this.evaluate(inst, true);
+    // Enter immediately if the strategy already has an active regime — but only
+    // when Algo Trading is globally enabled.
+    if (this.globalEnabled) void this.evaluate(inst, true);
   }
 
   detach(key: string) {
@@ -320,6 +332,8 @@ export class EARuntime {
 
   /** Call on every price tick; evaluates instances whose bar closed. */
   onTick() {
+    // Global Algo Trading OFF → pause all automated evaluation/orders.
+    if (!this.globalEnabled) return;
     for (const inst of this.instances.values()) {
       void this.evaluate(inst, false);
     }

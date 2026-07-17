@@ -69,6 +69,9 @@ export default function ChartSourceSwitcher({
   const [eaMenuOpen, setEaMenuOpen] = useState(false);
   const [eaStats, setEaStats] = useState<Record<string, EAStats>>({});
   const eaMenuRef = useRef<HTMLDivElement>(null);
+  // Global Algo Trading switch (MT5-style). When OFF, all EAs pause — no
+  // automated evaluation or orders — while manual trading stays available.
+  const [algoOn, setAlgoOn] = useState(true);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -275,8 +278,27 @@ export default function ChartSourceSwitcher({
           </button>
         ))}
 
+        {/* Global Algo Trading switch — pauses/resumes all EAs on this chart */}
+        <button
+          onClick={() => {
+            const next = !algoOn;
+            runtimeRef.current?.setGlobalEnabled(next);
+            setAlgoOn(next);
+          }}
+          title={algoOn ? 'Algo Trading is ON — EAs run automatically. Click to pause.' : 'Algo Trading is OFF — EAs paused. Click to resume.'}
+          className="ml-auto flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-colors"
+          style={{
+            backgroundColor: algoOn ? 'rgba(0,194,122,0.15)' : 'rgba(255,82,82,0.15)',
+            color: algoOn ? '#00C27A' : '#FF5252',
+            border: `1px solid ${algoOn ? 'rgba(0,194,122,0.4)' : 'rgba(255,82,82,0.4)'}`,
+          }}
+        >
+          <span style={{ fontSize: 9 }}>{algoOn ? '🟢' : '🔴'}</span>
+          Algo {algoOn ? 'ON' : 'OFF'}
+        </button>
+
         {source === 'tradingview' && (
-          <div className="relative ml-auto" ref={eaMenuRef}>
+          <div className="relative ml-1" ref={eaMenuRef}>
             <button
               onClick={() => setEaMenuOpen(!eaMenuOpen)}
               className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"

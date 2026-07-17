@@ -74,12 +74,10 @@ export default function TradingViewPanel() {
   return (
     <div className="relative h-full w-full" style={{ backgroundColor: '#060D16' }}>
       <div ref={hostRef} className="absolute inset-0" />
-      <div
-        className="absolute top-1 left-2 z-10 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-        style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A', border: '1px solid rgba(0,194,122,0.3)' }}
-      >
-        TradingView Live
-      </div>
+      {/* The "Live Data" state is shown by the source tab ("TradingView (Live
+          Data)"). We no longer overlay a badge here — it previously sat at
+          top-left and covered the TradingView widget's own timeframe buttons
+          (1m / 30m / 1h), causing the reported overlap. */}
     </div>
   );
 }

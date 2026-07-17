@@ -47,7 +47,8 @@ export interface ChartLayoutConfig {
 
 export type IndicatorCategory =
   | 'trend' | 'oscillator' | 'volatility' | 'volume'
-  | 'channel' | 'raptor_exclusive' | 'nexus_ai';
+  | 'channel' | 'market_structure' | 'statistical'
+  | 'raptor_exclusive' | 'nexus_ai';
 
 export interface IndicatorDefinition {
   id: string;
@@ -151,10 +152,12 @@ export const INDICATOR_REGISTRY: { category: IndicatorCategory; label: string; c
       { name: 'Keltner Channels', shortName: 'KC' },
       { name: 'Donchian Channels', shortName: 'DC' },
       { name: 'Linear Regression Channel', shortName: 'LRC' },
+      { name: 'Linear Regression', shortName: 'LREG' },
+      { name: 'Price Channels', shortName: 'PC' },
     ],
   },
   {
-    category: 'oscillator', label: 'Oscillators', color: '#8b5cf6',
+    category: 'oscillator', label: 'Momentum & Oscillators', color: '#8b5cf6',
     indicators: [
       { name: 'RSI (Wilder)', shortName: 'RSI' },
       { name: 'Stochastic', shortName: 'Stoch' },
@@ -172,6 +175,7 @@ export const INDICATOR_REGISTRY: { category: IndicatorCategory; label: string; c
       { name: 'PPO', shortName: 'PPO' },
       { name: 'DPO', shortName: 'DPO' },
       { name: 'Connors RSI', shortName: 'CRSI' },
+      { name: 'Fisher Transform', shortName: 'Fisher' },
     ],
   },
   {
@@ -185,6 +189,10 @@ export const INDICATOR_REGISTRY: { category: IndicatorCategory; label: string; c
       { name: 'Chaikin Volatility', shortName: 'CV' },
       { name: 'Relative Volatility', shortName: 'RVI' },
       { name: 'Standard Deviation', shortName: 'StdDev' },
+      { name: 'Bollinger Band Width', shortName: 'BBW' },
+      { name: 'Keltner Channels', shortName: 'KELT' },
+      { name: 'Donchian Width', shortName: 'DCW' },
+      { name: 'Volatility Stop', shortName: 'VStop' },
     ],
   },
   {
@@ -200,6 +208,57 @@ export const INDICATOR_REGISTRY: { category: IndicatorCategory; label: string; c
       { name: 'Force Index', shortName: 'FI' },
       { name: 'Volume Oscillator', shortName: 'VO' },
       { name: 'VWAP Bands', shortName: 'VWAPB' },
+      { name: 'Volume', shortName: 'VOL' },
+      { name: 'Volume Moving Average', shortName: 'VMA' },
+      { name: 'Session VWAP', shortName: 'sVWAP' },
+      { name: 'Fixed Range Volume Profile', shortName: 'FRVP' },
+      { name: 'Visible Range Volume Profile', shortName: 'VRVP' },
+      { name: 'Session Volume Profile', shortName: 'SVP' },
+      { name: 'Buy & Sell Volume', shortName: 'BSV' },
+      { name: 'Delta Volume', shortName: 'DVOL' },
+      { name: 'Cumulative Delta', shortName: 'CVD' },
+    ],
+  },
+  {
+    category: 'market_structure', label: 'Market Structure', color: '#22d3ee',
+    indicators: [
+      { name: 'Pivot Points', shortName: 'PIVOT' },
+      { name: 'Fibonacci Pivots', shortName: 'FPIVOT' },
+      { name: 'Swing High / Low', shortName: 'SWING' },
+      { name: 'Zig Zag', shortName: 'ZIGZAG' },
+      { name: 'Fractals', shortName: 'FRACTAL' },
+      { name: 'Support & Resistance', shortName: 'SR' },
+      { name: 'Break of Structure', shortName: 'BOS' },
+      { name: 'Change of Character', shortName: 'CHOCH' },
+      { name: 'Fair Value Gap', shortName: 'FVG' },
+      { name: 'Order Blocks', shortName: 'OB' },
+      { name: 'Liquidity Zones', shortName: 'LIQZ' },
+      { name: 'Supply & Demand', shortName: 'SND' },
+      { name: 'Premium / Discount Zones', shortName: 'PDZ' },
+      { name: 'Session High / Low', shortName: 'SESHL' },
+      { name: 'Previous Day High / Low', shortName: 'PDHL' },
+      { name: 'Previous Week High / Low', shortName: 'PWHL' },
+      { name: 'Previous Month High / Low', shortName: 'PMHL' },
+    ],
+  },
+  {
+    category: 'statistical', label: 'Statistical & Quant', color: '#a78bfa',
+    indicators: [
+      { name: 'Correlation Coefficient', shortName: 'CORR' },
+      { name: 'Beta', shortName: 'BETA' },
+      { name: 'Z-Score', shortName: 'ZSCORE' },
+      { name: 'Standard Deviation Bands', shortName: 'SDB' },
+      { name: 'Linear Regression Channel (Stat)', shortName: 'LREGC' },
+      { name: 'Polynomial Regression', shortName: 'POLYREG' },
+      { name: 'Cointegration', shortName: 'COINT' },
+      { name: 'Spread Analysis', shortName: 'SPREAD' },
+      { name: 'Pair Trading Indicator', shortName: 'PAIR' },
+      { name: 'Monte Carlo Bands', shortName: 'MCB' },
+      { name: 'Kalman Filter', shortName: 'KALMAN' },
+      { name: 'Hurst Exponent', shortName: 'HURST' },
+      { name: 'Entropy', shortName: 'ENTROPY' },
+      { name: 'Sharpe Ratio', shortName: 'SHARPE' },
+      { name: 'Sortino Ratio', shortName: 'SORTINO' },
     ],
   },
   {
