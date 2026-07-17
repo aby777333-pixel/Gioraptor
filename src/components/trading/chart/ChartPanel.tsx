@@ -42,6 +42,12 @@ import {
   EyeOff,
   Trash2,
   TrendingUp,
+  Play,
+  Pause,
+  StepForward,
+  StepBack,
+  Rewind,
+  X,
 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { formatPrice } from '@/lib/utils/format';
@@ -373,6 +379,50 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
 
   // OHLC overlay
   const [ohlcValues, setOhlcValues] = useState<{ open: number; high: number; low: number; close: number; } | null>(null);
+
+  // ─── Bar Replay (§12) ────────────────────────────
+  // Replays loaded history bar-by-bar on the RAPTOR chart. While active, live
+  // ticks are frozen and loadChartData renders only bars[0..replayIndex].
+  const [replayActive, setReplayActive] = useState(false);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [replaySpeed, setReplaySpeed] = useState(1);
+  const replayTotalRef = useRef(0);
+
+  const enterReplay = useCallback(() => {
+    if (!ohlcvBuilder) return;
+    const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution; if (!resolution) return;
+    const all = ohlcvBuilder.getAllBars(activeSymbol, resolution);
+    if (all.length < 20) return; // not enough history to replay
+    replayTotalRef.current = all.length;
+    setReplayIndex(Math.max(10, Math.floor(all.length * 0.6)));
+    setReplayPlaying(false);
+    setReplayActive(true);
+  }, [ohlcvBuilder, selectedTf, activeSymbol]);
+
+  const exitReplay = useCallback(() => {
+    setReplayPlaying(false);
+    setReplayActive(false);
+  }, []);
+
+  const replayStep = useCallback((dir: 1 | -1) => {
+    setReplayIndex((i) => Math.min(replayTotalRef.current, Math.max(10, i + dir)));
+  }, []);
+
+  // Advance the replay while playing, at speed-scaled cadence.
+  useEffect(() => {
+    if (!replayActive || !replayPlaying) return;
+    const id = setInterval(() => {
+      setReplayIndex((i) => {
+        if (i >= replayTotalRef.current) { setReplayPlaying(false); return i; }
+        return i + 1;
+      });
+    }, Math.max(60, 700 / replaySpeed));
+    return () => clearInterval(id);
+  }, [replayActive, replayPlaying, replaySpeed]);
+
+  // Leaving replay (or switching symbol/timeframe) resets to live.
+  useEffect(() => { if (replayActive) exitReplay(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeSymbol, selectedTf]);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -851,7 +901,10 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !volumeSeriesRef.current) return;
     const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution;
     if (!resolution) return;
-    const allBars = ohlcvBuilder.getAllBars(activeSymbol, resolution);
+    const fetchedBars = ohlcvBuilder.getAllBars(activeSymbol, resolution);
+    if (fetchedBars.length === 0) return;
+    // Bar Replay (§12): render only up to the replay cursor; else the full history.
+    const allBars = replayActive ? fetchedBars.slice(0, Math.min(replayIndex, fetchedBars.length)) : fetchedBars;
     if (allBars.length === 0) return;
 
     const candleData: CandlestickData[] = chartType === 'heikinashi'
@@ -884,12 +937,13 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     applyIndicators(times, closes, highs, lows, volumes);
 
     chartRef.current?.timeScale().scrollToRealTime();
-  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, chartType]);
+  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, chartType, replayActive, replayIndex]);
 
   useEffect(() => { loadChartData(); }, [loadChartData]);
 
   // Live tick updates
   useEffect(() => {
+    if (replayActive) return; // frozen while replaying history
     if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !volumeSeriesRef.current) return;
     const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution; if (!resolution) return;
     const tick = prices[activeSymbol]; if (!tick) return;
@@ -910,7 +964,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     }
 
     if (priceLineRef.current) priceLineRef.current.applyOptions({ price: tick.mid });
-  }, [prices, activeSymbol, selectedTf, ohlcvBuilder, loadChartData, chartType]);
+  }, [prices, activeSymbol, selectedTf, ohlcvBuilder, loadChartData, chartType, replayActive]);
 
   // ─── Display values ──────────────────────────────
 
@@ -1040,6 +1094,58 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
                   <BarChart3 size={48} className="mx-auto mb-3 animate-pulse" />
                   <div className="text-sm font-medium">Initializing chart...</div>
                 </div>
+              </div>
+            )}
+
+            {/* Bar Replay (§12) — toggle pill + transport controls */}
+            {ohlcvBuilder && !replayActive && (
+              <button
+                onClick={enterReplay}
+                title="Bar Replay — replay history bar by bar"
+                className="absolute bottom-2 right-2 z-20 flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:brightness-125"
+                style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
+              >
+                <Rewind size={12} /> Replay
+              </button>
+            )}
+            {replayActive && (
+              <div
+                className="absolute bottom-2 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg px-3 py-2 shadow-2xl"
+                style={{ backgroundColor: 'rgba(10,15,26,0.96)', border: '1px solid rgba(41,171,226,0.35)' }}
+              >
+                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#0091D5' }}>Replay</span>
+                <button onClick={() => replayStep(-1)} title="Step back" className="text-white/70 hover:text-white"><StepBack size={14} /></button>
+                <button
+                  onClick={() => setReplayPlaying((p) => !p)}
+                  title={replayPlaying ? 'Pause' : 'Play'}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-black"
+                  style={{ backgroundColor: '#0091D5' }}
+                >
+                  {replayPlaying ? <Pause size={13} /> : <Play size={13} />}
+                </button>
+                <button onClick={() => replayStep(1)} title="Step forward" className="text-white/70 hover:text-white"><StepForward size={14} /></button>
+                <input
+                  type="range"
+                  min={10}
+                  max={replayTotalRef.current || 100}
+                  value={replayIndex}
+                  onChange={(e) => { setReplayPlaying(false); setReplayIndex(parseInt(e.target.value, 10)); }}
+                  className="w-40 accent-[#0091D5]"
+                />
+                <span className="font-mono text-[10px] text-white/50">{replayIndex}/{replayTotalRef.current}</span>
+                <div className="flex items-center gap-0.5">
+                  {[0.5, 1, 2, 5].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setReplaySpeed(s)}
+                      className="rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors"
+                      style={{ backgroundColor: replaySpeed === s ? 'rgba(41,171,226,0.2)' : 'transparent', color: replaySpeed === s ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+                <button onClick={exitReplay} title="Exit replay" className="ml-1 text-white/50 hover:text-red-400"><X size={14} /></button>
               </div>
             )}
           </div>
