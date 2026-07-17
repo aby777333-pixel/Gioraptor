@@ -26,6 +26,7 @@ import AlertsMenu from './AlertsMenu';
 import WatchlistMenu from './WatchlistMenu';
 import TimeframeBar from './TimeframeBar';
 import TemplatesMenu from './TemplatesMenu';
+import MarketsMenu from './MarketsMenu';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -569,6 +570,9 @@ export default function ChartSourceSwitcher({
 
         {/* Price alerts — shared header, works over both charts */}
         <AlertsMenu activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
+
+        {/* Markets — economic calendar, news & screener (real TradingView data) */}
+        <MarketsMenu />
 
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>
