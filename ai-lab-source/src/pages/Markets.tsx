@@ -33,7 +33,10 @@ export default function Markets() {
     <div className="flex flex-col gap-4">
       <div>
         <h2 className="text-xl font-bold">Markets</h2>
-        <p className="text-sm text-subtext">40 instruments across 8 asset classes with live simulated ticks.</p>
+        <p className="text-sm text-subtext">
+          Live market data via the Raptor Market API (Finnhub · Twelve Data · Yahoo · Binance).
+          Falls back to simulated ticks if the feed is unavailable. Trade execution stays simulated.
+        </p>
       </div>
 
       <div className="flex gap-1 flex-wrap">
