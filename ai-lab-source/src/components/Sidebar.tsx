@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Search,
   Workflow,
   Blocks,
   Lightbulb,
@@ -19,6 +20,7 @@ import {
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/explore', label: 'Explore', icon: Search },
   { to: '/pipeline', label: 'Pipeline', icon: Workflow },
   { to: '/builder', label: 'Builder', icon: Blocks },
   { to: '/strategies', label: 'Strategies', icon: Lightbulb },

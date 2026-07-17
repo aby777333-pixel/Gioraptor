@@ -6,6 +6,7 @@ import { KillSwitchModal } from './components/KillSwitchModal';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import Dashboard from './pages/Dashboard';
+import Explore from './pages/Explore';
 import Pipeline from './pages/Pipeline';
 import Builder from './pages/Builder';
 import Strategies from './pages/Strategies';
@@ -39,6 +40,7 @@ export default function App() {
           <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/explore" element={<Explore />} />
               <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/builder" element={<Builder />} />
               <Route path="/strategies" element={<Strategies />} />

@@ -118,7 +118,27 @@ export function resolveSymbol(raw: string): Resolved {
   if (INDIA_MCX[s]) return { asset: 'commodity', currency: 'USD', yahoo: INDIA_MCX[s] };
   if (COMMODITIES[s]) return { asset: 'commodity', currency: 'USD', yahoo: COMMODITIES[s] };
   if (INDICES[s]) return { asset: 'index', currency: 'USD', yahoo: INDICES[s] };
-  // Unknown → try as a US equity ticker on Yahoo/EODHD.
+
+  // EODHD-style code coming straight from the symbol search (TICKER.EXCHANGE),
+  // e.g. AAPL.US, RELIANCE.NSE, EURUSD.FOREX, BTC-USD.CC, NSEI.INDX. Resolve it
+  // to the right provider so any searched instrument can be quoted/charted.
+  if (raw.includes('.')) {
+    const dot = raw.toUpperCase();
+    const idx = dot.lastIndexOf('.');
+    const tk = dot.slice(0, idx);
+    const exch = dot.slice(idx + 1);
+    if (exch === 'FOREX') return { asset: 'forex', currency: tk.slice(3, 6) || 'USD', yahoo: `${tk}=X`, eodhd: dot, twelve: `${tk.slice(0, 3)}/${tk.slice(3, 6)}` };
+    if (exch === 'CC') { const base = tk.replace(/-?USD$/, ''); return { asset: 'crypto', currency: 'USD', yahoo: `${base}-USD`, binance: `${base}USDT`, eodhd: dot }; }
+    if (exch === 'INDX') return { asset: 'index', currency: 'USD', yahoo: '', eodhd: dot };
+    if (exch === 'NSE') return { asset: 'india', currency: 'INR', yahoo: `${tk}.NS`, eodhd: dot };
+    if (exch === 'BSE') return { asset: 'india', currency: 'INR', yahoo: `${tk}.BO`, eodhd: dot };
+    if (exch === 'US') return { asset: 'stock', currency: 'USD', yahoo: tk, finnhub: tk, eodhd: dot };
+    if (exch === 'COMM') return { asset: 'commodity', currency: 'USD', yahoo: '', eodhd: dot };
+    // Foreign-listed equity — let EODHD resolve; Yahoo best-effort by exchange code.
+    return { asset: 'stock', currency: 'USD', yahoo: '', eodhd: dot };
+  }
+
+  // Unknown bare ticker → try as a US equity on Finnhub/Yahoo/EODHD.
   return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, eodhd: `${s}.US` };
 }
 
@@ -280,25 +300,79 @@ export async function getCandles(rawSymbol: string, tf = '1h', bars = 200): Prom
       }));
     }
   }
-  const { interval, range } = tfToYahoo(tf, bars);
-  const d = await jget(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(r.yahoo)}?interval=${interval}&range=${range}`);
-  const res = d?.chart?.result?.[0];
-  const ts: number[] = res?.timestamp || [];
-  const q = res?.indicators?.quote?.[0];
-  if (!ts.length || !q) return [];
-  const out: RaptorCandle[] = [];
-  for (let i = 0; i < ts.length; i++) {
-    if (q.close?.[i] == null) continue;
-    out.push({
-      time: new Date(ts[i] * 1000).toISOString(),
-      open: q.open?.[i] ?? q.close[i],
-      high: q.high?.[i] ?? q.close[i],
-      low: q.low?.[i] ?? q.close[i],
-      close: q.close[i],
-      volume: q.volume?.[i] ?? 0,
-    });
+  if (r.yahoo) {
+    const { interval, range } = tfToYahoo(tf, bars);
+    const d = await jget(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(r.yahoo)}?interval=${interval}&range=${range}`);
+    const res = d?.chart?.result?.[0];
+    const ts: number[] = res?.timestamp || [];
+    const q = res?.indicators?.quote?.[0];
+    if (ts.length && q) {
+      const out: RaptorCandle[] = [];
+      for (let i = 0; i < ts.length; i++) {
+        if (q.close?.[i] == null) continue;
+        out.push({
+          time: new Date(ts[i] * 1000).toISOString(),
+          open: q.open?.[i] ?? q.close[i],
+          high: q.high?.[i] ?? q.close[i],
+          low: q.low?.[i] ?? q.close[i],
+          close: q.close[i],
+          volume: q.volume?.[i] ?? 0,
+        });
+      }
+      if (out.length) return out.slice(-bars);
+    }
   }
-  return out.slice(-bars);
+  // EODHD fallback — works for any resolvable code (incl. indices with no Yahoo map).
+  if (EODHD_KEY && r.eodhd) {
+    const d = await jget(`https://eodhd.com/api/eod/${encodeURIComponent(r.eodhd)}?api_token=${EODHD_KEY}&fmt=json&order=a&period=d`);
+    if (Array.isArray(d) && d.length) {
+      return d.slice(-bars).map((row: any) => ({
+        time: new Date(row.date).toISOString(),
+        open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume ?? 0,
+      }));
+    }
+  }
+  return [];
+}
+
+export interface SearchResult {
+  symbol: string;    // canonical/EODHD code the feed can resolve (quote/candles)
+  name: string;
+  exchange: string;
+  type: string;
+  currency: string;
+  country: string;
+}
+
+// Instrument search across stocks, forex, indices, crypto — powered by EODHD's
+// search (rich metadata) with a Yahoo fallback. Returns symbols the feed can
+// then quote and chart directly.
+export async function getSearch(query: string): Promise<SearchResult[]> {
+  const q = query.trim();
+  if (q.length < 1) return [];
+  if (EODHD_KEY) {
+    const d = await jget(`https://eodhd.com/api/search/${encodeURIComponent(q)}?api_token=${EODHD_KEY}&limit=15`);
+    if (Array.isArray(d) && d.length) {
+      return d.map((r: any) => ({
+        symbol: `${r.Code}.${r.Exchange}`,
+        name: r.Name || r.Code,
+        exchange: r.Exchange || '',
+        type: r.Type || '',
+        currency: r.Currency || '',
+        country: r.Country || '',
+      }));
+    }
+  }
+  const y = await jget(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=15&newsCount=0`);
+  const quotes: any[] = y?.quotes || [];
+  return quotes.filter((x) => x.symbol).map((x) => ({
+    symbol: x.symbol,
+    name: x.shortname || x.longname || x.symbol,
+    exchange: x.exchDisp || x.exchange || '',
+    type: x.typeDisp || x.quoteType || '',
+    currency: '',
+    country: '',
+  }));
 }
 
 export interface NewsItem {

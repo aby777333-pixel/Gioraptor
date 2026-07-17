@@ -10,6 +10,8 @@ import {
   Tooltip,
   LineChart,
 } from 'recharts';
+import { Link } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import { Card, Badge, Skeleton, Modal, fmtPct, fmtMoney } from '../components/ui';
 import { useMarkets, useMarketData } from '../hooks/useApi';
 import { useStore } from '../store';
@@ -31,12 +33,17 @@ export default function Markets() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-bold">Markets</h2>
-        <p className="text-sm text-subtext">
-          Live market data via the Raptor Market API (Finnhub · Twelve Data · Yahoo · Binance).
-          Falls back to simulated ticks if the feed is unavailable. Trade execution stays simulated.
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold">Markets</h2>
+          <p className="text-sm text-subtext">
+            Live market data via the Raptor Market API (Finnhub · EODHD · Twelve Data · Yahoo · Binance).
+            Falls back to simulated ticks if the feed is unavailable. Trade execution stays simulated.
+          </p>
+        </div>
+        <Link to="/explore" className="btn-primary !py-1.5 shrink-0">
+          <Search size={15} /> Search any instrument
+        </Link>
       </div>
 
       <div className="flex gap-1 flex-wrap">
