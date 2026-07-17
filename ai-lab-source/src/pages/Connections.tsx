@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
-import { KeyRound, ShieldCheck, Plug, Check, Globe, Boxes, Building2, Lock, Network, Radio } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  KeyRound, ShieldCheck, Plug, Check, Globe, Boxes, Building2, Lock, Network, Radio,
+  Copy, Trash2, Plus, Terminal, Loader2, AlertTriangle,
+} from 'lucide-react';
 import { Card, SectionTitle, Badge, StatusDot } from '../components/ui';
 import { useStore } from '../store';
 import { api } from '../api/client';
@@ -36,6 +39,9 @@ export default function Connections() {
           connections are made.</span>
         </p>
       </div>
+
+      {/* Raptor API keys — issue credentials for the Raptor Market API */}
+      <ApiKeys />
 
       {/* Raptor ecosystem + live data-feed health */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -110,6 +116,152 @@ export default function Connections() {
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+interface ApiKey {
+  id: string; name: string; key_id: string; secret_prefix: string;
+  scopes: string[]; created_at: string; last_used_at: string | null; revoked: boolean;
+}
+
+function ApiKeys() {
+  const pushToast = useStore((s) => s.pushToast);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<{ key_id: string; secret: string; name: string } | null>(null);
+  const [copied, setCopied] = useState('');
+
+  const base = typeof window !== 'undefined' ? window.location.origin : '';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/raptor/keys');
+      const d = await r.json();
+      setKeys(Array.isArray(d.keys) ? d.keys : []);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const r = await fetch('/api/raptor/keys', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() || 'Default' }),
+      });
+      const d = await r.json();
+      if (d?.secret) {
+        setCreated({ key_id: d.key_id, secret: d.secret, name: d.name });
+        setName('');
+        load();
+      } else {
+        pushToast({ type: 'error', message: d?.error || 'Could not create key.' });
+      }
+    } catch { pushToast({ type: 'error', message: 'Could not create key.' }); }
+    finally { setCreating(false); }
+  };
+
+  const revoke = async (id: string) => {
+    try { await fetch(`/api/raptor/keys?id=${id}`, { method: 'DELETE' }); load(); pushToast({ type: 'warning', message: 'Key revoked.' }); }
+    catch { pushToast({ type: 'error', message: 'Could not revoke key.' }); }
+  };
+
+  const copy = (text: string, tag: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(tag);
+    setTimeout(() => setCopied(''), 1500);
+  };
+
+  return (
+    <Card>
+      <SectionTitle right={<KeyRound size={14} className="text-primary" />}>Raptor API Keys</SectionTitle>
+      <p className="text-[11px] text-subtext mb-3">
+        Issue credentials so external apps can call the <span className="font-mono">/api/raptor/v1</span> Market API.
+        The secret is shown <b>once</b> at creation and stored only as a hash — it can never be retrieved again.
+      </p>
+
+      {/* Create */}
+      <div className="flex gap-2 mb-3">
+        <input className="input" placeholder="Key name (e.g. My Trading Bot)" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="btn-primary shrink-0" onClick={create} disabled={creating}>
+          {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Generate
+        </button>
+      </div>
+
+      {/* Freshly created secret (shown once) */}
+      {created && (
+        <div className="glass !rounded-lg p-3 mb-3 border border-warning/40 bg-warning/5">
+          <div className="flex items-center gap-2 text-warning text-xs font-semibold mb-2">
+            <AlertTriangle size={13} /> Save these now — the secret is shown only once.
+          </div>
+          <KeyLine label="Key ID" value={created.key_id} onCopy={() => copy(created.key_id, 'kid')} copied={copied === 'kid'} />
+          <KeyLine label="Secret" value={created.secret} onCopy={() => copy(created.secret, 'sec')} copied={copied === 'sec'} />
+          <button className="text-[10px] text-subtext hover:text-text mt-1" onClick={() => setCreated(null)}>Done — I saved them</button>
+        </div>
+      )}
+
+      {/* Existing keys */}
+      {loading ? (
+        <p className="text-xs text-subtext">Loading keys…</p>
+      ) : keys.length === 0 ? (
+        <p className="text-xs text-subtext">No API keys yet. Generate one above.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5 mb-3">
+          {keys.map((k) => (
+            <div key={k.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-border/40 last:border-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold truncate">{k.name}</span>
+                  {k.revoked
+                    ? <Badge status="REJECTED">revoked</Badge>
+                    : <Badge status="APPROVED"><StatusDot status="complete" /> active</Badge>}
+                </div>
+                <div className="font-mono text-[10px] text-subtext truncate">{k.key_id} · secret {k.secret_prefix}</div>
+                <div className="text-[9px] text-subtext/70">
+                  {k.scopes?.join(', ')} · last used {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'never'}
+                </div>
+              </div>
+              {!k.revoked && (
+                <button className="text-subtext hover:text-danger p-1" title="Revoke" onClick={() => revoke(k.id)}>
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Usage */}
+      <div className="glass !rounded-lg p-3 border-l-2 border-primary/50">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-subtext mb-1.5">
+          <Terminal size={12} /> Example request
+        </div>
+        <code className="block text-[10px] font-mono text-text/80 leading-relaxed break-all whitespace-pre-wrap">
+{`curl -H "x-raptor-key: <KEY_ID>" \\
+     -H "x-raptor-secret: <SECRET>" \\
+  "${base}/api/raptor/v1/quote?symbol=EURUSD"`}
+        </code>
+        <div className="text-[10px] text-subtext mt-2">
+          Endpoints: <span className="font-mono">/api/raptor/v1/quote</span>, <span className="font-mono">/quotes</span>,{' '}
+          <span className="font-mono">/candles</span>, <span className="font-mono">/search</span>. Same params as the internal API.
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function KeyLine({ label, value, onCopy, copied }: { label: string; value: string; onCopy: () => void; copied: boolean }) {
+  return (
+    <div className="flex items-center gap-2 mb-1">
+      <span className="text-[10px] text-subtext w-12 shrink-0">{label}</span>
+      <code className="flex-1 font-mono text-[11px] bg-bg rounded px-2 py-1 truncate">{value}</code>
+      <button className="text-subtext hover:text-primary shrink-0" onClick={onCopy} title="Copy">
+        {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+      </button>
     </div>
   );
 }
