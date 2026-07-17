@@ -49,10 +49,13 @@ const EODHD_KEY = process.env.EODHD_API_KEY || '';
 const MARKETSTACK_KEY = process.env.MARKETSTACK_API_KEY || '';
 const NEWSDATA_KEY = process.env.NEWSDATA_API_KEY || '';
 const INDIAN_API = process.env.INDIAN_STOCK_API_URL || '';
+const POLYGON_KEY = process.env.POLYGON_API_KEY || '';        // direct api.polygon.io
+const APIMARKET_KEY = process.env.APIMARKET_KEY || '';         // api.market gateway (Polygon/Yahoo stores)
+const STOCKER_KEY = process.env.STOCKER_API_KEY || '';         // StockerAPI forex
+const STOCKER_URL = process.env.STOCKER_API_URL || 'https://api.stockerapi.com';
 // Stored for completeness / health; bulk & enterprise gateways are not called
 // from the serverless feed (see feedHealth notes).
 const MASSIVE_KEY_ID = process.env.MASSIVE_ACCESS_KEY_ID || '';
-const APIMARKET_KEY = process.env.APIMARKET_KEY || '';
 
 // ── Symbol resolution ────────────────────────────────────────────
 // Map a canonical Raptor symbol to each provider's ticker + asset class.
@@ -65,6 +68,8 @@ interface Resolved {
   binance?: string;   // Binance spot pair
   eodhd?: string;     // EODHD code (e.g. AAPL.US / EURUSD.FOREX / BTC-USD.CC / NSEI.INDX)
   marketstack?: string; // marketstack symbol (US equities)
+  polygon?: string;   // Polygon ticker (AAPL / C:EURUSD / X:BTCUSD)
+  polygonMarket?: 'stocks' | 'forex' | 'crypto';
 }
 
 const FOREX: Record<string, string> = {
@@ -106,9 +111,9 @@ const INDIA_EODHD: Record<string, string> = {
 
 export function resolveSymbol(raw: string): Resolved {
   const s = raw.toUpperCase().replace('/', '').replace('_', '');
-  if (FOREX[s]) return { asset: 'forex', currency: s.slice(3, 6), yahoo: FOREX[s], twelve: `${s.slice(0, 3)}/${s.slice(3, 6)}`, eodhd: `${s}.FOREX` };
-  if (CRYPTO[s]) return { asset: 'crypto', currency: 'USD', yahoo: CRYPTO[s], finnhub: `BINANCE:${s}`, binance: s, eodhd: `${s.replace(/USDT$/, '')}-USD.CC` };
-  if (US_STOCKS.includes(s)) return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, twelve: s, eodhd: `${s}.US`, marketstack: s };
+  if (FOREX[s]) return { asset: 'forex', currency: s.slice(3, 6), yahoo: FOREX[s], twelve: `${s.slice(0, 3)}/${s.slice(3, 6)}`, eodhd: `${s}.FOREX`, polygon: `C:${s}`, polygonMarket: 'forex' };
+  if (CRYPTO[s]) return { asset: 'crypto', currency: 'USD', yahoo: CRYPTO[s], finnhub: `BINANCE:${s}`, binance: s, eodhd: `${s.replace(/USDT$/, '')}-USD.CC`, polygon: `X:${s.replace(/USDT$/, 'USD')}`, polygonMarket: 'crypto' };
+  if (US_STOCKS.includes(s)) return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, twelve: s, eodhd: `${s}.US`, marketstack: s, polygon: s, polygonMarket: 'stocks' };
   if (INDIA[s]) return { asset: 'india', currency: 'INR', yahoo: INDIA[s].yahoo, eodhd: INDIA_EODHD[s] };
   if (INDIA_MCX[s]) return { asset: 'commodity', currency: 'USD', yahoo: INDIA_MCX[s] };
   if (COMMODITIES[s]) return { asset: 'commodity', currency: 'USD', yahoo: COMMODITIES[s] };
@@ -190,14 +195,45 @@ async function marketstackQuote(r: Resolved): Promise<PartialQuote> {
   return { price: row.close, prev_close: row.open ?? row.close, source: 'marketstack' };
 }
 
+// Polygon.io — used either directly (POLYGON_API_KEY) or through the api.market
+// gateway (APIMARKET_KEY on prod.api.market). Previous-day aggregate bar gives a
+// clean {close, open}; snapshot could add live last-trade when on a paid tier.
+async function polygonQuote(r: Resolved): Promise<PartialQuote> {
+  if (!r.polygon) return null;
+  const path = `/v2/aggs/ticker/${encodeURIComponent(r.polygon)}/prev?adjusted=true`;
+  let d: any = null;
+  if (POLYGON_KEY) {
+    d = await jget(`https://api.polygon.io${path}&apiKey=${POLYGON_KEY}`);
+  } else if (APIMARKET_KEY) {
+    d = await jget(`https://prod.api.market/api/v1/polygon.io/polygon${path}`, {
+      headers: { 'x-magicapi-key': APIMARKET_KEY },
+    });
+  } else {
+    return null;
+  }
+  const row = d?.results?.[0];
+  if (!row || typeof row.c !== 'number') return null;
+  return { price: row.c, prev_close: row.o ?? row.c, source: 'polygon' };
+}
+
+// StockerAPI — forex market data (env-gated; inert without STOCKER_API_KEY).
+async function stockerQuote(r: Resolved): Promise<PartialQuote> {
+  if (!STOCKER_KEY || r.asset !== 'forex') return null;
+  const pair = r.yahoo.replace('=X', '');
+  const d = await jget(`${STOCKER_URL}/v1/forex/quote?symbol=${pair}&apikey=${STOCKER_KEY}`);
+  const price = d?.price ?? d?.rate ?? d?.close;
+  if (typeof price !== 'number') return null;
+  return { price, prev_close: d?.previous_close ?? d?.open ?? price, source: 'stockerapi' };
+}
+
 // ── Public API ───────────────────────────────────────────────────
 export async function getQuote(rawSymbol: string): Promise<RaptorQuote | null> {
   const r = resolveSymbol(rawSymbol);
   // Provider preference by asset class, then universal fallbacks.
   const chain: (() => Promise<PartialQuote>)[] =
-    r.asset === 'crypto' ? [() => binanceQuote(r), () => eodhdQuote(r), () => finnhubQuote(r), () => yahooQuote(r)]
-    : r.asset === 'stock' ? [() => finnhubQuote(r), () => eodhdQuote(r), () => yahooQuote(r), () => twelveQuote(r), () => marketstackQuote(r)]
-    : r.asset === 'forex' ? [() => eodhdQuote(r), () => yahooQuote(r), () => twelveQuote(r)]
+    r.asset === 'crypto' ? [() => binanceQuote(r), () => eodhdQuote(r), () => finnhubQuote(r), () => polygonQuote(r), () => yahooQuote(r)]
+    : r.asset === 'stock' ? [() => finnhubQuote(r), () => polygonQuote(r), () => eodhdQuote(r), () => yahooQuote(r), () => twelveQuote(r), () => marketstackQuote(r)]
+    : r.asset === 'forex' ? [() => eodhdQuote(r), () => polygonQuote(r), () => stockerQuote(r), () => yahooQuote(r), () => twelveQuote(r)]
     : r.asset === 'india' ? [() => eodhdQuote(r), () => yahooQuote(r)]
     : [() => yahooQuote(r), () => eodhdQuote(r), () => twelveQuote(r)];
 
@@ -293,13 +329,14 @@ export function feedHealth() {
     providers: [
       { name: 'finnhub', configured: !!FINNHUB_KEY, scope: 'US equities + crypto (real-time)' },
       { name: 'eodhd', configured: !!EODHD_KEY, scope: 'US equities + forex + crypto + world indices' },
+      { name: 'polygon', configured: !!(POLYGON_KEY || APIMARKET_KEY), scope: 'stocks + forex + crypto (direct or api.market gateway)' },
       { name: 'twelvedata', configured: !!TWELVEDATA_KEY, scope: 'forex + equities + indices' },
       { name: 'yahoo', configured: true, scope: 'universal backbone (no key)' },
       { name: 'binance', configured: true, scope: 'crypto spot + klines (no key)' },
       { name: 'marketstack', configured: !!MARKETSTACK_KEY, scope: 'EOD equities' },
+      { name: 'stockerapi', configured: !!STOCKER_KEY, scope: 'forex market data' },
       { name: 'newsdata', configured: !!NEWSDATA_KEY, scope: 'financial news + sentiment' },
       { name: 'indian_stock_api', configured: !!INDIAN_API, scope: 'NSE/BSE (self-hosted)' },
-      { name: 'apimarket_yahoo', configured: !!APIMARKET_KEY, scope: 'Yahoo proxy (endpoint pending)' },
       { name: 'massive_flatfiles', configured: !!MASSIVE_KEY_ID, scope: 'bulk historical flat files (S3, offline backfill)' },
       { name: 'bloomberg', configured: false, scope: 'gateway required (BLPAPI / enterprise)' },
       { name: 'fxcm_forexconnect', configured: false, scope: 'gateway required (native SDK)' },
