@@ -17,6 +17,7 @@ const CATEGORY_ICONS: Record<IndicatorCategory, React.ReactNode> = {
   channel: <BarChart3 className="h-3.5 w-3.5" />,
   market_structure: <Layers className="h-3.5 w-3.5" />,
   statistical: <Sparkles className="h-3.5 w-3.5" />,
+  gio_custom: <Star className="h-3.5 w-3.5" />,
   raptor_exclusive: <Zap className="h-3.5 w-3.5" />,
   nexus_ai: <Brain className="h-3.5 w-3.5" />,
 };
@@ -51,6 +52,7 @@ export function IndicatorLibrary({ onAddIndicator, activeIndicators }: Indicator
       <div className="flex items-center gap-4 text-[10px] text-white/25">
         <span className="flex items-center gap-1"><BarChart3 className="h-3 w-3" />{totalIndicators} indicators</span>
         <span className="flex items-center gap-1"><Layers className="h-3 w-3" />{totalDrawings} drawing tools</span>
+        <span className="flex items-center gap-1"><Star className="h-3 w-3 text-[#f5c518]" />15 GIO custom</span>
         <span className="flex items-center gap-1"><Zap className="h-3 w-3 text-[#ff6b35]" />8 RAPTOR exclusive</span>
         <span className="flex items-center gap-1"><Brain className="h-3 w-3 text-[#8b5cf6]" />5 NEXUS AI</span>
       </div>
@@ -118,7 +120,7 @@ export function IndicatorLibrary({ onAddIndicator, activeIndicators }: Indicator
                         <span className="text-xs text-white/50 flex-1">{ind.name}</span>
                         {ind.isExclusive && (
                           <span className="text-[7px] px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: `${cat.color}15`, color: cat.color }}>
-                            {cat.category === 'nexus_ai' ? 'AI' : 'RAPTOR'}
+                            {cat.category === 'nexus_ai' ? 'AI' : cat.category === 'gio_custom' ? 'GIO' : 'RAPTOR'}
                           </span>
                         )}
                         <button onClick={() => onAddIndicator(ind.shortName)}

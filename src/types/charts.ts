@@ -48,7 +48,7 @@ export interface ChartLayoutConfig {
 export type IndicatorCategory =
   | 'trend' | 'oscillator' | 'volatility' | 'volume'
   | 'channel' | 'market_structure' | 'statistical'
-  | 'raptor_exclusive' | 'nexus_ai';
+  | 'gio_custom' | 'raptor_exclusive' | 'nexus_ai';
 
 export interface IndicatorDefinition {
   id: string;
@@ -259,6 +259,26 @@ export const INDICATOR_REGISTRY: { category: IndicatorCategory; label: string; c
       { name: 'Entropy', shortName: 'ENTROPY' },
       { name: 'Sharpe Ratio', shortName: 'SHARPE' },
       { name: 'Sortino Ratio', shortName: 'SORTINO' },
+    ],
+  },
+  {
+    category: 'gio_custom', label: 'GIO Custom', color: '#f5c518',
+    indicators: [
+      { name: 'GIO Absolute Indicator', shortName: 'ABS', isExclusive: true },
+      { name: 'GIO BLUEBIRD (Dual Kalman Trend)', shortName: 'BLUE', isExclusive: true },
+      { name: 'GIO LNL Trend Cloud (ATR)', shortName: 'LNL', isExclusive: true },
+      { name: 'GIO Donchian Trend Ribbon', shortName: 'DTR', isExclusive: true },
+      { name: 'GIO Hull Day Trader Pro', shortName: 'HULLDT', isExclusive: true },
+      { name: 'GIO Ichimoku Signals', shortName: 'GICHI', isExclusive: true },
+      { name: 'GIO Ichimoku Cloud Trend', shortName: 'ICT', isExclusive: true },
+      { name: 'GIO Kalman Trend', shortName: 'GKALT', isExclusive: true },
+      { name: 'GIO Market Structure PRO', shortName: 'MSPRO', isExclusive: true },
+      { name: 'GIO Range Scanner', shortName: 'RSCAN', isExclusive: true },
+      { name: 'GIO SMC (Smart Money Concepts)', shortName: 'SMC', isExclusive: true },
+      { name: 'GIO VRVP S/R Matrix', shortName: 'VRVPM', isExclusive: true },
+      { name: 'GIO Gold Scalper', shortName: 'GSCALP', isExclusive: true },
+      { name: 'GIO Gold System', shortName: 'GGOLD', isExclusive: true },
+      { name: 'GIO The Equalizer (Regime)', shortName: 'EQLZ', isExclusive: true },
     ],
   },
   {
