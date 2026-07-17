@@ -263,6 +263,8 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const { activeSymbol, prices } = useTradingStore();
   const storeTf = useTradingStore((s) => s.activeTimeframe);
   const setStoreTf = useTradingStore((s) => s.setActiveTimeframe);
+  const setRaptorChartType = useTradingStore((s) => s.setRaptorChartType);
+  const setRaptorIndicators = useTradingStore((s) => s.setRaptorIndicators);
   const [selectedTf, setSelectedTf] = useState<string>(storeTf || '1H');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [oneClickTrading, setOneClickTrading] = useState(false);
@@ -317,6 +319,24 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorId>>(new Set());
   const [indicatorParams, setIndicatorParams] = useState<Record<IndicatorId, Record<string, number>>>({} as Record<IndicatorId, Record<string, number>>);
+
+  // Mirror this chart's type + indicator set into the shared store so the
+  // Templates menu (§1/§11) can snapshot it. Read-only publish.
+  useEffect(() => { setRaptorChartType(chartType); }, [chartType, setRaptorChartType]);
+  useEffect(() => { setRaptorIndicators([...activeIndicators]); }, [activeIndicators, setRaptorIndicators]);
+
+  // Apply a saved template pushed from the shared Templates menu. Symbol + TF
+  // arrive via the store; here we restore the RAPTOR chart-type + indicators.
+  useEffect(() => {
+    function onApply(e: Event) {
+      const d = (e as CustomEvent<{ chartType?: string; indicators?: string[] }>).detail;
+      if (!d) return;
+      if (d.chartType) setChartType(d.chartType as ChartType);
+      if (Array.isArray(d.indicators)) setActiveIndicators(new Set(d.indicators as IndicatorId[]));
+    }
+    window.addEventListener('raptor-apply-template', onApply);
+    return () => window.removeEventListener('raptor-apply-template', onApply);
+  }, []);
 
   // Drawing tools state
   const [activeTool, setActiveTool] = useState<DrawingToolId>('cursor');

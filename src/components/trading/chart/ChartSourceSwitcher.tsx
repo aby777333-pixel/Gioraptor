@@ -25,6 +25,7 @@ import StrategyTesterModal from './StrategyTesterModal';
 import AlertsMenu from './AlertsMenu';
 import WatchlistMenu from './WatchlistMenu';
 import TimeframeBar from './TimeframeBar';
+import TemplatesMenu from './TemplatesMenu';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -559,6 +560,9 @@ export default function ChartSourceSwitcher({
             );
           })()}
         </div>
+
+        {/* Chart templates / layouts — save & restore symbol+TF+type+indicators */}
+        <TemplatesMenu onToast={showEAToast} />
 
         {/* Watchlist — switches the active symbol for both charts */}
         <WatchlistMenu activeSymbol={activeSymbol} prices={prices} setActiveSymbol={setActiveSymbol} />

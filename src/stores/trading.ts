@@ -11,6 +11,13 @@ interface TradingState {
   activeTimeframe: string;
   setActiveTimeframe: (tf: string) => void;
 
+  // RAPTOR-chart context mirrored here so shared features (Templates) can
+  // snapshot it. Written by ChartPanel; read by the Templates menu.
+  raptorChartType: string;
+  setRaptorChartType: (t: string) => void;
+  raptorIndicators: string[];
+  setRaptorIndicators: (ids: string[]) => void;
+
   // Active account
   activeAccountId: string | null;
   setActiveAccountId: (id: string) => void;
@@ -55,6 +62,11 @@ export const useTradingStore = create<TradingState>((set) => ({
 
   activeTimeframe: '1H',
   setActiveTimeframe: (tf) => set({ activeTimeframe: tf }),
+
+  raptorChartType: 'candlestick',
+  setRaptorChartType: (t) => set({ raptorChartType: t }),
+  raptorIndicators: [],
+  setRaptorIndicators: (ids) => set({ raptorIndicators: ids }),
 
   activeAccountId: null,
   setActiveAccountId: (id) => set({ activeAccountId: id }),
