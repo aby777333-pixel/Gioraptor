@@ -683,3 +683,61 @@ export function bullsBearsPower(
   }
   return { bulls, bears };
 }
+
+/**
+ * 1-D Kalman filter on price — faithful port of the GIO_Kalman_Trend /
+ * BLUEBIRD MQL5 recursion (measurement noise = R*length, process noise =
+ * Q/length). Used by the GIO Kalman Trend and BLUEBIRD indicators.
+ */
+export function kalmanFilter(
+  closes: number[],
+  length: number,
+  R: number = 0.01,
+  Q: number = 0.10
+): (number | null)[] {
+  const n = closes.length;
+  const out: (number | null)[] = new Array(n).fill(null);
+  if (n === 0 || length < 1) return out;
+  const errMeas = R * length;
+  const q = Q / length;
+  let est = closes[0];
+  let err = 1.0;
+  out[0] = est;
+  for (let i = 1; i < n; i++) {
+    const pred = est;
+    const gain = err / (err + errMeas);
+    est = pred + gain * (closes[i] - pred);
+    err = (1 - gain) * err + q;
+    out[i] = est;
+  }
+  return out;
+}
+
+/**
+ * Kaufman Adaptive Moving Average (KAMA / AMA) — matches MT5 iAMA(period,
+ * fast, slow). Baseline of the GIO "The Equalizer" indicator.
+ */
+export function kama(
+  closes: number[],
+  period: number = 10,
+  fast: number = 2,
+  slow: number = 30
+): (number | null)[] {
+  const n = closes.length;
+  const out: (number | null)[] = new Array(n).fill(null);
+  if (n < period + 1) return out;
+  const fastSC = 2 / (fast + 1);
+  const slowSC = 2 / (slow + 1);
+  let prev = closes[period];
+  out[period] = prev;
+  for (let i = period + 1; i < n; i++) {
+    const change = Math.abs(closes[i] - closes[i - period]);
+    let vol = 0;
+    for (let j = i - period + 1; j <= i; j++) vol += Math.abs(closes[j] - closes[j - 1]);
+    const er = vol === 0 ? 0 : change / vol;
+    const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+    prev = prev + sc * (closes[i] - prev);
+    out[i] = prev;
+  }
+  return out;
+}

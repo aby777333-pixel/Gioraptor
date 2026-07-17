@@ -57,6 +57,7 @@ import {
   sma, ema, rsi, macd, bollingerBands, atr, stochastic, vwap,
   aroon, adx, donchianChannel, envelope, fractals, ichimoku,
   momentum, parabolicSAR, pivotPoints, bullsBearsPower,
+  kalmanFilter, kama,
 } from '@/lib/trading/indicators';
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -244,6 +245,11 @@ const INDICATOR_COLORS: Record<string, string> = {
   pp_pivot: '#FFD700', pp_r1: '#00C27A', pp_r2: 'rgba(0,194,122,0.5)', pp_r3: 'rgba(0,194,122,0.3)',
   pp_s1: '#C1121F', pp_s2: 'rgba(193,18,31,0.5)', pp_s3: 'rgba(193,18,31,0.3)',
   bullsbears_bulls: '#00C27A', bullsbears_bears: '#C1121F',
+  // GIO custom
+  gio_kalman_short: '#f5c518', gio_kalman_long: '#8b5cf6',
+  gio_bluebird_short: '#22d3ee', gio_bluebird_long: '#2563eb',
+  gio_eq_base: '#f5c518', gio_eq_upper: 'rgba(0,194,122,0.5)', gio_eq_lower: 'rgba(193,18,31,0.5)',
+  gio_ribbon_upper: '#f5c518', gio_ribbon_mid: 'rgba(245,197,24,0.35)', gio_ribbon_lower: '#f5c518',
 };
 
 // ─── Main Component ────────────────────────────────────────────────
@@ -609,6 +615,10 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       else if (id === 'ichimoku') { activeKeys.add('ichimoku_conversion'); activeKeys.add('ichimoku_base'); activeKeys.add('ichimoku_spanA'); activeKeys.add('ichimoku_spanB'); activeKeys.add('ichimoku_lagging'); }
       else if (id === 'pivotpoints') { activeKeys.add('pp_pivot'); activeKeys.add('pp_r1'); activeKeys.add('pp_r2'); activeKeys.add('pp_r3'); activeKeys.add('pp_s1'); activeKeys.add('pp_s2'); activeKeys.add('pp_s3'); }
       else if (id === 'bullsbears') { activeKeys.add('bullsbears_bulls'); activeKeys.add('bullsbears_bears'); }
+      else if (id === 'gio_kalman') { activeKeys.add('gio_kalman_short'); activeKeys.add('gio_kalman_long'); }
+      else if (id === 'gio_bluebird') { activeKeys.add('gio_bluebird_short'); activeKeys.add('gio_bluebird_long'); }
+      else if (id === 'gio_equalizer') { activeKeys.add('gio_eq_base'); activeKeys.add('gio_eq_upper'); activeKeys.add('gio_eq_lower'); }
+      else if (id === 'gio_donchian_ribbon') { activeKeys.add('gio_ribbon_upper'); activeKeys.add('gio_ribbon_mid'); activeKeys.add('gio_ribbon_lower'); }
       else { activeKeys.add(id); }
     }
     for (const [key, series] of indicatorSeriesRef.current.entries()) {
@@ -749,6 +759,31 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
             bs.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
             bs.setData(bullsHist);
             getOrCreateHistSeries('bullsbears_bears', 'bbp').setData(bearsHist); break;
+          }
+          // ─── GIO custom (ported from .mq5) ─────────
+          case 'gio_kalman': {
+            getOrCreateLineSeries('gio_kalman_short', INDICATOR_COLORS.gio_kalman_short, 'right', 2).setData(toLineData(kalmanFilter(closes, params.shortLen || 50)));
+            getOrCreateLineSeries('gio_kalman_long', INDICATOR_COLORS.gio_kalman_long, 'right', 2).setData(toLineData(kalmanFilter(closes, params.longLen || 150))); break;
+          }
+          case 'gio_bluebird': {
+            getOrCreateLineSeries('gio_bluebird_short', INDICATOR_COLORS.gio_bluebird_short, 'right', 2).setData(toLineData(kalmanFilter(closes, params.shortLen || 30)));
+            getOrCreateLineSeries('gio_bluebird_long', INDICATOR_COLORS.gio_bluebird_long, 'right', 2).setData(toLineData(kalmanFilter(closes, params.longLen || 100))); break;
+          }
+          case 'gio_equalizer': {
+            const base = kama(closes, params.period || 10, 2, 30);
+            const av = atr(highs, lows, closes, params.atrPeriod || 14);
+            const mult = params.bandMult || 1.5;
+            const upper = base.map((b, i) => (b !== null && av[i] !== null) ? b + av[i]! * mult : null);
+            const lower = base.map((b, i) => (b !== null && av[i] !== null) ? b - av[i]! * mult : null);
+            getOrCreateLineSeries('gio_eq_base', INDICATOR_COLORS.gio_eq_base, 'right', 2).setData(toLineData(base));
+            getOrCreateLineSeries('gio_eq_upper', INDICATOR_COLORS.gio_eq_upper).setData(toLineData(upper));
+            getOrCreateLineSeries('gio_eq_lower', INDICATOR_COLORS.gio_eq_lower).setData(toLineData(lower)); break;
+          }
+          case 'gio_donchian_ribbon': {
+            const dc = donchianChannel(highs, lows, params.period || 20);
+            getOrCreateLineSeries('gio_ribbon_upper', INDICATOR_COLORS.gio_ribbon_upper).setData(toLineData(dc.upper));
+            getOrCreateLineSeries('gio_ribbon_mid', INDICATOR_COLORS.gio_ribbon_mid, 'right', 2).setData(toLineData(dc.middle));
+            getOrCreateLineSeries('gio_ribbon_lower', INDICATOR_COLORS.gio_ribbon_lower).setData(toLineData(dc.lower)); break;
           }
         }
       } catch { /* skip */ }

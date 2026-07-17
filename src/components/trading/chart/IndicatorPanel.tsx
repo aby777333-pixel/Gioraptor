@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Search, Settings2, TrendingUp, Activity, BarChart3, Volume2, Brain } from 'lucide-react';
+import { X, Search, Settings2, TrendingUp, Activity, BarChart3, Volume2, Brain, Star } from 'lucide-react';
 
 // ─── Indicator definitions ─────────────────────────────────────
 
@@ -24,9 +24,14 @@ export type IndicatorId =
   | 'ichimoku'
   | 'momentum'
   | 'psar'
-  | 'pivotpoints';
+  | 'pivotpoints'
+  // GIO custom (ported from the .mq5 sources)
+  | 'gio_kalman'
+  | 'gio_bluebird'
+  | 'gio_equalizer'
+  | 'gio_donchian_ribbon';
 
-export type IndicatorCategory = 'Trend' | 'Momentum' | 'Volatility' | 'Volume' | 'Overlay';
+export type IndicatorCategory = 'Trend' | 'Momentum' | 'Volatility' | 'Volume' | 'Overlay' | 'GIO';
 
 export interface IndicatorConfig {
   id: IndicatorId;
@@ -69,6 +74,12 @@ export const INDICATOR_DEFS: IndicatorConfig[] = [
   // Overlay
   { id: 'fractals', name: 'Fractals',        shortName: 'Fractals', category: 'Overlay', overlay: true, defaultParams: {}, description: 'Williams Fractals — swing highs and lows' },
   { id: 'pivotpoints', name: 'Pivot Points',  shortName: 'PP',      category: 'Overlay', overlay: true, defaultParams: {}, description: 'Standard pivot points with R1-R3, S1-S3' },
+
+  // GIO custom — ported from the .mq5 sources, computed & plotted for real
+  { id: 'gio_kalman',   name: 'GIO Kalman Trend',        shortName: 'GKALT',  category: 'GIO', overlay: true, defaultParams: { shortLen: 50, longLen: 150 }, description: 'Dual Kalman-filtered trend lines (short + long) with crossover signals' },
+  { id: 'gio_bluebird', name: 'GIO BLUEBIRD',            shortName: 'BLUE',   category: 'GIO', overlay: true, defaultParams: { shortLen: 30, longLen: 100 }, description: 'Dual Kalman trend zones (BLUEBIRD) — fast/slow Kalman filter' },
+  { id: 'gio_equalizer', name: 'GIO The Equalizer',      shortName: 'EQLZ',   category: 'GIO', overlay: true, defaultParams: { period: 10, atrPeriod: 14, bandMult: 1.5 }, description: 'KAMA baseline with ATR regime bands (regime-aware trend)' },
+  { id: 'gio_donchian_ribbon', name: 'GIO Donchian Trend Ribbon', shortName: 'DTR', category: 'GIO', overlay: true, defaultParams: { period: 20 }, description: 'Donchian channel ribbon with trend direction' },
 ];
 
 export function getIndicatorDef(id: IndicatorId): IndicatorConfig | undefined {
@@ -83,6 +94,7 @@ const CATEGORY_ICONS: Record<IndicatorCategory, React.ReactNode> = {
   Volatility: <BarChart3 size={14} />,
   Volume: <Volume2 size={14} />,
   Overlay: <Brain size={14} />,
+  GIO: <Star size={14} />,
 };
 
 // ─── Component ─────────────────────────────────────────────────
