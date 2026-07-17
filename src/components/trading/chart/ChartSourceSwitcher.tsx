@@ -11,13 +11,14 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2 } from 'lucide-react';
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
-import { EA_LIBRARY, type EAConfig } from './ChartToolbar';
+import { type EAConfig } from './ChartToolbar';
+import { useEALibrary } from './useEALibrary';
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
-import { EARuntime, type EAStats } from '@/lib/trading/ea-engine';
+import { EARuntime, type EAStats, type StrategyKind } from '@/lib/trading/ea-engine';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -28,6 +29,7 @@ interface AttachedEA {
   strategyId: string;
   name: string;
   symbol: string;
+  strategyKind?: string;
 }
 
 export default function ChartSourceSwitcher({
@@ -41,6 +43,20 @@ export default function ChartSourceSwitcher({
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
   const { activeSymbol, prices, activeAccountId, triggerRefresh } = useTradingStore();
+
+  // Merged EA library (built-in + uploaded custom) + upload flow for the TV menu.
+  const { all: eaList, fileInputRef, handleFile, remove: removeCustom } = useEALibrary();
+  const [uploadMsg, setUploadMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const onFileChosen = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const res = await handleFile(file);
+    setUploadMsg(res.ok
+      ? { ok: true, text: `"${res.name}" converted — drag it onto the chart.` }
+      : { ok: false, text: res.error ?? 'Upload failed.' });
+    setTimeout(() => setUploadMsg(null), 5000);
+  }, [handleFile]);
 
   useEffect(() => {
     onSourceChange?.(source);
@@ -84,8 +100,9 @@ export default function ChartSourceSwitcher({
     const wanted = new Map(attachedEAs.map((a) => [`${a.strategyId}-${a.symbol}`, a]));
     for (const [key, a] of wanted) {
       if (!runtime.has(key)) {
-        const lib = EA_LIBRARY.find((e) => e.id === a.strategyId);
-        runtime.attach(key, a.strategyId, a.name, a.symbol, lib?.timeframes ?? ['15m']);
+        const lib = eaList.find((e) => e.id === a.strategyId);
+        const kind = (a.strategyKind ?? lib?.strategyKind) as StrategyKind | undefined;
+        runtime.attach(key, a.strategyId, a.name, a.symbol, lib?.timeframes ?? ['15m'], kind);
       }
     }
     // Detach removed instances (position stays open for the trader to manage).
@@ -117,6 +134,7 @@ export default function ChartSourceSwitcher({
               strategyId: r.strategy_id as string,
               name: (r.name as string) ?? 'EA',
               symbol: ((r.parameters as Record<string, unknown> | null)?.symbol as string) ?? '',
+              strategyKind: (r.parameters as Record<string, unknown> | null)?.strategyKind as string | undefined,
             }))
           );
         }
@@ -156,7 +174,7 @@ export default function ChartSourceSwitcher({
 
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
-  const attachEA = useCallback(async (ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[] }) => {
+  const attachEA = useCallback(async (ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[]; strategyKind?: string; custom?: boolean }) => {
     if (!ea?.name || !ea?.id) return;
     const key = `${ea.id}-${activeSymbol}`;
     if (attachInFlightRef.current.has(key)) return;
@@ -166,6 +184,15 @@ export default function ChartSourceSwitcher({
     }
     attachInFlightRef.current.add(key);
     setTimeout(() => attachInFlightRef.current.delete(key), 3000);
+
+    // Uploaded custom EAs live in the browser (localStorage) and their id is
+    // not a DB uuid — attach them locally; they still trade via the runtime.
+    if (ea.custom) {
+      setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol, strategyKind: ea.strategyKind }]);
+      showEAToast(`Custom EA "${ea.name}" attached to ${activeSymbol} — running`);
+      return;
+    }
+
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -184,18 +211,18 @@ export default function ChartSourceSwitcher({
           account_id: accountId,
           strategy_id: ea.id,
           name: ea.name,
-          parameters: { symbol: activeSymbol, pairs: ea.pairs ?? [], timeframes: ea.timeframes ?? [] },
+          parameters: { symbol: activeSymbol, pairs: ea.pairs ?? [], timeframes: ea.timeframes ?? [], strategyKind: ea.strategyKind ?? null },
           status: 'running',
           mode: 'live',
         })
         .select('id')
         .single();
       if (error) throw error;
-      setAttachedEAs((prev) => [...prev, { instanceId: inst.id as string, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol }]);
+      setAttachedEAs((prev) => [...prev, { instanceId: inst.id as string, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol, strategyKind: ea.strategyKind }]);
       showEAToast(`EA "${ea.name}" attached to ${activeSymbol} — running`);
     } catch {
       // Signed-out / no account: keep the attachment local so the UI still works.
-      setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol }]);
+      setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol, strategyKind: ea.strategyKind }]);
       showEAToast(`EA "${ea.name}" attached to ${activeSymbol}`);
     }
   }, [attachedEAs, activeSymbol, showEAToast]);
@@ -270,7 +297,7 @@ export default function ChartSourceSwitcher({
                     Drag onto the chart or click Attach — runs on {activeSymbol}
                   </span>
                 </div>
-                {EA_LIBRARY.map((ea: EAConfig) => (
+                {eaList.map((ea: EAConfig) => (
                   <div
                     key={ea.id}
                     draggable
@@ -282,12 +309,24 @@ export default function ChartSourceSwitcher({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-[11px] font-bold text-white">{ea.name}</span>
+                        {ea.custom && (
+                          <span className="shrink-0 rounded px-1 text-[8px] font-bold uppercase" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
+                        )}
                         <span className="flex items-center gap-0.5 text-[9px] text-white/40">
                           <Star size={8} fill="currentColor" /> {ea.rating}
                         </span>
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-[9px] leading-relaxed text-white/40">{ea.description}</p>
                     </div>
+                    {ea.custom && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
+                        className="shrink-0 text-white/30 hover:text-red-400"
+                        title="Remove custom EA"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
                     <button
                       onClick={() => { void attachEA(ea); setEaMenuOpen(false); }}
                       className="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors"
@@ -297,6 +336,26 @@ export default function ChartSourceSwitcher({
                     </button>
                   </div>
                 ))}
+                {/* Upload custom EA */}
+                <div className="px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                  {uploadMsg && (
+                    <div className="mb-2 rounded-md px-2 py-1.5 text-[10px]" style={{
+                      backgroundColor: uploadMsg.ok ? 'rgba(0,194,122,0.12)' : 'rgba(255,82,82,0.12)',
+                      color: uploadMsg.ok ? '#00C27A' : '#FF5252',
+                      border: `1px solid ${uploadMsg.ok ? 'rgba(0,194,122,0.3)' : 'rgba(255,82,82,0.3)'}`,
+                    }}>
+                      {uploadMsg.text}
+                    </div>
+                  )}
+                  <input ref={fileInputRef} type="file" accept=".mq5,.ex5" className="hidden" onChange={onFileChosen} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-md py-2 text-[11px] font-semibold transition-all hover:bg-[rgba(0,145,213,0.15)]"
+                    style={{ border: '1px dashed rgba(0,145,213,0.3)', color: '#0091D5' }}
+                  >
+                    <Zap size={14} /> Upload Custom EA (.mq5, .ex5)
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -326,9 +385,11 @@ export default function ChartSourceSwitcher({
           </div>
         )}
 
-        {/* Attached EA chips (rendered on both chart sources) */}
+        {/* Attached EA chips — pinned bottom-left, offset past the chart's
+            watermark logo so they never collide with either chart's top
+            toolbar (the TradingView tab has its own controls row up top). */}
         {symbolEAs.length > 0 && (
-          <div className="absolute left-2 z-30 flex max-w-[60%] flex-wrap gap-1.5" style={{ top: source === 'tradingview' ? 34 : 76 }}>
+          <div className="absolute bottom-2 z-30 flex max-w-[70%] flex-wrap gap-1.5" style={{ left: 56 }}>
             {symbolEAs.map((a) => (
               <div
                 key={`${a.instanceId ?? a.strategyId}-${a.symbol}`}

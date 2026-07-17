@@ -199,6 +199,27 @@ const stratPattern: Strategy = (bars) => {
   return null;
 };
 
+// Named strategy kinds — used to run uploaded/custom EAs after the
+// MQL5 source is mapped to the closest platform engine (see custom-ea.ts).
+export type StrategyKind =
+  | 'ema_pullback' | 'sar_flip' | 'boll_macd' | 'trend_reversal'
+  | 'kalman' | 'linreg' | 'ichimoku' | 'ssl' | 'pattern'
+  | 'rsi_macd' | 'rsi_adaptive';
+
+export const STRATEGY_KINDS: Record<StrategyKind, Strategy> = {
+  ema_pullback: stratEmaPullback,
+  sar_flip: stratSarFlip,
+  boll_macd: stratBollMacd,
+  trend_reversal: stratTrendReversal,
+  kalman: stratKalmanTrend,
+  linreg: stratLinReg,
+  ichimoku: stratIchimoku,
+  ssl: stratSslChannel,
+  pattern: stratPattern,
+  rsi_macd: stratRsiMacdMomentum,
+  rsi_adaptive: stratRsiAdaptive,
+};
+
 // strategyId (EA_LIBRARY id) → strategy
 const STRATEGIES: Record<string, Strategy> = {
   '1da5f188-c659-4843-b91d-4fdc003002dc': stratTrendReversal, // Bad Boy v3.0
@@ -239,6 +260,7 @@ export interface EAStats {
 interface InstanceState {
   key: string;
   strategyId: string;
+  strategyKind?: StrategyKind;
   name: string;
   symbol: string;
   resolution: Resolution;
@@ -272,7 +294,7 @@ export class EARuntime {
     return Array.from(this.instances.keys());
   }
 
-  attach(key: string, strategyId: string, name: string, symbol: string, timeframes: string[]) {
+  attach(key: string, strategyId: string, name: string, symbol: string, timeframes: string[], strategyKind?: StrategyKind) {
     if (this.instances.has(key)) return;
     // Trade the EA's shortest timeframe so activity is visible quickly.
     const tf = [...(timeframes ?? [])].sort(
@@ -280,7 +302,7 @@ export class EARuntime {
     )[0];
     const resolution = TF_TO_RES[tf] ?? '15';
     const inst: InstanceState = {
-      key, strategyId, name, symbol, resolution,
+      key, strategyId, strategyKind, name, symbol, resolution,
       lastBarTime: 0, positionId: null, direction: null, trades: 0, busy: false,
     };
     this.instances.set(key, inst);
@@ -317,7 +339,11 @@ export class EARuntime {
     if (!initial && newestClosed <= inst.lastBarTime) return; // no new closed bar yet
     inst.lastBarTime = newestClosed;
 
-    const strategy = STRATEGIES[inst.strategyId] ?? stratTrendReversal;
+    // Built-in EA → mapped strategy; uploaded EA → its detected kind.
+    const strategy =
+      STRATEGIES[inst.strategyId] ??
+      (inst.strategyKind ? STRATEGY_KINDS[inst.strategyKind] : undefined) ??
+      stratTrendReversal;
     const regime = strategy(bars);
     if (regime === null || regime === inst.direction) return;
 

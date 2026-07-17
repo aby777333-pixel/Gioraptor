@@ -1,0 +1,47 @@
+'use client';
+
+// Merged EA library: the 25 built-in EAs plus any uploaded custom EAs
+// (persisted in localStorage). Re-renders when a custom EA is added or
+// removed, so both the RAPTOR-chart menu and the TradingView-tab menu
+// stay in sync.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { EA_LIBRARY, type EAConfig } from './ChartToolbar';
+import {
+  loadCustomEAs, onCustomEAsChanged, convertUploadedEA, saveCustomEA, removeCustomEA,
+} from '@/lib/trading/custom-ea';
+
+export function useEALibrary() {
+  const [custom, setCustom] = useState<EAConfig[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const sync = () => setCustom(loadCustomEAs() as unknown as EAConfig[]);
+    sync();
+    return onCustomEAsChanged(sync);
+  }, []);
+
+  const all: EAConfig[] = [...custom, ...EA_LIBRARY];
+
+  const handleFile = useCallback(async (file: File): Promise<{ ok: boolean; name?: string; error?: string }> => {
+    if (!/\.(mq5|ex5)$/i.test(file.name)) {
+      return { ok: false, error: 'Please choose a .mq5 or .ex5 file.' };
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return { ok: false, error: 'File too large (max 5 MB).' };
+    }
+    try {
+      // .ex5 is binary — read as text anyway (we only key off the filename for it).
+      const content = /\.mq5$/i.test(file.name) ? await file.text() : '';
+      const ea = convertUploadedEA(file.name, content);
+      saveCustomEA(ea);
+      return { ok: true, name: ea.name };
+    } catch {
+      return { ok: false, error: 'Could not read the file.' };
+    }
+  }, []);
+
+  const remove = useCallback((id: string) => removeCustomEA(id), []);
+
+  return { all, custom, fileInputRef, handleFile, remove };
+}

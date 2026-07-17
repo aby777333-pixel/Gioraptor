@@ -11,6 +11,7 @@ import {
   GripVertical, Star, Zap,
 } from 'lucide-react';
 import type { IndicatorId } from './IndicatorPanel';
+import { useEALibrary } from './useEALibrary';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ export interface EAConfig {
   pairs: string[]; timeframes: string[];
   type: 'scalper' | 'trend' | 'reversal' | 'hybrid' | 'grid' | 'hedge' | 'martingale';
   rating: number; status: string;
+  custom?: boolean;
+  strategyKind?: string;
 }
 
 // Real EA library imported from the owner's MQL5 collection
@@ -203,6 +206,21 @@ export default function ChartToolbar({
   const toggle = useCallback((id: string) => setOpenDropdown((p) => p === id ? null : id), []);
   const close = useCallback(() => setOpenDropdown(null), []);
 
+  // Merged EA library (built-in + uploaded custom) and the upload flow.
+  const { all: eaList, fileInputRef, handleFile, remove: removeCustom } = useEALibrary();
+  const [uploadMsg, setUploadMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const onUploadClick = useCallback(() => fileInputRef.current?.click(), [fileInputRef]);
+  const onFileChosen = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-uploading the same file
+    if (!file) return;
+    const res = await handleFile(file);
+    setUploadMsg(res.ok
+      ? { ok: true, text: `"${res.name}" converted and added — drag it onto the chart.` }
+      : { ok: false, text: res.error ?? 'Upload failed.' });
+    setTimeout(() => setUploadMsg(null), 5000);
+  }, [handleFile]);
+
   const tfDef = TIMEFRAMES.find((t) => t.value === selectedTf) || TIMEFRAMES[4];
   const ctDef = CHART_TYPES.find((c) => c.value === chartType) || CHART_TYPES[1];
   const btn = 'flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium rounded-md transition-all shrink-0 cursor-pointer';
@@ -312,13 +330,13 @@ export default function ChartToolbar({
       <PortalDropdown anchorRef={eaRef} open={openDropdown === 'ea'} onClose={close} width={360} maxHeight={500}>
         <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span className="text-[12px] font-semibold text-white">Expert Advisors</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5' }}>{EA_LIBRARY.length} available</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5' }}>{eaList.length} available</span>
         </div>
         <div className="text-[9px] px-3 py-1.5" style={{ color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           Drag and drop an EA onto the chart to activate it
         </div>
         <div className="py-1">
-          {EA_LIBRARY.map((ea) => (
+          {eaList.map((ea) => (
             <div key={ea.id} draggable
               onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify(ea)); e.dataTransfer.effectAllowed = 'copy'; }}
               className="px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors hover:bg-[rgba(255,255,255,0.04)]"
@@ -330,6 +348,18 @@ export default function ChartToolbar({
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[12px] font-semibold text-white truncate">{ea.name}</span>
                     <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: `${EA_TYPE_COLORS[ea.type]}20`, color: EA_TYPE_COLORS[ea.type] }}>{ea.type}</span>
+                    {ea.custom && (
+                      <>
+                        <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
+                          className="ml-auto shrink-0 text-[rgba(255,255,255,0.3)] hover:text-red-400"
+                          title="Remove custom EA"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </>
+                    )}
                   </div>
                   <div className="text-[10px] mb-1.5" style={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>{ea.description}</div>
                   <div className="flex items-center gap-3 flex-wrap">
@@ -352,7 +382,21 @@ export default function ChartToolbar({
           ))}
         </div>
         <div className="px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-          <button className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-[11px] font-semibold transition-all hover:bg-[rgba(0,145,213,0.15)]" style={{ border: '1px dashed rgba(0,145,213,0.3)', color: '#0091D5' }}>
+          {uploadMsg && (
+            <div className="mb-2 rounded-md px-2 py-1.5 text-[10px]" style={{
+              backgroundColor: uploadMsg.ok ? 'rgba(0,194,122,0.12)' : 'rgba(255,82,82,0.12)',
+              color: uploadMsg.ok ? '#00C27A' : '#FF5252',
+              border: `1px solid ${uploadMsg.ok ? 'rgba(0,194,122,0.3)' : 'rgba(255,82,82,0.3)'}`,
+            }}>
+              {uploadMsg.text}
+            </div>
+          )}
+          <input ref={fileInputRef} type="file" accept=".mq5,.ex5" className="hidden" onChange={onFileChosen} />
+          <button
+            onClick={onUploadClick}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-[11px] font-semibold transition-all hover:bg-[rgba(0,145,213,0.15)]"
+            style={{ border: '1px dashed rgba(0,145,213,0.3)', color: '#0091D5' }}
+          >
             <Zap size={14} /> Upload Custom EA (.mq5, .ex5)
           </button>
         </div>
