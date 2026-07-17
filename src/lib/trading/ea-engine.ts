@@ -271,6 +271,17 @@ export interface EAInfo {
   lastBarTime: number;
 }
 
+// Editable EA settings (subset the web runtime honors on execution). Additional
+// fields (risk caps, notifications, logging) are persisted per-EA in the UI.
+export interface EASettings {
+  lot: number;            // fixed lot size per entry
+  slAtrMult: number;      // stop-loss = slAtrMult × ATR(14)
+  tpAtrMult: number;      // take-profit = tpAtrMult × ATR(14)
+  direction: 'both' | 'long' | 'short';  // trade direction filter
+}
+
+export const DEFAULT_EA_SETTINGS: EASettings = { lot: 0.01, slAtrMult: 2, tpAtrMult: 3, direction: 'both' };
+
 // Stable 6-digit "magic number" derived from the instance key (MT5-style).
 function magicFromKey(key: string): number {
   let h = 2166136261;
@@ -291,6 +302,7 @@ interface InstanceState {
   trades: number;
   busy: boolean;
   enabled: boolean;   // per-EA on/off, independent of the global Algo switch
+  settings: EASettings;
 }
 
 export interface EARuntimeDeps {
@@ -301,7 +313,7 @@ export interface EARuntimeDeps {
   onRefresh: () => void;
 }
 
-const EA_LOT = 0.01;
+// Default lot lives in DEFAULT_EA_SETTINGS; per-EA lot is read from inst.settings.
 
 export class EARuntime {
   private instances = new Map<string, InstanceState>();
@@ -337,6 +349,7 @@ export class EARuntime {
     const inst: InstanceState = {
       key, strategyId, strategyKind, name, symbol, resolution,
       lastBarTime: 0, positionId: null, direction: null, trades: 0, busy: false, enabled: true,
+      settings: { ...DEFAULT_EA_SETTINGS },
     };
     this.instances.set(key, inst);
     // Enter immediately if the strategy already has an active regime — but only
@@ -366,6 +379,16 @@ export class EARuntime {
     inst.trades = 0;
     inst.busy = false;
     if (this.globalEnabled && inst.enabled) void this.evaluate(inst, true);
+  }
+
+  getInstanceSettings(key: string): EASettings | null {
+    const inst = this.instances.get(key);
+    return inst ? { ...inst.settings } : null;
+  }
+
+  setInstanceSettings(key: string, settings: EASettings) {
+    const inst = this.instances.get(key);
+    if (inst) inst.settings = { ...settings };
   }
 
   getInstanceInfo(key: string): EAInfo | null {
@@ -417,6 +440,9 @@ export class EARuntime {
       stratTrendReversal;
     const regime = strategy(bars);
     if (regime === null || regime === inst.direction) return;
+    // Direction filter (Long only / Short only / Long & Short).
+    if (inst.settings.direction === 'long' && regime === 'SELL') return;
+    if (inst.settings.direction === 'short' && regime === 'BUY') return;
 
     inst.busy = true;
     try {
@@ -438,15 +464,16 @@ export class EARuntime {
       };
       const atrArr = atr(highs, lows, closes, 14);
       const a = atrArr[atrArr.length - 1] ?? 0;
+      const { slAtrMult, tpAtrMult, lot } = inst.settings;
       const fillPrice = regime === 'BUY' ? tick.ask : tick.bid;
-      const sl = a > 0 ? (regime === 'BUY' ? fillPrice - 2 * a : fillPrice + 2 * a) : undefined;
-      const tp = a > 0 ? (regime === 'BUY' ? fillPrice + 3 * a : fillPrice - 3 * a) : undefined;
+      const sl = a > 0 ? (regime === 'BUY' ? fillPrice - slAtrMult * a : fillPrice + slAtrMult * a) : undefined;
+      const tp = a > 0 ? (regime === 'BUY' ? fillPrice + tpAtrMult * a : fillPrice - tpAtrMult * a) : undefined;
 
       const result = await orderService.placeMarketOrder({
         accountId,
         symbol: inst.symbol,
         direction: regime,
-        size: EA_LOT,
+        size: lot,
         sl, tp,
         fillPrice,
         comment: `EA:${inst.name}`,
@@ -459,7 +486,7 @@ export class EARuntime {
         this.deps.onStats(inst.key, {
           trades: inst.trades,
           direction: regime,
-          lastAction: `${regime} ${EA_LOT} ${inst.symbol}`,
+          lastAction: `${regime} ${lot} ${inst.symbol}`,
         });
         this.deps.onRefresh();
       }

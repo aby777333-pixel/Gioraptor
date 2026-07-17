@@ -11,7 +11,7 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2 } from 'lucide-react';
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
@@ -20,6 +20,7 @@ import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
 import { EARuntime, type EAStats, type EAInfo, type StrategyKind } from '@/lib/trading/ea-engine';
 import { orderService } from '@/lib/trading/order-service';
+import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from './EAPropertiesModal';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -95,6 +96,8 @@ export default function ChartSourceSwitcher({
   }, []);
   // Which EA's diagnostics popover is open (by `${strategyId}-${symbol}` key).
   const [infoKey, setInfoKey] = useState<string | null>(null);
+  // EA Properties modal (§1).
+  const [propsFor, setPropsFor] = useState<AttachedEA | null>(null);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -129,6 +132,14 @@ export default function ChartSourceSwitcher({
         const lib = eaList.find((e) => e.id === a.strategyId);
         const kind = (a.strategyKind ?? lib?.strategyKind) as StrategyKind | undefined;
         runtime.attach(key, a.strategyId, a.name, a.symbol, lib?.timeframes ?? ['15m'], kind);
+        // Apply any previously-saved Properties for this EA type.
+        try {
+          const saved = JSON.parse(localStorage.getItem(`raptor_ea_full_${a.strategyId}`) || 'null');
+          if (saved) {
+            runtime.setInstanceSettings(key, { lot: saved.lot, slAtrMult: saved.slAtrMult, tpAtrMult: saved.tpAtrMult, direction: saved.direction });
+            if (saved.allowLiveTrading === false) { runtime.setInstanceEnabled(key, false); setEaEnabled((p) => ({ ...p, [key]: false })); }
+          }
+        } catch { /* ignore */ }
       }
     }
     // Detach removed instances (position stays open for the trader to manage).
@@ -295,6 +306,31 @@ export default function ChartSourceSwitcher({
     setAttachedEAs((prev) => prev.filter((a) => a.symbol !== activeSymbol));
     showEAToast(`All EAs cleared on ${activeSymbol} — chart is now manual`);
   }, [attachedEAs, activeSymbol, showEAToast]);
+
+  // EA Properties: build the current settings and apply edits back to the runtime.
+  const buildEASettings = useCallback((a: AttachedEA): EAFullSettings => {
+    const key = `${a.strategyId}-${a.symbol}`;
+    const exec = runtimeRef.current?.getInstanceSettings(key);
+    let persisted: Partial<EAFullSettings> = {};
+    try { persisted = JSON.parse(localStorage.getItem(`raptor_ea_full_${a.strategyId}`) || '{}'); } catch { /* ignore */ }
+    return {
+      ...DEFAULT_FULL_SETTINGS,
+      ...persisted,
+      ...(exec ?? {}),
+      allowLiveTrading: eaEnabled[key] ?? true,
+      confirmBeforeExecution: confirmTrade,
+    };
+  }, [eaEnabled, confirmTrade]);
+
+  const applyEASettings = useCallback((a: AttachedEA, full: EAFullSettings) => {
+    const key = `${a.strategyId}-${a.symbol}`;
+    runtimeRef.current?.setInstanceSettings(key, { lot: full.lot, slAtrMult: full.slAtrMult, tpAtrMult: full.tpAtrMult, direction: full.direction });
+    runtimeRef.current?.setInstanceEnabled(key, full.allowLiveTrading);
+    setEaEnabled((prev) => ({ ...prev, [key]: full.allowLiveTrading }));
+    setConfirmTrade(full.confirmBeforeExecution);
+    try { localStorage.setItem(`raptor_ea_full_${a.strategyId}`, JSON.stringify(full)); } catch { /* ignore */ }
+    showEAToast(`EA "${a.name}" properties applied`);
+  }, [showEAToast]);
 
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
@@ -687,6 +723,14 @@ export default function ChartSourceSwitcher({
                 >
                   <Info size={11} />
                 </button>
+                {/* EA properties */}
+                <button
+                  onClick={() => setPropsFor(a)}
+                  className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                  title="EA properties (inputs, risk, presets)"
+                >
+                  <Settings2 size={11} />
+                </button>
                 {/* Per-EA ON/OFF (independent of the global Algo switch) */}
                 <button
                   onClick={() => toggleEA(a)}
@@ -726,6 +770,24 @@ export default function ChartSourceSwitcher({
           </div>
         )}
       </div>
+
+      {/* EA Properties modal (§1) */}
+      {propsFor && (() => {
+        const info = runtimeRef.current?.getInstanceInfo(`${propsFor.strategyId}-${propsFor.symbol}`);
+        return (
+          <EAPropertiesModal
+            eaName={propsFor.name}
+            strategyId={propsFor.strategyId}
+            symbol={propsFor.symbol}
+            timeframe={info?.timeframe ?? '—'}
+            magic={info?.magic ?? 0}
+            engine={propsFor.strategyKind ?? 'built-in'}
+            initial={buildEASettings(propsFor)}
+            onApply={(full) => applyEASettings(propsFor, full)}
+            onClose={() => setPropsFor(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
