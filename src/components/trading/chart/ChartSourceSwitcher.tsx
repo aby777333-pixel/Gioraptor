@@ -19,6 +19,7 @@ import { useEALibrary } from './useEALibrary';
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
 import { EARuntime, type EAStats, type StrategyKind } from '@/lib/trading/ea-engine';
+import { orderService } from '@/lib/trading/order-service';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -72,6 +73,15 @@ export default function ChartSourceSwitcher({
   // Global Algo Trading switch (MT5-style). When OFF, all EAs pause — no
   // automated evaluation or orders — while manual trading stays available.
   const [algoOn, setAlgoOn] = useState(true);
+  // QuickTrade one-click panel (cTrader-style). Lives in the shared header so it
+  // works over BOTH the TradingView and RAPTOR charts.
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [lot, setLot] = useState('0.10');
+  const [slPrice, setSlPrice] = useState('');
+  const [tpPrice, setTpPrice] = useState('');
+  const [confirmTrade, setConfirmTrade] = useState(true);
+  const [placing, setPlacing] = useState(false);
+  const quickRef = useRef<HTMLDivElement>(null);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -174,6 +184,42 @@ export default function ChartSourceSwitcher({
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 3000);
   }, []);
+
+  // Close the QuickTrade panel on outside click.
+  useEffect(() => {
+    if (!quickOpen) return;
+    const h = (e: MouseEvent) => { if (quickRef.current && !quickRef.current.contains(e.target as Node)) setQuickOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [quickOpen]);
+
+  // One-click market order for the active symbol via the real order service.
+  const placeQuick = useCallback(async (direction: 'BUY' | 'SELL') => {
+    const acct = accountRef.current;
+    const t = pricesRef.current[activeSymbol];
+    const size = parseFloat(lot);
+    if (!acct) { showEAToast('Select a trading account first'); return; }
+    if (!t || t.bid == null || t.ask == null) { showEAToast(`No live price for ${activeSymbol}`); return; }
+    if (!(size > 0)) { showEAToast('Enter a valid lot size'); return; }
+    const fill = direction === 'BUY' ? t.ask : t.bid;
+    if (confirmTrade && !window.confirm(`${direction} ${size} ${activeSymbol} @ market (${fill})?`)) return;
+    setPlacing(true);
+    try {
+      await orderService.placeMarketOrder({
+        accountId: acct, symbol: activeSymbol, direction, size, fillPrice: fill,
+        sl: slPrice ? parseFloat(slPrice) : undefined,
+        tp: tpPrice ? parseFloat(tpPrice) : undefined,
+        comment: 'QuickTrade',
+      });
+      showEAToast(`✓ ${direction} ${size} ${activeSymbol} filled @ ${fill}`);
+      triggerRefresh();
+      setQuickOpen(false);
+    } catch (err) {
+      showEAToast(`Order failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPlacing(false);
+    }
+  }, [activeSymbol, lot, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
 
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
@@ -296,6 +342,79 @@ export default function ChartSourceSwitcher({
           <span style={{ fontSize: 9 }}>{algoOn ? '🟢' : '🔴'}</span>
           Algo {algoOn ? 'ON' : 'OFF'}
         </button>
+
+        {/* QuickTrade one-click panel — works over both charts */}
+        <div className="relative ml-1" ref={quickRef}>
+          <button
+            onClick={() => setQuickOpen((o) => !o)}
+            title="QuickTrade — one-click Buy/Sell for the active symbol"
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-colors"
+            style={{
+              backgroundColor: quickOpen ? 'rgba(41,171,226,0.15)' : 'transparent',
+              color: quickOpen ? '#0091D5' : 'rgba(255,255,255,0.55)',
+              border: '1px solid rgba(41,171,226,0.35)',
+            }}
+          >
+            <Zap size={12} /> Trade <ChevronDown size={10} />
+          </button>
+          {quickOpen && (() => {
+            const t = prices[activeSymbol];
+            const bid = t?.bid, ask = t?.ask;
+            const digits = bid != null && bid < 20 ? 5 : bid != null && bid < 500 ? 3 : 2;
+            return (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 w-[260px] rounded-lg border p-3 shadow-2xl"
+                style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-white">{activeSymbol}</span>
+                  <span className="text-[9px] text-white/35">one-click · both charts</span>
+                </div>
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => placeQuick('SELL')}
+                    disabled={placing}
+                    className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{ backgroundColor: 'rgba(193,18,31,0.15)', border: '1px solid rgba(193,18,31,0.4)' }}
+                  >
+                    <span className="text-[10px] font-bold uppercase" style={{ color: '#FF5252' }}>Sell</span>
+                    <span className="font-mono text-[12px] text-white">{bid != null ? bid.toFixed(digits) : '—'}</span>
+                  </button>
+                  <button
+                    onClick={() => placeQuick('BUY')}
+                    disabled={placing}
+                    className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{ backgroundColor: 'rgba(0,194,122,0.15)', border: '1px solid rgba(0,194,122,0.4)' }}
+                  >
+                    <span className="text-[10px] font-bold uppercase" style={{ color: '#00C27A' }}>Buy</span>
+                    <span className="font-mono text-[12px] text-white">{ask != null ? ask.toFixed(digits) : '—'}</span>
+                  </button>
+                </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="w-10 text-[10px] text-white/45">Lots</label>
+                  <input value={lot} onChange={(e) => setLot(e.target.value)} inputMode="decimal"
+                    className="flex-1 rounded bg-white/[0.06] px-2 py-1 font-mono text-[11px] text-white outline-none" />
+                </div>
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] text-white/45">SL</label>
+                    <input value={slPrice} onChange={(e) => setSlPrice(e.target.value)} placeholder="price" inputMode="decimal"
+                      className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-[10px] text-white/45">TP</label>
+                    <input value={tpPrice} onChange={(e) => setTpPrice(e.target.value)} placeholder="price" inputMode="decimal"
+                      className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
+                  </div>
+                </div>
+                <label className="flex items-center gap-1.5 text-[10px] text-white/45">
+                  <input type="checkbox" checked={confirmTrade} onChange={(e) => setConfirmTrade(e.target.checked)} className="accent-[#0091D5]" />
+                  Confirm before execution
+                </label>
+              </div>
+            );
+          })()}
+        </div>
 
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>
