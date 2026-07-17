@@ -42,3 +42,8 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# AI Strategy Lab (embedded Vite app) — commit source + built public/ai-lab,
+# but not its install/build artifacts
+/ai-lab-source/node_modules
+/ai-lab-source/dist
