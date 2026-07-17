@@ -15,7 +15,7 @@ import { useEALibrary } from './useEALibrary';
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type ChartType = 'candlestick' | 'bar' | 'line' | 'area';
+export type ChartType = 'candlestick' | 'bar' | 'line' | 'area' | 'heikinashi';
 export type LayoutType = 'single' | 'split' | 'vsplit' | 'h3' | 'v3' | 'quarters' | 'onefive' | 'table3x2';
 
 const TIMEFRAMES = [
@@ -29,6 +29,7 @@ const TIMEFRAMES = [
 const CHART_TYPES: { label: string; value: ChartType; icon: React.ReactNode }[] = [
   { label: 'Bars', value: 'bar', icon: <BarChart3 size={16} /> },
   { label: 'Candles', value: 'candlestick', icon: <CandlestickChart size={16} /> },
+  { label: 'Heikin Ashi', value: 'heikinashi', icon: <CandlestickChart size={16} /> },
   { label: 'Line', value: 'line', icon: <TrendingUp size={16} /> },
   { label: 'Area', value: 'area', icon: <AreaChart size={16} /> },
 ];

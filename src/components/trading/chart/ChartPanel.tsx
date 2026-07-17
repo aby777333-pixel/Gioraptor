@@ -95,6 +95,24 @@ interface Drawing {
 const CANVAS_DRAWING_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'measure'];
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
 
+// Heikin Ashi transform (pure). Smooths OHLC using the classic recurrence:
+//   haClose = (o+h+l+c)/4;  haOpen = (prevHaOpen+prevHaClose)/2 (seed = (o+c)/2)
+//   haHigh = max(h, haOpen, haClose);  haLow = min(l, haOpen, haClose)
+function toHeikinAshi(bars: { time: number; open: number; high: number; low: number; close: number }[]): CandlestickData[] {
+  const out: CandlestickData[] = [];
+  let prevOpen = 0, prevClose = 0;
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    const haClose = (b.open + b.high + b.low + b.close) / 4;
+    const haOpen = i === 0 ? (b.open + b.close) / 2 : (prevOpen + prevClose) / 2;
+    const haHigh = Math.max(b.high, haOpen, haClose);
+    const haLow = Math.min(b.low, haOpen, haClose);
+    out.push({ time: b.time as Time, open: haOpen, high: haHigh, low: haLow, close: haClose });
+    prevOpen = haOpen; prevClose = haClose;
+  }
+  return out;
+}
+
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
   if (symbol.startsWith('XAU') || symbol.startsWith('ETH')) return 2;
@@ -606,9 +624,10 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     };
   }, []);
 
-  // Toggle chart type visibility
+  // Toggle chart type visibility. Heikin Ashi reuses the candlestick series
+  // (fed transformed data in loadChartData), so it shares the candle visibility.
   useEffect(() => {
-    candleSeriesRef.current?.applyOptions({ visible: chartType === 'candlestick' });
+    candleSeriesRef.current?.applyOptions({ visible: chartType === 'candlestick' || chartType === 'heikinashi' });
     barSeriesRef.current?.applyOptions({ visible: chartType === 'bar' });
     lineSeriesRef.current?.applyOptions({ visible: chartType === 'line' });
     areaSeriesRef.current?.applyOptions({ visible: chartType === 'area' });
@@ -835,7 +854,9 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const allBars = ohlcvBuilder.getAllBars(activeSymbol, resolution);
     if (allBars.length === 0) return;
 
-    const candleData: CandlestickData[] = allBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
+    const candleData: CandlestickData[] = chartType === 'heikinashi'
+      ? toHeikinAshi(allBars)
+      : allBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
     const barData: BarData[] = allBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
     const lineData: LineData[] = allBars.map((bar) => ({ time: bar.time as Time, value: bar.close }));
     const areaData: AreaData[] = allBars.map((bar) => ({ time: bar.time as Time, value: bar.close }));
@@ -863,7 +884,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     applyIndicators(times, closes, highs, lows, volumes);
 
     chartRef.current?.timeScale().scrollToRealTime();
-  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators]);
+  }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, chartType]);
 
   useEffect(() => { loadChartData(); }, [loadChartData]);
 
@@ -873,6 +894,10 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution; if (!resolution) return;
     const tick = prices[activeSymbol]; if (!tick) return;
     const currentBar = ohlcvBuilder.getCurrentBar(activeSymbol, resolution); if (!currentBar) return;
+
+    // Heikin Ashi each bar depends on the prior HA bar, so an isolated update
+    // would drift — recompute the whole series from source bars on every tick.
+    if (chartType === 'heikinashi') { loadChartData(); if (priceLineRef.current) priceLineRef.current.applyOptions({ price: tick.mid }); return; }
 
     if (currentBar.time > lastBarTimeRef.current) { loadChartData(); }
     else {
@@ -885,7 +910,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     }
 
     if (priceLineRef.current) priceLineRef.current.applyOptions({ price: tick.mid });
-  }, [prices, activeSymbol, selectedTf, ohlcvBuilder, loadChartData]);
+  }, [prices, activeSymbol, selectedTf, ohlcvBuilder, loadChartData, chartType]);
 
   // ─── Display values ──────────────────────────────
 
