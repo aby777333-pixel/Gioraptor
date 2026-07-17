@@ -11,14 +11,14 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info } from 'lucide-react';
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
 import { useEALibrary } from './useEALibrary';
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
-import { EARuntime, type EAStats, type StrategyKind } from '@/lib/trading/ea-engine';
+import { EARuntime, type EAStats, type EAInfo, type StrategyKind } from '@/lib/trading/ea-engine';
 import { orderService } from '@/lib/trading/order-service';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
@@ -93,6 +93,8 @@ export default function ChartSourceSwitcher({
       return { ...prev, [key]: next };
     });
   }, []);
+  // Which EA's diagnostics popover is open (by `${strategyId}-${symbol}` key).
+  const [infoKey, setInfoKey] = useState<string | null>(null);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -618,14 +620,39 @@ export default function ChartSourceSwitcher({
         {symbolEAs.length > 0 && (
           <div className="absolute bottom-2 z-30 flex max-w-[70%] flex-wrap gap-1.5" style={{ left: 56 }}>
             {symbolEAs.map((a) => {
-              const on = eaEnabled[`${a.strategyId}-${a.symbol}`] ?? true;
+              const key = `${a.strategyId}-${a.symbol}`;
+              const on = eaEnabled[key] ?? true;
               const accent = on ? '#00C27A' : 'rgba(255,255,255,0.35)';
+              const info: EAInfo | null = infoKey === key ? (runtimeRef.current?.getInstanceInfo(key) ?? null) : null;
               return (
               <div
                 key={`${a.instanceId ?? a.strategyId}-${a.symbol}`}
-                className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono"
+                className="relative flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-mono"
                 style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: `1px solid ${on ? 'rgba(0,194,122,0.3)' : 'rgba(255,255,255,0.15)'}`, color: accent }}
               >
+                {/* Diagnostics popover — opens upward above the chip */}
+                {infoKey === key && (
+                  <div
+                    className="absolute bottom-full left-0 z-50 mb-1 w-[220px] rounded-lg border p-2.5 text-[10px] shadow-2xl"
+                    style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)' }}
+                  >
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="font-bold text-white">{a.name}</span>
+                      <span className="text-[8px] uppercase tracking-wide" style={{ color: accent }}>
+                        {!on ? 'paused' : info?.hasPosition ? `in ${info?.direction ?? ''}` : 'scanning'}
+                      </span>
+                    </div>
+                    <InfoRow k="Symbol" v={info?.symbol ?? a.symbol} />
+                    <InfoRow k="Timeframe" v={info?.timeframe ?? '—'} />
+                    <InfoRow k="Current signal" v={info?.direction ?? '—'} />
+                    <InfoRow k="Open position" v={info?.hasPosition ? 'Yes' : 'None'} />
+                    <InfoRow k="Trades" v={String(info?.trades ?? 0)} />
+                    <InfoRow k="Magic #" v={String(info?.magic ?? '—')} />
+                    <InfoRow k="Last execution" v={info?.lastBarTime ? new Date(info.lastBarTime * 1000).toLocaleTimeString() : '—'} />
+                    <InfoRow k="Engine" v={a.strategyKind ?? 'built-in'} />
+                    <InfoRow k="State" v={!on ? 'Disabled' : 'Enabled'} />
+                  </div>
+                )}
                 <span className={`h-1.5 w-1.5 rounded-full ${on ? 'animate-pulse' : ''}`} style={{ backgroundColor: accent }} />
                 {a.name}
                 {(() => {
@@ -638,6 +665,14 @@ export default function ChartSourceSwitcher({
                     </span>
                   );
                 })()}
+                {/* EA diagnostics */}
+                <button
+                  onClick={() => setInfoKey((k) => (k === key ? null : key))}
+                  className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                  title="EA status & diagnostics"
+                >
+                  <Info size={11} />
+                </button>
                 {/* Per-EA ON/OFF (independent of the global Algo switch) */}
                 <button
                   onClick={() => toggleEA(a)}
@@ -660,6 +695,15 @@ export default function ChartSourceSwitcher({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function InfoRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-white/35">{k}</span>
+      <span className="font-semibold text-white/85">{v}</span>
     </div>
   );
 }

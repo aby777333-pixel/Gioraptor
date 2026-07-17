@@ -257,6 +257,27 @@ export interface EAStats {
   lastAction: string;
 }
 
+// Full per-EA diagnostics snapshot (§9 / §14).
+export interface EAInfo {
+  key: string;
+  name: string;
+  symbol: string;
+  timeframe: string;
+  enabled: boolean;
+  trades: number;
+  direction: EARegime;
+  hasPosition: boolean;
+  magic: number;
+  lastBarTime: number;
+}
+
+// Stable 6-digit "magic number" derived from the instance key (MT5-style).
+function magicFromKey(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (Math.abs(h) % 900000) + 100000;
+}
+
 interface InstanceState {
   key: string;
   strategyId: string;
@@ -332,6 +353,16 @@ export class EARuntime {
     if (!inst) return;
     inst.enabled = on;
     if (on && this.globalEnabled) void this.evaluate(inst, true);
+  }
+
+  getInstanceInfo(key: string): EAInfo | null {
+    const inst = this.instances.get(key);
+    if (!inst) return null;
+    return {
+      key: inst.key, name: inst.name, symbol: inst.symbol, timeframe: inst.resolution,
+      enabled: inst.enabled, trades: inst.trades, direction: inst.direction,
+      hasPosition: !!inst.positionId, magic: magicFromKey(inst.key), lastBarTime: inst.lastBarTime,
+    };
   }
 
   detach(key: string) {
