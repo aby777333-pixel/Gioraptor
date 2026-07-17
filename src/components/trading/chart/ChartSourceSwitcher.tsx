@@ -421,8 +421,8 @@ export default function ChartSourceSwitcher({
     >
       {/* Source tabs + TV-tab EA menu */}
       <div
-        className="flex shrink-0 items-center gap-1 border-b px-2"
-        style={{ height: 30, minHeight: 30, backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+        className="flex shrink-0 items-center gap-1 overflow-x-auto border-b px-2 [&>*]:shrink-0"
+        style={{ height: 30, minHeight: 30, backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', scrollbarWidth: 'none' }}
       >
         {(
           [
@@ -474,7 +474,7 @@ export default function ChartSourceSwitcher({
               border: '1px solid rgba(41,171,226,0.35)',
             }}
           >
-            <Zap size={12} /> <span className="hidden xl:inline">Trade</span> <ChevronDown size={10} />
+            <Zap size={12} /> <span className="hidden 2xl:inline">Trade</span> <ChevronDown size={10} />
           </button>
           {quickOpen && (() => {
             const t = prices[activeSymbol];

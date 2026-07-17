@@ -67,7 +67,7 @@ export default function WatchlistMenu({
         className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
         style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
       >
-        <List size={12} /> <span className="hidden xl:inline">Watchlist</span> <ChevronDown size={10} />
+        <List size={12} /> <span className="hidden 2xl:inline">Watchlist</span> <ChevronDown size={10} />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
