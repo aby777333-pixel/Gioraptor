@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 });
   const q = await getQuote(symbol);
   if (!q) return NextResponse.json({ error: 'no data for symbol', symbol }, { status: 404 });
-  return NextResponse.json(q, {
-    headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' },
-  });
+  // no-store: Netlify's CDN keys function responses by path (not query), so a
+  // shared cache here would serve one symbol's price for every symbol. The
+  // upstream provider fetches are still deduped by the data-layer fetch cache.
+  return NextResponse.json(q, { headers: { 'Cache-Control': 'no-store' } });
 }

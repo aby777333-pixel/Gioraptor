@@ -18,8 +18,9 @@ export async function GET(
   if (!candles.length) {
     return NextResponse.json({ error: 'no candles', symbol }, { status: 502 });
   }
+  // no-store: the ?timeframe= query varies within one path; avoid CDN collisions.
   return NextResponse.json(
     { symbol: symbol.toUpperCase(), candles, indicators: {} },
-    { headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=60' } },
+    { headers: { 'Cache-Control': 'no-store' } },
   );
 }

@@ -10,8 +10,6 @@ export async function GET(request: Request) {
   const symbols = raw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 60);
   if (!symbols.length) return NextResponse.json({ error: 'symbols required' }, { status: 400 });
   const quotes = await getQuotes(symbols);
-  return NextResponse.json(
-    { count: quotes.length, quotes },
-    { headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' } },
-  );
+  // no-store: CDN keys by path, not the ?symbols= query (see quote route).
+  return NextResponse.json({ count: quotes.length, quotes }, { headers: { 'Cache-Control': 'no-store' } });
 }

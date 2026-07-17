@@ -12,8 +12,9 @@ export async function GET(request: Request) {
   const bars = Math.min(parseInt(p.get('bars') || '200', 10) || 200, 1000);
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 });
   const candles = await getCandles(symbol, tf, bars);
+  // no-store: CDN keys by path, not the ?symbol= query (see quote route).
   return NextResponse.json(
     { symbol: symbol.toUpperCase(), tf, count: candles.length, candles },
-    { headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=60' } },
+    { headers: { 'Cache-Control': 'no-store' } },
   );
 }
