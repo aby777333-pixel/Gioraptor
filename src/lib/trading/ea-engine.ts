@@ -495,3 +495,108 @@ export class EARuntime {
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Strategy Tester (§11) — bar-level backtest of an EA's strategy over
+// historical bars. Reuses the SAME strategy functions the live runtime uses,
+// so the tester reflects real entry/exit logic. Entries flip on opposite
+// signals; ATR-scaled SL/TP (from the EA's settings) close intrabar. Returns
+// are computed per trade (asset-agnostic %), then a fixed-notional equity curve.
+// ═══════════════════════════════════════════════════════════════
+
+export interface BTTrade {
+  entryTime: number; exitTime: number; direction: 'BUY' | 'SELL';
+  entry: number; exit: number; retPct: number; pnl: number; reason: string;
+}
+
+export interface BacktestResult {
+  trades: BTTrade[];
+  equity: number[];
+  barsTested: number;
+  netProfit: number; grossProfit: number; grossLoss: number; profitFactor: number;
+  maxDrawdownPct: number; winRate: number; numTrades: number; wins: number; losses: number;
+  avgTradePct: number; largestWinPct: number; largestLossPct: number;
+  sharpe: number; expectancy: number;
+}
+
+const BT_NOTIONAL = 10000; // fixed notional per trade for P&L in $
+
+export function backtestStrategy(
+  bars: OHLCVBar[],
+  strategyId: string,
+  strategyKind: StrategyKind | undefined,
+  settings: EASettings,
+): BacktestResult {
+  const strat = STRATEGIES[strategyId] ?? (strategyKind ? STRATEGY_KINDS[strategyKind] : undefined) ?? stratTrendReversal;
+  const START = 60;
+  const trades: BTTrade[] = [];
+  const highs = bars.map((b) => b.high), lows = bars.map((b) => b.low), closes = bars.map((b) => b.close);
+  const atrArr = atr(highs, lows, closes, 14);
+
+  let pos: { dir: 'BUY' | 'SELL'; entry: number; entryTime: number; sl: number | null; tp: number | null } | null = null;
+  const close = (exit: number, time: number, reason: string) => {
+    if (!pos) return;
+    const ret = ((exit - pos.entry) / pos.entry) * (pos.dir === 'BUY' ? 1 : -1);
+    trades.push({ entryTime: pos.entryTime, exitTime: time, direction: pos.dir, entry: pos.entry, exit, retPct: ret * 100, pnl: ret * BT_NOTIONAL, reason });
+    pos = null;
+  };
+
+  for (let i = START; i < bars.length; i++) {
+    const bar = bars[i];
+    // Intrabar SL/TP on the open position.
+    if (pos) {
+      if (pos.dir === 'BUY') {
+        if (pos.sl != null && bar.low <= pos.sl) close(pos.sl, bar.time, 'SL');
+        else if (pos.tp != null && bar.high >= pos.tp) close(pos.tp, bar.time, 'TP');
+      } else {
+        if (pos.sl != null && bar.high >= pos.sl) close(pos.sl, bar.time, 'SL');
+        else if (pos.tp != null && bar.low <= pos.tp) close(pos.tp, bar.time, 'TP');
+      }
+    }
+    const regime = strat(bars.slice(0, i + 1));
+    if (regime === null) continue;
+    if (settings.direction === 'long' && regime === 'SELL') continue;
+    if (settings.direction === 'short' && regime === 'BUY') continue;
+    if (!pos || pos.dir !== regime) {
+      if (pos) close(bar.close, bar.time, 'flip');
+      const a = atrArr[i] ?? 0;
+      const entry = bar.close;
+      pos = {
+        dir: regime, entry, entryTime: bar.time,
+        sl: a > 0 ? (regime === 'BUY' ? entry - settings.slAtrMult * a : entry + settings.slAtrMult * a) : null,
+        tp: a > 0 ? (regime === 'BUY' ? entry + settings.tpAtrMult * a : entry - settings.tpAtrMult * a) : null,
+      };
+    }
+  }
+  if (pos && bars.length) close(bars[bars.length - 1].close, bars[bars.length - 1].time, 'end');
+
+  // Metrics
+  const rets = trades.map((t) => t.retPct);
+  const pnls = trades.map((t) => t.pnl);
+  const wins = trades.filter((t) => t.pnl > 0);
+  const losses = trades.filter((t) => t.pnl < 0);
+  const grossProfit = wins.reduce((s, t) => s + t.pnl, 0);
+  const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+  const netProfit = grossProfit - grossLoss;
+  const equity: number[] = [BT_NOTIONAL];
+  let eq = BT_NOTIONAL, peak = BT_NOTIONAL, maxDD = 0;
+  for (const p of pnls) { eq += p; equity.push(eq); peak = Math.max(peak, eq); maxDD = Math.max(maxDD, (peak - eq) / peak); }
+  const mean = rets.length ? rets.reduce((a, b) => a + b, 0) / rets.length : 0;
+  const variance = rets.length ? rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length : 0;
+  const std = Math.sqrt(variance);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  return {
+    trades, equity, barsTested: bars.length,
+    netProfit: round2(netProfit), grossProfit: round2(grossProfit), grossLoss: round2(grossLoss),
+    profitFactor: grossLoss > 0 ? round2(grossProfit / grossLoss) : (grossProfit > 0 ? 999 : 0),
+    maxDrawdownPct: round2(maxDD * 100),
+    winRate: trades.length ? round2((wins.length / trades.length) * 100) : 0,
+    numTrades: trades.length, wins: wins.length, losses: losses.length,
+    avgTradePct: round2(mean),
+    largestWinPct: round2(Math.max(0, ...rets)),
+    largestLossPct: round2(Math.min(0, ...rets)),
+    sharpe: std > 0 ? round2((mean / std) * Math.sqrt(Math.max(rets.length, 1))) : 0,
+    expectancy: round2(pnls.length ? netProfit / pnls.length : 0),
+  };
+}

@@ -11,7 +11,7 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2 } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical } from 'lucide-react';
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client';
 import { EARuntime, type EAStats, type EAInfo, type StrategyKind } from '@/lib/trading/ea-engine';
 import { orderService } from '@/lib/trading/order-service';
 import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from './EAPropertiesModal';
+import StrategyTesterModal from './StrategyTesterModal';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -98,6 +99,8 @@ export default function ChartSourceSwitcher({
   const [infoKey, setInfoKey] = useState<string | null>(null);
   // EA Properties modal (§1).
   const [propsFor, setPropsFor] = useState<AttachedEA | null>(null);
+  // Strategy Tester modal (§11).
+  const [testFor, setTestFor] = useState<AttachedEA | null>(null);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -731,6 +734,14 @@ export default function ChartSourceSwitcher({
                 >
                   <Settings2 size={11} />
                 </button>
+                {/* Strategy tester */}
+                <button
+                  onClick={() => setTestFor(a)}
+                  className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                  title="Strategy Tester — backtest this EA"
+                >
+                  <FlaskConical size={11} />
+                </button>
                 {/* Per-EA ON/OFF (independent of the global Algo switch) */}
                 <button
                   onClick={() => toggleEA(a)}
@@ -785,6 +796,27 @@ export default function ChartSourceSwitcher({
             initial={buildEASettings(propsFor)}
             onApply={(full) => applyEASettings(propsFor, full)}
             onClose={() => setPropsFor(null)}
+          />
+        );
+      })()}
+
+      {/* Strategy Tester modal (§11) */}
+      {testFor && (() => {
+        const key = `${testFor.strategyId}-${testFor.symbol}`;
+        const info = runtimeRef.current?.getInstanceInfo(key);
+        const resolution = (info?.timeframe ?? '15') as Resolution;
+        const bars = ohlcvRef.current ? ohlcvRef.current.getAllBars(testFor.symbol, resolution) : [];
+        const settings = runtimeRef.current?.getInstanceSettings(key) ?? { lot: 0.01, slAtrMult: 2, tpAtrMult: 3, direction: 'both' as const };
+        return (
+          <StrategyTesterModal
+            eaName={testFor.name}
+            symbol={testFor.symbol}
+            timeframe={resolution}
+            bars={bars}
+            strategyId={testFor.strategyId}
+            strategyKind={testFor.strategyKind as StrategyKind | undefined}
+            settings={settings}
+            onClose={() => setTestFor(null)}
           />
         );
       })()}
