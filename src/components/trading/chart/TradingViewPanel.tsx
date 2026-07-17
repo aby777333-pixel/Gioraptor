@@ -19,13 +19,23 @@ const TV_SYMBOLS: Record<string, string> = {
   USOIL: 'TVC:USOIL', UKOIL: 'TVC:UKOIL', NATGAS: 'NYMEX:NG1!',
 };
 
+// Shared TF label → TradingView interval code.
+const TV_INTERVALS: Record<string, string> = {
+  '1m': '1', '5m': '5', '15m': '15', '30m': '30',
+  '1H': '60', '4H': '240', '1D': 'D', '1W': 'W', '1Mo': 'M',
+};
+
 export default function TradingViewPanel() {
-  const { activeSymbol } = useTradingStore();
+  const { activeSymbol, activeTimeframe } = useTradingStore();
   const hostRef = useRef<HTMLDivElement>(null);
 
   const tvSymbol = useMemo(
     () => TV_SYMBOLS[activeSymbol] ?? `FX:${activeSymbol}`,
     [activeSymbol]
+  );
+  const tvInterval = useMemo(
+    () => TV_INTERVALS[activeTimeframe] ?? '60',
+    [activeTimeframe]
   );
 
   useEffect(() => {
@@ -51,7 +61,7 @@ export default function TradingViewPanel() {
     script.innerHTML = JSON.stringify({
       autosize: true,
       symbol: tvSymbol,
-      interval: '60',
+      interval: tvInterval,
       timezone: 'Etc/UTC',
       theme: 'dark',
       style: '1',
@@ -69,7 +79,7 @@ export default function TradingViewPanel() {
     return () => {
       host.innerHTML = '';
     };
-  }, [tvSymbol]);
+  }, [tvSymbol, tvInterval]);
 
   return (
     <div className="relative h-full w-full" style={{ backgroundColor: '#060D16' }}>

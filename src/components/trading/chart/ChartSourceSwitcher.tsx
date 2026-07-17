@@ -24,6 +24,7 @@ import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from '.
 import StrategyTesterModal from './StrategyTesterModal';
 import AlertsMenu from './AlertsMenu';
 import WatchlistMenu from './WatchlistMenu';
+import TimeframeBar from './TimeframeBar';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -651,6 +652,9 @@ export default function ChartSourceSwitcher({
           </div>
         )}
       </div>
+
+      {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts */}
+      <TimeframeBar />
 
       {/* Active chart + shared EA overlays */}
       <div className="relative min-h-0 flex-1">

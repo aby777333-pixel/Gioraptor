@@ -6,6 +6,11 @@ interface TradingState {
   activeSymbol: string;
   setActiveSymbol: (symbol: string) => void;
 
+  // Shared timeframe (drives BOTH the TradingView and RAPTOR charts). Value is
+  // a user-facing TF label: '1m' | '5m' | '15m' | '30m' | '1H' | '4H' | '1D' | '1W' | '1Mo'.
+  activeTimeframe: string;
+  setActiveTimeframe: (tf: string) => void;
+
   // Active account
   activeAccountId: string | null;
   setActiveAccountId: (id: string) => void;
@@ -47,6 +52,9 @@ interface TradingState {
 export const useTradingStore = create<TradingState>((set) => ({
   activeSymbol: 'EURUSD',
   setActiveSymbol: (symbol) => set({ activeSymbol: symbol }),
+
+  activeTimeframe: '1H',
+  setActiveTimeframe: (tf) => set({ activeTimeframe: tf }),
 
   activeAccountId: null,
   setActiveAccountId: (id) => set({ activeAccountId: id }),

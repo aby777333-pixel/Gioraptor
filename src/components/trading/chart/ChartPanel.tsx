@@ -261,21 +261,37 @@ interface ChartPanelProps {
 
 export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPanelProps) {
   const { activeSymbol, prices } = useTradingStore();
-  const [selectedTf, setSelectedTf] = useState<string>('1H');
+  const storeTf = useTradingStore((s) => s.activeTimeframe);
+  const setStoreTf = useTradingStore((s) => s.setActiveTimeframe);
+  const [selectedTf, setSelectedTf] = useState<string>(storeTf || '1H');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [oneClickTrading, setOneClickTrading] = useState(false);
   const [activeLayout, setActiveLayout] = useState<LayoutType>('single');
 
-  // Listen for keyboard tf changes
+  // Change timeframe locally AND publish to the shared store, so the RAPTOR
+  // chart, the TradingView chart, and the shared Timeframe bar stay in lock-step.
+  const changeTf = useCallback((tf: string) => {
+    if (!TF_TO_RESOLUTION[tf]) return;
+    setSelectedTf(tf);
+    setStoreTf(tf);
+  }, [setStoreTf]);
+
+  // Mirror shared-store timeframe changes (from the shared bar / TV tab) into
+  // this chart. Guarded so it never loops with changeTf.
   useEffect(() => {
-    const TF_MAP: Record<string, string> = { '1':'1m','2':'5m','3':'15m','4':'1H','5':'4H','6':'1D' };
+    if (storeTf && storeTf !== selectedTf) setSelectedTf(storeTf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeTf]);
+
+  // Listen for keyboard tf changes (any valid timeframe label).
+  useEffect(() => {
     function handleTfChange(e: Event) {
       const detail = (e as CustomEvent<string>).detail;
-      if (detail && Object.values(TF_MAP).includes(detail)) setSelectedTf(detail);
+      if (detail && TF_TO_RESOLUTION[detail]) changeTf(detail);
     }
     window.addEventListener('raptor-timeframe-change', handleTfChange);
     return () => window.removeEventListener('raptor-timeframe-change', handleTfChange);
-  }, []);
+  }, [changeTf]);
 
   // Listen for drawing tool selection from the toolbar dropdown
   useEffect(() => {
@@ -893,7 +909,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       {/* Enhanced Chart Toolbar */}
       <ChartToolbar
         selectedTf={selectedTf}
-        onTfChange={setSelectedTf}
+        onTfChange={changeTf}
         chartType={chartType}
         onChartTypeChange={setChartType}
         oneClickTrading={oneClickTrading}
