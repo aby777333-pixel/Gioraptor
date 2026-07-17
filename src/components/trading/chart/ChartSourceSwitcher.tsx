@@ -27,6 +27,7 @@ import WatchlistMenu from './WatchlistMenu';
 import TimeframeBar from './TimeframeBar';
 import TemplatesMenu from './TemplatesMenu';
 import MarketsMenu from './MarketsMenu';
+import DomLadder from './DomLadder';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -573,6 +574,9 @@ export default function ChartSourceSwitcher({
 
         {/* Markets — economic calendar, news & screener (real TradingView data) */}
         <MarketsMenu />
+
+        {/* DOM — click-to-trade price ladder (real order service, both charts) */}
+        <DomLadder activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
 
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>
