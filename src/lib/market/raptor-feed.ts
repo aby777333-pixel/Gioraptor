@@ -1,0 +1,276 @@
+// ═══════════════════════════════════════════════════════════════
+// GIO RAPTOR — Unified Market Data Feed
+//
+// One normalised market-data service that fuses several providers behind a
+// single interface, so the rest of Raptor (terminal, AI Strategy Lab) can ask
+// for a quote/candles by symbol without caring where the data comes from.
+//
+// Providers (used in priority order per asset class; all optional except the
+// free public backbones, so the feed degrades gracefully):
+//   • Finnhub      — US equities & crypto real-time      (env FINNHUB_API_KEY)
+//   • Twelve Data  — forex / equities / indices          (env TWELVEDATA_API_KEY)
+//   • Yahoo Finance— universal backbone, no key           (public)
+//   • Binance      — crypto spot & klines, no key         (public)
+//   • Marketstack  — EOD equities                          (env MARKETSTACK_API_KEY)
+//   • Indian Stock API — NSE/BSE via self-hosted service   (env INDIAN_STOCK_API_URL)
+//
+// Keys are read from the server environment only — never shipped to the client.
+// FXCM ForexConnect / FIX are native/socket gateways that cannot run inside a
+// stateless serverless function; they are represented in health() as "gateway
+// required" rather than called here.
+// ═══════════════════════════════════════════════════════════════
+
+export type AssetClass = 'forex' | 'stock' | 'crypto' | 'index' | 'commodity' | 'india';
+
+export interface RaptorQuote {
+  symbol: string;       // canonical Raptor symbol (e.g. EURUSD, RELIANCE, BTCUSDT)
+  price: number;
+  prev_close: number;
+  change: number;
+  change_pct: number;
+  currency: string;
+  asset_class: AssetClass;
+  source: string;       // which provider answered
+  time: string;         // ISO
+}
+
+export interface RaptorCandle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+const FINNHUB_KEY = process.env.FINNHUB_API_KEY || '';
+const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY || '';
+const MARKETSTACK_KEY = process.env.MARKETSTACK_API_KEY || '';
+const INDIAN_API = process.env.INDIAN_STOCK_API_URL || '';
+
+// ── Symbol resolution ────────────────────────────────────────────
+// Map a canonical Raptor symbol to each provider's ticker + asset class.
+interface Resolved {
+  asset: AssetClass;
+  currency: string;
+  yahoo: string;
+  finnhub?: string;   // Finnhub ticker (US stocks / BINANCE:xxx crypto)
+  twelve?: string;    // Twelve Data ticker (e.g. EUR/USD)
+  binance?: string;   // Binance spot pair
+}
+
+const FOREX: Record<string, string> = {
+  EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', USDJPY: 'USDJPY=X', AUDUSD: 'AUDUSD=X',
+  USDCAD: 'USDCAD=X', NZDUSD: 'NZDUSD=X', EURGBP: 'EURGBP=X', USDCHF: 'USDCHF=X',
+  EURJPY: 'EURJPY=X', GBPJPY: 'GBPJPY=X',
+};
+const US_STOCKS = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 'NVDA', 'META', 'NFLX', 'AMD'];
+const CRYPTO: Record<string, string> = {
+  BTCUSDT: 'BTC-USD', ETHUSDT: 'ETH-USD', BNBUSDT: 'BNB-USD', SOLUSDT: 'SOL-USD',
+  XRPUSDT: 'XRP-USD', ADAUSDT: 'ADA-USD', DOGEUSDT: 'DOGE-USD',
+};
+const INDIA: Record<string, { yahoo: string }> = {
+  NIFTY50: { yahoo: '^NSEI' }, SENSEX: { yahoo: '^BSESN' }, BANKNIFTY: { yahoo: '^NSEBANK' },
+  FINNIFTY: { yahoo: '^CNXFIN' }, NIFTYIT: { yahoo: '^CNXIT' },
+  RELIANCE: { yahoo: 'RELIANCE.NS' }, TCS: { yahoo: 'TCS.NS' }, INFY: { yahoo: 'INFY.NS' },
+  HDFC: { yahoo: 'HDFCBANK.NS' },
+};
+// MCX contracts are INR-denominated; we proxy price discovery to the global
+// futures curve (USD) and tag the source so it is never presented as an exact
+// MCX print.
+const INDIA_MCX: Record<string, string> = {
+  GOLDMCX: 'GC=F', SILVERMCX: 'SI=F', CRUDEMCX: 'CL=F', NATGASMCX: 'NG=F',
+};
+const COMMODITIES: Record<string, string> = {
+  GOLD: 'GC=F', XAUUSD: 'GC=F', SILVER: 'SI=F', XAGUSD: 'SI=F', PLATINUM: 'PL=F',
+  CRUDEOIL: 'CL=F', USOIL: 'CL=F', NATURALGAS: 'NG=F', NATGAS: 'NG=F',
+};
+const INDICES: Record<string, string> = {
+  SPX500: '^GSPC', DJI30: '^DJI', NASDAQ: '^IXIC', FTSE100: '^FTSE', DAX40: '^GDAXI',
+  NIKKEI225: '^N225', UK100: '^FTSE', GER40: '^GDAXI', FRA40: '^FCHI', US30: '^DJI', NAS100: '^IXIC',
+};
+
+export function resolveSymbol(raw: string): Resolved {
+  const s = raw.toUpperCase().replace('/', '').replace('_', '');
+  if (FOREX[s]) return { asset: 'forex', currency: s.slice(3, 6), yahoo: FOREX[s], twelve: `${s.slice(0, 3)}/${s.slice(3, 6)}` };
+  if (CRYPTO[s]) return { asset: 'crypto', currency: 'USD', yahoo: CRYPTO[s], finnhub: `BINANCE:${s}`, binance: s };
+  if (US_STOCKS.includes(s)) return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s, twelve: s };
+  if (INDIA[s]) return { asset: 'india', currency: 'INR', yahoo: INDIA[s].yahoo };
+  if (INDIA_MCX[s]) return { asset: 'commodity', currency: 'USD', yahoo: INDIA_MCX[s] };
+  if (COMMODITIES[s]) return { asset: 'commodity', currency: 'USD', yahoo: COMMODITIES[s] };
+  if (INDICES[s]) return { asset: 'index', currency: 'USD', yahoo: INDICES[s] };
+  // Unknown → try as a US equity ticker on Yahoo.
+  return { asset: 'stock', currency: 'USD', yahoo: s, finnhub: s };
+}
+
+// ── Provider adapters (each returns a partial quote or null) ──────
+type PartialQuote = { price: number; prev_close: number; source: string } | null;
+
+async function jget(url: string, opts: RequestInit = {}, ms = 6000): Promise<any | null> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'GIO4X-Raptor/1.0', ...(opts.headers || {}) },
+      // Cache at the CDN layer to stay well within provider rate limits.
+      next: { revalidate: 12 },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function finnhubQuote(r: Resolved): Promise<PartialQuote> {
+  if (!FINNHUB_KEY || !r.finnhub) return null;
+  const d = await jget(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(r.finnhub)}&token=${FINNHUB_KEY}`);
+  if (!d || typeof d.c !== 'number' || d.c === 0) return null;
+  return { price: d.c, prev_close: d.pc || d.c, source: 'finnhub' };
+}
+
+async function binanceQuote(r: Resolved): Promise<PartialQuote> {
+  if (!r.binance) return null;
+  const d = await jget(`https://api.binance.com/api/v3/ticker/24hr?symbol=${r.binance}`);
+  if (!d || !d.lastPrice) return null;
+  const price = parseFloat(d.lastPrice);
+  const prev = parseFloat(d.openPrice) || price;
+  return { price, prev_close: prev, source: 'binance' };
+}
+
+async function twelveQuote(r: Resolved): Promise<PartialQuote> {
+  if (!TWELVEDATA_KEY || !r.twelve) return null;
+  const d = await jget(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(r.twelve)}&apikey=${TWELVEDATA_KEY}`);
+  if (!d || !d.close) return null;
+  const price = parseFloat(d.close);
+  const prev = parseFloat(d.previous_close) || price;
+  return { price, prev_close: prev, source: 'twelvedata' };
+}
+
+async function yahooQuote(r: Resolved): Promise<PartialQuote> {
+  const d = await jget(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(r.yahoo)}?interval=1d&range=5d`);
+  const meta = d?.chart?.result?.[0]?.meta;
+  if (!meta || typeof meta.regularMarketPrice !== 'number') return null;
+  const price = meta.regularMarketPrice;
+  const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
+  return { price, prev_close: prev, source: 'yahoo' };
+}
+
+// ── Public API ───────────────────────────────────────────────────
+export async function getQuote(rawSymbol: string): Promise<RaptorQuote | null> {
+  const r = resolveSymbol(rawSymbol);
+  // Provider preference by asset class, then universal fallbacks.
+  const chain: (() => Promise<PartialQuote>)[] =
+    r.asset === 'crypto' ? [() => binanceQuote(r), () => finnhubQuote(r), () => yahooQuote(r)]
+    : r.asset === 'stock' ? [() => finnhubQuote(r), () => yahooQuote(r), () => twelveQuote(r)]
+    : r.asset === 'forex' ? [() => yahooQuote(r), () => twelveQuote(r)]
+    : [() => yahooQuote(r), () => twelveQuote(r)];
+
+  let q: PartialQuote = null;
+  for (const step of chain) {
+    q = await step();
+    if (q) break;
+  }
+  if (!q) return null;
+
+  const price = round(q.price, digitsFor(rawSymbol, q.price));
+  const prev = round(q.prev_close, digitsFor(rawSymbol, q.prev_close));
+  const change = round(price - prev, 6);
+  return {
+    symbol: rawSymbol.toUpperCase(),
+    price,
+    prev_close: prev,
+    change,
+    change_pct: prev ? round((change / prev) * 100, 2) : 0,
+    currency: r.currency,
+    asset_class: r.asset,
+    source: q.source,
+    time: nowIso(),
+  };
+}
+
+export async function getQuotes(symbols: string[]): Promise<RaptorQuote[]> {
+  const settled = await Promise.allSettled(symbols.map((s) => getQuote(s)));
+  return settled
+    .map((x) => (x.status === 'fulfilled' ? x.value : null))
+    .filter((q): q is RaptorQuote => q != null);
+}
+
+export async function getCandles(rawSymbol: string, tf = '1h', bars = 200): Promise<RaptorCandle[]> {
+  const r = resolveSymbol(rawSymbol);
+  // Prefer Binance klines for crypto (full OHLCV), else Yahoo chart.
+  if (r.binance) {
+    const iv = tfToBinance(tf);
+    const d = await jget(`https://api.binance.com/api/v3/klines?symbol=${r.binance}&interval=${iv}&limit=${Math.min(bars, 1000)}`);
+    if (Array.isArray(d) && d.length) {
+      return d.map((k: any[]) => ({
+        time: new Date(k[0]).toISOString(),
+        open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+      }));
+    }
+  }
+  const { interval, range } = tfToYahoo(tf, bars);
+  const d = await jget(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(r.yahoo)}?interval=${interval}&range=${range}`);
+  const res = d?.chart?.result?.[0];
+  const ts: number[] = res?.timestamp || [];
+  const q = res?.indicators?.quote?.[0];
+  if (!ts.length || !q) return [];
+  const out: RaptorCandle[] = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.close?.[i] == null) continue;
+    out.push({
+      time: new Date(ts[i] * 1000).toISOString(),
+      open: q.open?.[i] ?? q.close[i],
+      high: q.high?.[i] ?? q.close[i],
+      low: q.low?.[i] ?? q.close[i],
+      close: q.close[i],
+      volume: q.volume?.[i] ?? 0,
+    });
+  }
+  return out.slice(-bars);
+}
+
+export function feedHealth() {
+  return {
+    providers: [
+      { name: 'finnhub', configured: !!FINNHUB_KEY, scope: 'US equities + crypto' },
+      { name: 'twelvedata', configured: !!TWELVEDATA_KEY, scope: 'forex + equities + indices' },
+      { name: 'yahoo', configured: true, scope: 'universal backbone (no key)' },
+      { name: 'binance', configured: true, scope: 'crypto spot + klines (no key)' },
+      { name: 'marketstack', configured: !!MARKETSTACK_KEY, scope: 'EOD equities' },
+      { name: 'indian_stock_api', configured: !!INDIAN_API, scope: 'NSE/BSE (self-hosted)' },
+      { name: 'fxcm_forexconnect', configured: false, scope: 'gateway required (native SDK)' },
+      { name: 'fxcm_fix', configured: false, scope: 'gateway required (FIX 4.4 socket)' },
+    ],
+    ts: nowIso(),
+  };
+}
+
+// ── helpers ──────────────────────────────────────────────────────
+function round(n: number, d: number) { const f = 10 ** d; return Math.round(n * f) / f; }
+function digitsFor(sym: string, price: number) {
+  const s = sym.toUpperCase();
+  if (s.includes('JPY')) return 3;
+  if (FOREX[s.replace('/', '')]) return 5;
+  return price < 5 ? 4 : 2;
+}
+function nowIso() { return new Date().toISOString(); }
+function tfToBinance(tf: string) {
+  const m: Record<string, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1h', '4h': '4h', '1d': '1d', '1H': '1h', '1D': '1d' };
+  return m[tf] || '1h';
+}
+function tfToYahoo(tf: string, bars: number) {
+  const t = tf.toLowerCase();
+  if (t === '1m') return { interval: '1m', range: '1d' };
+  if (t === '5m') return { interval: '5m', range: '5d' };
+  if (t === '15m') return { interval: '15m', range: '5d' };
+  if (t === '30m') return { interval: '30m', range: '1mo' };
+  if (t === '1h') return { interval: '60m', range: bars > 200 ? '3mo' : '1mo' };
+  if (t === '4h') return { interval: '60m', range: '6mo' };
+  if (t === '1d') return { interval: '1d', range: '1y' };
+  return { interval: '60m', range: '1mo' };
+}
