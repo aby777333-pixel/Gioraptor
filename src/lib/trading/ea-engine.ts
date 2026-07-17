@@ -355,6 +355,19 @@ export class EARuntime {
     if (on && this.globalEnabled) void this.evaluate(inst, true);
   }
 
+  // Restart an EA: reset its evaluation state so it re-scans from scratch and
+  // re-enters on the next signal. The open position (if any) is kept and gets
+  // managed/flipped by the strategy on the next evaluation.
+  restart(key: string) {
+    const inst = this.instances.get(key);
+    if (!inst) return;
+    inst.lastBarTime = 0;
+    inst.direction = null;
+    inst.trades = 0;
+    inst.busy = false;
+    if (this.globalEnabled && inst.enabled) void this.evaluate(inst, true);
+  }
+
   getInstanceInfo(key: string): EAInfo | null {
     const inst = this.instances.get(key);
     if (!inst) return null;

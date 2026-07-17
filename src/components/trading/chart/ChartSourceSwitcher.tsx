@@ -11,7 +11,7 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser } from 'lucide-react';
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
@@ -281,6 +281,20 @@ export default function ChartSourceSwitcher({
       setPlacing(false);
     }
   }, [confirmTrade, showEAToast, triggerRefresh]);
+
+  // Restart / Clear EA toolbar actions (§3).
+  const restartEA = useCallback((a: AttachedEA) => {
+    runtimeRef.current?.restart(`${a.strategyId}-${a.symbol}`);
+    showEAToast(`EA "${a.name}" restarted — re-scanning`);
+  }, [showEAToast]);
+  const clearAllEAs = useCallback(() => {
+    const forSymbol = attachedEAs.filter((a) => a.symbol === activeSymbol);
+    if (!forSymbol.length) return;
+    if (!window.confirm(`Clear all ${forSymbol.length} EA(s) on ${activeSymbol}? Open positions stay for you to manage manually.`)) return;
+    for (const a of forSymbol) runtimeRef.current?.detach(`${a.strategyId}-${a.symbol}`);
+    setAttachedEAs((prev) => prev.filter((a) => a.symbol !== activeSymbol));
+    showEAToast(`All EAs cleared on ${activeSymbol} — chart is now manual`);
+  }, [attachedEAs, activeSymbol, showEAToast]);
 
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
@@ -683,6 +697,13 @@ export default function ChartSourceSwitcher({
                   {on ? 'ON' : 'OFF'}
                 </button>
                 <button
+                  onClick={() => restartEA(a)}
+                  className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                  title="Restart EA — reset & re-scan"
+                >
+                  <RotateCcw size={10} />
+                </button>
+                <button
                   onClick={() => detachEA(a)}
                   className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
                   title="Detach EA"
@@ -692,6 +713,16 @@ export default function ChartSourceSwitcher({
               </div>
               );
             })}
+            {symbolEAs.length > 1 && (
+              <button
+                onClick={clearAllEAs}
+                className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-mono transition-colors hover:brightness-125"
+                style={{ backgroundColor: 'rgba(17,17,24,0.85)', border: '1px solid rgba(255,82,82,0.35)', color: '#FF5252' }}
+                title="Clear all EAs on this chart"
+              >
+                <Eraser size={10} /> Clear All
+              </button>
+            )}
           </div>
         )}
       </div>
