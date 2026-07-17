@@ -1,33 +1,73 @@
-import { Play, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Loader2, Sparkles } from 'lucide-react';
 import { AgentFlow } from '../components/AgentFlow';
 import { Card, SectionTitle, StatusDot, ConfidenceBar } from '../components/ui';
 import { useGeneratePipeline } from '../hooks/useApi';
 import { useStore } from '../store';
 import { AGENTS, agentMeta } from '../data/agents';
 
+const EXAMPLES = [
+  'Medium-risk strategy for NIFTY 50, EUR/USD, gold, Bitcoin and Nasdaq stocks. Risk 1% per trade. Backtest across regimes and send the strongest for approval.',
+  'Mean-reversion basket on Bank Nifty options and large-cap Indian equities, intraday only.',
+  'Trend-following on gold and crude with ATR stops; avoid high-impact news windows.',
+];
+
 export default function Pipeline() {
   const generate = useGeneratePipeline();
   const running = useStore((s) => s.pipelineRunning);
   const agentStatus = useStore((s) => s.agentStatus);
   const steps = useStore((s) => s.pipelineSteps);
+  const pushToast = useStore((s) => s.pushToast);
+  const [request, setRequest] = useState('');
 
   const completed = AGENTS.filter((a) => agentStatus[a.name]?.status === 'complete').length;
   const progress = (completed / AGENTS.length) * 100;
 
+  const run = () => {
+    if (request.trim()) {
+      pushToast({ type: 'info', message: `Briefing agents: "${request.slice(0, 60)}${request.length > 60 ? '…' : ''}"` });
+    }
+    generate.mutate();
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">Strategy Pipeline</h2>
-          <p className="text-sm text-subtext">
-            Interactive 15-agent flow. Click a node to inspect its latest output.
-          </p>
-        </div>
-        <button className="btn-primary" onClick={() => generate.mutate()} disabled={generate.isPending || running}>
-          {running ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
-          {running ? 'Running…' : 'Generate Strategies'}
-        </button>
+      <div>
+        <h2 className="text-xl font-bold">Strategy Pipeline</h2>
+        <p className="text-sm text-subtext">
+          Describe what you want — fifteen agents research, build, backtest, debate and rank it live.
+        </p>
       </div>
+
+      {/* Natural-language command bar */}
+      <Card glow>
+        <div className="flex items-start gap-3">
+          <Sparkles size={18} className="text-primary mt-2 shrink-0" />
+          <div className="flex-1">
+            <textarea
+              className="input !h-20 text-sm leading-relaxed resize-none"
+              placeholder="e.g. Create a medium-risk strategy for NIFTY 50, EUR/USD, gold, Bitcoin and Nasdaq stocks. Risk no more than 1% per trade. Backtest across market conditions and send the final candidates for my approval."
+              value={request}
+              onChange={(e) => setRequest(e.target.value)}
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {EXAMPLES.map((ex, i) => (
+                <button
+                  key={i}
+                  onClick={() => setRequest(ex)}
+                  className="badge border border-border text-subtext bg-bg hover:border-primary/50 hover:text-primary transition-colors text-left"
+                >
+                  {ex.slice(0, 42)}…
+                </button>
+              ))}
+            </div>
+          </div>
+          <button className="btn-primary self-stretch" onClick={run} disabled={generate.isPending || running}>
+            {running ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
+            {running ? 'Running…' : 'Run Agents'}
+          </button>
+        </div>
+      </Card>
 
       {/* Overall progress */}
       <Card>

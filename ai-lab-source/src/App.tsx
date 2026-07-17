@@ -7,10 +7,14 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 import Dashboard from './pages/Dashboard';
 import Pipeline from './pages/Pipeline';
+import Builder from './pages/Builder';
 import Strategies from './pages/Strategies';
+import Portfolio from './pages/Portfolio';
 import Research from './pages/Research';
 import Positions from './pages/Positions';
 import Markets from './pages/Markets';
+import Connections from './pages/Connections';
+import Audit from './pages/Audit';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -32,10 +36,14 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/pipeline" element={<Pipeline />} />
+              <Route path="/builder" element={<Builder />} />
               <Route path="/strategies" element={<Strategies />} />
+              <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/research" element={<Research />} />
               <Route path="/positions" element={<Positions />} />
               <Route path="/markets" element={<Markets />} />
+              <Route path="/connections" element={<Connections />} />
+              <Route path="/audit" element={<Audit />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>

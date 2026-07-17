@@ -2,20 +2,28 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Workflow,
+  Blocks,
   Lightbulb,
+  PieChart,
   BookOpen,
   Briefcase,
   CandlestickChart,
+  Plug,
+  ScrollText,
   Settings,
 } from 'lucide-react';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/pipeline', label: 'Pipeline', icon: Workflow },
+  { to: '/builder', label: 'Builder', icon: Blocks },
   { to: '/strategies', label: 'Strategies', icon: Lightbulb },
+  { to: '/portfolio', label: 'Portfolio', icon: PieChart },
   { to: '/research', label: 'Research', icon: BookOpen },
   { to: '/positions', label: 'Positions', icon: Briefcase },
   { to: '/markets', label: 'Markets', icon: CandlestickChart },
+  { to: '/connections', label: 'Connections', icon: Plug },
+  { to: '/audit', label: 'Audit', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
