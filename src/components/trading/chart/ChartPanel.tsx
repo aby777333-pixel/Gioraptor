@@ -561,6 +561,8 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
 
   // Canvas drawing state
   const [drawings, setDrawings] = useState<Drawing[]>([]);
+  // Object Tree (§7): number of live Raptor Script plot series.
+  const [scriptPlotCount, setScriptPlotCount] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [previewEnd, setPreviewEnd] = useState<{ x: number; y: number } | null>(null);
@@ -1171,9 +1173,11 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         s.setData(data);
         scriptSeriesRef.current.set(`script_${pi}`, s);
       });
+      setScriptPlotCount(plots.length);
       window.dispatchEvent(new CustomEvent('raptor-script-result', { detail: { ok: true, plots: plots.length } }));
     } catch (e) {
       clearScriptSeries();
+      setScriptPlotCount(0);
       window.dispatchEvent(new CustomEvent('raptor-script-result', { detail: { ok: false, error: e instanceof Error ? e.message : String(e) } }));
     }
   }, [clearScriptSeries]);
@@ -1249,7 +1253,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       userScriptRef.current = d?.code ?? null;
       loadChartData();
     };
-    const onClear = () => { userScriptRef.current = null; clearScriptSeries(); };
+    const onClear = () => { userScriptRef.current = null; clearScriptSeries(); setScriptPlotCount(0); };
     window.addEventListener('raptor-apply-script', onApply);
     window.addEventListener('raptor-clear-script', onClear);
     return () => {
@@ -1337,6 +1341,16 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
         onClearAll={handleClearAll}
         activeLayout={activeLayout}
         onLayoutChange={setActiveLayout}
+        drawings={drawings}
+        onRemoveDrawing={(i) => setDrawings((prev) => prev.filter((_, di) => di !== i))}
+        onClearDrawings={() => {
+          setDrawings([]);
+          for (const pl of customPriceLinesRef.current) { try { candleSeriesRef.current?.removePriceLine(pl); } catch { /* noop */ } }
+          customPriceLinesRef.current = [];
+        }}
+        scriptPlots={scriptPlotCount}
+        onClearScriptPlots={() => window.dispatchEvent(new CustomEvent('raptor-clear-script'))}
+        onRemoveIndicator={handleIndicatorToggle}
       />
 
       {/* Symbol & OHLC info bar */}

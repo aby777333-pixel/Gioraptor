@@ -88,7 +88,8 @@ export function getIndicatorDef(id: IndicatorId): IndicatorConfig | undefined {
 
 // ─── Category icons ────────────────────────────────────────────
 
-const CATEGORY_ICONS: Record<IndicatorCategory, React.ReactNode> = {
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  Favorites: <Star size={14} fill="#FFD700" style={{ color: '#FFD700' }} />,
   Trend: <TrendingUp size={14} />,
   Momentum: <Activity size={14} />,
   Volatility: <BarChart3 size={14} />,
@@ -107,6 +108,15 @@ interface IndicatorPanelProps {
   onClose: () => void;
 }
 
+const FAV_KEY = 'raptor_fav_indicators';
+
+function loadFavs(): Set<IndicatorId> {
+  try {
+    const a = JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+    return new Set(Array.isArray(a) ? a : []);
+  } catch { return new Set(); }
+}
+
 export default function IndicatorPanel({
   activeIndicators,
   indicatorParams,
@@ -116,6 +126,17 @@ export default function IndicatorPanel({
 }: IndicatorPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<IndicatorId | null>(null);
+  // Indicator favorites (§4/§11) — starred indicators float to a Favorites
+  // section on top; persisted in localStorage.
+  const [favs, setFavs] = useState<Set<IndicatorId>>(() => (typeof window !== 'undefined' ? loadFavs() : new Set()));
+  const toggleFav = (id: IndicatorId) => {
+    setFavs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem(FAV_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const filteredIndicators = useMemo(() => {
     if (!searchQuery.trim()) return INDICATOR_DEFS;
@@ -130,14 +151,17 @@ export default function IndicatorPanel({
   }, [searchQuery]);
 
   const grouped = useMemo(() => {
-    const map = new Map<IndicatorCategory, IndicatorConfig[]>();
+    const map = new Map<string, IndicatorConfig[]>();
+    // Favorites float to a section on top (still shown in their category too).
+    const favList = filteredIndicators.filter((i) => favs.has(i.id));
+    if (favList.length > 0) map.set('Favorites', favList);
     for (const ind of filteredIndicators) {
       const arr = map.get(ind.category) || [];
       arr.push(ind);
       map.set(ind.category, arr);
     }
     return map;
-  }, [filteredIndicators]);
+  }, [filteredIndicators, favs]);
 
   return (
     <div
@@ -249,18 +273,28 @@ export default function IndicatorPanel({
                       </div>
                     </div>
 
-                    {Object.keys(ind.defaultParams).length > 0 && (
+                    <div className="flex items-center gap-0.5">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingId(isEditing ? null : ind.id);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); toggleFav(ind.id); }}
+                        title={favs.has(ind.id) ? 'Remove from favorites' : 'Add to favorites'}
                         className="p-1 rounded hover:bg-white/10 transition-colors"
-                        style={{ color: isEditing ? '#0091D5' : 'rgba(255,255,255,0.3)' }}
+                        style={{ color: favs.has(ind.id) ? '#FFD700' : 'rgba(255,255,255,0.25)' }}
                       >
-                        <Settings2 size={12} />
+                        <Star size={12} fill={favs.has(ind.id) ? '#FFD700' : 'none'} />
                       </button>
-                    )}
+                      {Object.keys(ind.defaultParams).length > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingId(isEditing ? null : ind.id);
+                          }}
+                          className="p-1 rounded hover:bg-white/10 transition-colors"
+                          style={{ color: isEditing ? '#0091D5' : 'rgba(255,255,255,0.3)' }}
+                        >
+                          <Settings2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {isEditing && (

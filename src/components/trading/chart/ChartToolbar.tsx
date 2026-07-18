@@ -8,9 +8,9 @@ import {
   MousePointer2, ArrowUpRight, Circle, GitCommitHorizontal,
   Flag, LineChart, Square, Ruler, Minus, Move,
   Columns2, Rows2, Columns3, Rows3, Grid2x2, LayoutPanelLeft, Grid3x3,
-  GripVertical, Star, Zap,
+  GripVertical, Star, Zap, Layers,
 } from 'lucide-react';
-import type { IndicatorId } from './IndicatorPanel';
+import { INDICATOR_DEFS, type IndicatorId } from './IndicatorPanel';
 import { useEALibrary } from './useEALibrary';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -207,21 +207,49 @@ interface ChartToolbarProps {
   onClearAll: () => void;
   activeLayout: LayoutType;
   onLayoutChange: (layout: LayoutType) => void;
+  // Object Tree (§7)
+  drawings: { type: string }[];
+  onRemoveDrawing: (index: number) => void;
+  onClearDrawings: () => void;
+  scriptPlots: number;
+  onClearScriptPlots: () => void;
+  onRemoveIndicator: (id: IndicatorId) => void;
 }
+
+const TF_FAV_KEY = 'raptor_fav_timeframes';
 
 export default function ChartToolbar({
   selectedTf, onTfChange, chartType, onChartTypeChange,
   oneClickTrading, onOneClickTradingToggle,
   activeIndicators, onShowIndicators, onClearAll,
   activeLayout, onLayoutChange,
+  drawings, onRemoveDrawing, onClearDrawings,
+  scriptPlots, onClearScriptPlots, onRemoveIndicator,
 }: ChartToolbarProps) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  // Favorite timeframes (§2/§11) — starred TFs float to the top of the
+  // timeframe dropdown; persisted in localStorage.
+  const [favTfs, setFavTfs] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try { const a = JSON.parse(localStorage.getItem(TF_FAV_KEY) || '[]'); return new Set(Array.isArray(a) ? a : []); }
+    catch { return new Set(); }
+  });
+  const toggleFavTf = useCallback((v: string) => {
+    setFavTfs((prev) => {
+      const next = new Set(prev);
+      next.has(v) ? next.delete(v) : next.add(v);
+      try { localStorage.setItem(TF_FAV_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const tfRef = useRef<HTMLButtonElement>(null);
   const ctRef = useRef<HTMLButtonElement>(null);
   const toolsRef = useRef<HTMLButtonElement>(null);
   const layoutRef = useRef<HTMLButtonElement>(null);
   const eaRef = useRef<HTMLButtonElement>(null);
+  const objectsRef = useRef<HTMLButtonElement>(null);
 
   const toggle = useCallback((id: string) => setOpenDropdown((p) => p === id ? null : id), []);
   const close = useCallback(() => setOpenDropdown(null), []);
@@ -269,16 +297,29 @@ export default function ChartToolbar({
       <button ref={tfRef} onClick={() => toggle('tf')} className={`${btn} bg-[#0091D5] text-white`}>
         <Clock size={14} /> {tfDef.label} <ChevronDown size={12} />
       </button>
-      <PortalDropdown anchorRef={tfRef} open={openDropdown === 'tf'} onClose={close} width={200}>
+      <PortalDropdown anchorRef={tfRef} open={openDropdown === 'tf'} onClose={close} width={210}>
         <div className="py-1">
-          {TIMEFRAMES.map((tf) => (
-            <button key={tf.value} onClick={() => { onTfChange(tf.value); close(); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-[12px] transition-colors hover:bg-[rgba(255,255,255,0.06)]"
-              style={{ color: selectedTf === tf.value ? '#0091D5' : 'rgba(255,255,255,0.7)', fontWeight: selectedTf === tf.value ? 600 : 400, borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-            >
-              <Clock size={14} style={{ opacity: 0.5 }} /> {tf.label}
-            </button>
-          ))}
+          {(() => { const favList = TIMEFRAMES.filter((t) => favTfs.has(t.value)); return [...favList, ...TIMEFRAMES].map((tf, i) => {
+            const isFavRow = i < favList.length;
+            return (
+            <div key={`${isFavRow ? 'fav-' : ''}${tf.value}`} className="flex items-center transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', backgroundColor: isFavRow ? 'rgba(255,215,0,0.03)' : 'transparent' }}>
+              <button onClick={() => { onTfChange(tf.value); close(); }}
+                className="flex flex-1 items-center gap-3 px-3 py-2.5 text-[12px]"
+                style={{ color: selectedTf === tf.value ? '#0091D5' : 'rgba(255,255,255,0.7)', fontWeight: selectedTf === tf.value ? 600 : 400 }}
+              >
+                <Clock size={14} style={{ opacity: 0.5 }} /> {tf.label}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); toggleFavTf(tf.value); }}
+                title={favTfs.has(tf.value) ? 'Remove from favorites' : 'Add to favorites'}
+                className="px-2 py-2.5"
+                style={{ color: favTfs.has(tf.value) ? '#FFD700' : 'rgba(255,255,255,0.2)' }}
+              >
+                <Star size={12} fill={favTfs.has(tf.value) ? '#FFD700' : 'none'} />
+              </button>
+            </div>
+            );
+          }); })()}
         </div>
       </PortalDropdown>
 
@@ -323,6 +364,63 @@ export default function ChartToolbar({
               <span style={{ color: '#0091D5' }}>{tool.icon}</span> {tool.label}
             </button>
           ))}
+        </div>
+      </PortalDropdown>
+
+      {/* ── Objects (Object Tree §7) ── */}
+      <button ref={objectsRef} onClick={() => toggle('objects')} className={`${btn} text-[rgba(255,255,255,0.65)] hover:text-white hover:bg-[rgba(255,255,255,0.06)]`}>
+        <Layers size={14} /> Objects
+        {(activeIndicators.size + drawings.length + (scriptPlots > 0 ? 1 : 0)) > 0 && (
+          <span className="text-[9px] bg-white/20 px-1 rounded">{activeIndicators.size + drawings.length + (scriptPlots > 0 ? 1 : 0)}</span>
+        )}
+        <ChevronDown size={12} />
+      </button>
+      <PortalDropdown anchorRef={objectsRef} open={openDropdown === 'objects'} onClose={close} width={280} maxHeight={440}>
+        <div className="py-1">
+          {/* Indicators */}
+          <div className="flex items-center justify-between px-3 py-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <span>Indicators ({activeIndicators.size})</span>
+          </div>
+          {activeIndicators.size === 0 && (
+            <div className="px-3 pb-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>None active</div>
+          )}
+          {[...activeIndicators].map((id) => {
+            const def = INDICATOR_DEFS.find((d) => d.id === id);
+            return (
+              <div key={id} className="flex items-center justify-between px-3 py-1.5 hover:bg-[rgba(255,255,255,0.04)]">
+                <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.75)' }}>{def?.name ?? id}</span>
+                <button onClick={() => onRemoveIndicator(id)} title="Remove indicator" className="text-white/30 hover:text-red-400"><Trash2 size={12} /></button>
+              </div>
+            );
+          })}
+          {/* Drawings */}
+          <div className="mt-1 flex items-center justify-between border-t px-3 py-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.06)' }}>
+            <span>Drawings ({drawings.length})</span>
+            {drawings.length > 0 && (
+              <button onClick={onClearDrawings} className="text-[9px] normal-case text-red-400/70 hover:text-red-400">Clear all</button>
+            )}
+          </div>
+          {drawings.length === 0 && (
+            <div className="px-3 pb-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>None drawn</div>
+          )}
+          {drawings.map((d, i) => (
+            <div key={i} className="flex items-center justify-between px-3 py-1.5 hover:bg-[rgba(255,255,255,0.04)]">
+              <span className="text-[11px] capitalize" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                {d.type === 'longpos' ? 'Long Position' : d.type === 'shortpos' ? 'Short Position' : d.type === 'channel' ? 'Parallel Channel' : d.type} #{i + 1}
+              </span>
+              <button onClick={() => onRemoveDrawing(i)} title="Remove drawing" className="text-white/30 hover:text-red-400"><Trash2 size={12} /></button>
+            </div>
+          ))}
+          {/* Raptor Script plots */}
+          <div className="mt-1 flex items-center justify-between border-t px-3 py-1.5 text-[10px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.06)' }}>
+            <span>Script plots ({scriptPlots})</span>
+            {scriptPlots > 0 && (
+              <button onClick={onClearScriptPlots} className="text-[9px] normal-case text-red-400/70 hover:text-red-400">Clear plots</button>
+            )}
+          </div>
+          {scriptPlots === 0 && (
+            <div className="px-3 pb-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>No script running</div>
+          )}
         </div>
       </PortalDropdown>
 
