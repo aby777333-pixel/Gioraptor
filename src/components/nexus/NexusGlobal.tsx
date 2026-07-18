@@ -296,25 +296,31 @@ export function NexusGlobal() {
       const say = (text: string) =>
         setChatMessages(prev => [...prev, { id: `n-${Date.now()}`, role: 'nexus', text, timestamp: new Date().toISOString() }]);
       if (z && 'direction' in z) {
+        // Markers can only draw on the native RAPTOR chart — the TradingView
+        // embed is a sealed cross-origin iframe. Ask the switcher to show the
+        // RAPTOR chart, then retry the mark until the chart acks (mount takes
+        // a moment when switching tabs).
+        window.dispatchEvent(new CustomEvent('nexus-ensure-raptor'));
         let count = 0;
         const ack = (e: Event) => { count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0; };
         window.addEventListener('nexus-zone-marked', ack);
-        window.dispatchEvent(new CustomEvent('nexus-mark-zone', {
-          detail: {
-            symbol: z.symbol,
-            levels: [
-              { price: z.preferred, label: `NEXUS ${z.direction} entry`, color: '#8b5cf6' },
-              { price: z.stop, label: 'NEXUS stop', color: '#ef4444' },
-              { price: z.target1, label: 'NEXUS T1', color: '#00dc82' },
-              { price: z.target2, label: 'NEXUS T2', color: '#00b47f' },
-            ],
-          },
-        }));
-        await new Promise(r => setTimeout(r, 150));
+        const detail = {
+          symbol: z.symbol,
+          levels: [
+            { price: z.preferred, label: `NEXUS ${z.direction} entry`, color: '#8b5cf6' },
+            { price: z.stop, label: 'NEXUS stop', color: '#ef4444' },
+            { price: z.target1, label: 'NEXUS T1', color: '#00dc82' },
+            { price: z.target2, label: 'NEXUS T2', color: '#00b47f' },
+          ],
+        };
+        for (let attempt = 0; attempt < 12 && count === 0; attempt++) {
+          window.dispatchEvent(new CustomEvent('nexus-mark-zone', { detail }));
+          await new Promise(r => setTimeout(r, 350));
+        }
         window.removeEventListener('nexus-zone-marked', ack);
         say(count > 0
-          ? `Zone marked on the RAPTOR chart for ${z.symbol} — ${count} levels drawn: ${z.direction} entry ${z.preferred}, stop ${z.stop}, targets ${z.target1} / ${z.target2} (confidence ${z.confidence}%). Your own drawings are untouched; the markers clear when you switch symbols. ⚠️ Levels come from live platform bars — a plan, not a promise.`
-          : `I computed a ${z.direction} zone for ${z.symbol} (entry ${z.preferred}, stop ${z.stop}) but no RAPTOR chart acknowledged the markers — make sure the RAPTOR Chart tab is open on the terminal, then try again.`);
+          ? `Zone marked on the RAPTOR chart for ${z.symbol} — ${count} levels drawn: ${z.direction} entry ${z.preferred}, stop ${z.stop}, targets ${z.target1} / ${z.target2} (confidence ${z.confidence}%). I switched you to the RAPTOR chart if you were on TradingView — the TV embed is a third-party iframe I can't draw inside. Your own drawings are untouched; the markers clear when you switch symbols.\n\n⚠️ Levels come from live platform bars — a plan, not a promise.`
+          : `I computed a ${z.direction} zone for ${z.symbol} (entry ${z.preferred}, stop ${z.stop}) but no RAPTOR chart acknowledged the markers — open the terminal page and try again.`);
       } else if (z && 'reason' in z) {
         say(`No zone to mark right now: ${z.reason} I won't draw levels I can't defend with evidence.`);
       } else {

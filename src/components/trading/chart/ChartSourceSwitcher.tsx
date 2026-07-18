@@ -80,6 +80,14 @@ export default function ChartSourceSwitcher({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source]);
 
+  // NEXUS can request the RAPTOR chart (zone markers can only draw on the
+  // native chart — the TradingView embed is a sealed cross-origin iframe).
+  useEffect(() => {
+    const onEnsure = () => setSource('raptor');
+    window.addEventListener('nexus-ensure-raptor', onEnsure);
+    return () => window.removeEventListener('nexus-ensure-raptor', onEnsure);
+  }, []);
+
   // ── EA attach lifecycle ─────────────────────────
   const [attachedEAs, setAttachedEAs] = useState<AttachedEA[]>([]);
   const [dragActive, setDragActive] = useState(false);
