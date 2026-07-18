@@ -11,12 +11,13 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical, Grid3x3 } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical, Grid3x3, ShieldCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Market Insights module — lazy-loaded so the terminal bundle is untouched
 // unless the trader actually opens it.
 const InsightsPanel = dynamic(() => import('../insights/InsightsPanel'), { ssr: false });
+const RiskPanel = dynamic(() => import('../insights/RiskPanel'), { ssr: false });
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
@@ -138,6 +139,9 @@ export default function ChartSourceSwitcher({
   // Market Insights module (lazy-loaded overlay; entitlement market_insights).
   const [insightsEnabled, setInsightsEnabled] = useState(true);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  // Risk module (§14/§15; entitlement risk_tools).
+  const [riskEnabled, setRiskEnabled] = useState(true);
+  const [riskOpen, setRiskOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -208,6 +212,7 @@ export default function ChartSourceSwitcher({
       // Market Insights module (enhancement prompt §2/§3/§7): admin-toggleable,
       // fail-open like every entitlement.
       if (ents['market_insights'] === false) setInsightsEnabled(false);
+      if (ents['risk_tools'] === false) setRiskEnabled(false);
     })();
     return () => { active = false; };
   }, []);
@@ -683,6 +688,18 @@ export default function ChartSourceSwitcher({
           </button>
         )}
 
+        {/* Risk module — dashboard + position sizer (admin-toggleable) */}
+        {riskEnabled && (
+          <button
+            onClick={() => setRiskOpen(true)}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
+            style={{ color: riskOpen ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+            title="Risk Tools — dashboard & position sizer (real account data)"
+          >
+            <ShieldCheck size={12} /> Risk
+          </button>
+        )}
+
         {/* DOM — click-to-trade price ladder (real order service, both charts) */}
         <DomLadder activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
 
@@ -948,6 +965,9 @@ export default function ChartSourceSwitcher({
 
       {/* Market Insights module — display-only overlay */}
       {insightsOpen && <InsightsPanel onClose={() => setInsightsOpen(false)} />}
+
+      {/* Risk module — display-only overlay */}
+      {riskOpen && <RiskPanel onClose={() => setRiskOpen(false)} />}
 
       {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
       {disclaimerFor && (
