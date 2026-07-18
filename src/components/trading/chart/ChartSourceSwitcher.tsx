@@ -39,6 +39,7 @@ import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
+import { effectiveEngineParams, builtinInputsFor } from '@/lib/trading/ea-params';
 import EADisclaimerModal from './EADisclaimerModal';
 import { isDisclaimerAccepted, recordDisclaimerAcceptance } from '@/lib/trading/ea-disclaimer';
 import { getEntitlements } from '@/lib/trading/entitlements';
@@ -184,6 +185,9 @@ export default function ChartSourceSwitcher({
       getAccountId: () => accountRef.current ?? null,
       onStats: (key, stats) => setEaStats((prev) => ({ ...prev, [key]: stats })),
       onRefresh: () => triggerRefresh(),
+      // EA Properties inputs drive the engine live — read fresh each
+      // evaluation so edits apply from the next signal check.
+      getParams: (strategyId, kind) => effectiveEngineParams(strategyId, kind),
     });
   }
 
@@ -465,7 +469,12 @@ export default function ChartSourceSwitcher({
     // Inputs / source) so the trader reviews parameters right away.
     const openProperties = () => {
       const full = eaList.find((e) => e.id === ea.id);
-      if (full) setInfoEa({ ...full, builtin: !full.custom } as unknown as CustomEA);
+      if (full) {
+        setInfoEa({
+          ...full, builtin: !full.custom,
+          ...(full.custom ? {} : { inputs: builtinInputsFor(full.id, full.strategyKind) }),
+        } as unknown as CustomEA);
+      }
     };
 
     // Uploaded custom EAs live in the browser (localStorage) and their id is
@@ -783,7 +792,7 @@ export default function ChartSourceSwitcher({
                       <p className="mt-0.5 line-clamp-2 text-[9px] leading-relaxed text-white/40">{ea.description}</p>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom } as unknown as CustomEA); setEaMenuOpen(false); }}
+                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom, ...(ea.custom ? {} : { inputs: builtinInputsFor(ea.id, ea.strategyKind) }) } as unknown as CustomEA); setEaMenuOpen(false); }}
                       className="shrink-0 rounded px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors"
                       style={{ backgroundColor: 'rgba(0,145,213,0.12)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}
                       title="EA Properties — Common, Inputs, source code"
@@ -931,7 +940,7 @@ export default function ChartSourceSwitcher({
                 <button
                   onClick={() => {
                     const full = eaList.find((e) => e.id === a.strategyId);
-                    if (full) setInfoEa({ ...full, builtin: !full.custom } as unknown as CustomEA);
+                    if (full) setInfoEa({ ...full, builtin: !full.custom, ...(full.custom ? {} : { inputs: builtinInputsFor(full.id, full.strategyKind) }) } as unknown as CustomEA);
                   }}
                   className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
                   title="EA Inputs & source code — full Properties window"

@@ -138,7 +138,7 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Proper
 
         <div className="flex gap-0.5 border-b px-2 pt-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           {((isBuiltin
-            ? [['overview', 'Common', Info], ['inputs', 'Inputs', ListTree]]
+            ? [['overview', 'Common', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree]]
             : [['overview', 'Common', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree], ['report', 'Conversion report', ShieldAlert], ['source', 'Source', FileCode2], ...(ea.raptorScript ? [['script', 'Script', Play]] : [])]
           ) as [Tab, string, typeof Info][]).map(([t, label, Icon]) => (
             <button key={t} onClick={() => setTab(t)}
@@ -168,13 +168,11 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Proper
               </div>
               <div className="mt-3 text-[10px] leading-relaxed text-white/45">{ea.description}</div>
               <div className="mt-4 rounded-md border p-3 text-[10px] leading-relaxed text-white/50" style={{ borderColor: 'rgba(0,145,213,0.25)', backgroundColor: 'rgba(0,145,213,0.05)' }}>
-                This strategy is <b className="text-white/75">built into the RAPTOR engine</b> — it has no user-editable source code or
-                declared MQL inputs, so the parameter engine and code editor do not apply here.
-                Its executed lot / SL / TP / direction are set per attached instance via the EA&apos;s
-                Properties on the chart, and it can be tuned in the Strategy Tester.
-                To use the <b className="text-white/75">full parameter engine and code editor</b> (like the MT5 Inputs window),
-                upload your own <b className="text-white/75">.mq5 or .pine</b> EA — every declared input becomes editable, with
-                .set import/export and an editable source view.
+                This strategy is <b className="text-white/75">built into the RAPTOR engine</b>. Its declared inputs on the
+                <b className="text-white/75"> Inputs tab are live</b> — the engine reads them on every evaluation, so edits
+                apply from the next signal check (and the Strategy Tester backtests the same values). Executed
+                lot / SL / TP / direction remain per attached instance (⚙ on the chart chip). There is no MQL source
+                to edit for built-ins — upload a <b className="text-white/75">.mq5 or .pine</b> EA for the code editor.
               </div>
             </div>
           )}
@@ -201,7 +199,7 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Proper
             (ea.inputs?.length ?? 0) === 0 ? (
               <div className="py-6 text-center text-[11px] text-white/35">
                 {isBuiltin
-                  ? 'Built-in strategy — no declared MQL inputs to edit. Executed lot / SL / TP / direction are per-instance (EA Properties on the chart). Upload a .mq5 or .pine EA to use the full parameter engine.'
+                  ? 'This engine variant has no tunable inputs. Executed lot / SL / TP / direction are per-instance (EA Properties on the chart).'
                   : ea.sourceKind !== 'ex5'
                   ? 'No input declarations were found in the source.'
                   : 'Compiled binary — input parameters cannot be read from an .ex5 file. Runtime execution uses the EA Properties window (lot / SL / TP / direction).'}

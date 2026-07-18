@@ -14,6 +14,7 @@ import { INDICATOR_DEFS, type IndicatorId } from './IndicatorPanel';
 import { useEALibrary } from './useEALibrary';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
+import { builtinInputsFor } from '@/lib/trading/ea-params';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -474,7 +475,7 @@ export default function ChartToolbar({
                       <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
                     )}
                     <button
-                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom } as unknown as CustomEA); close(); }}
+                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom, ...(ea.custom ? {} : { inputs: builtinInputsFor(ea.id, ea.strategyKind) }) } as unknown as CustomEA); close(); }}
                       className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide"
                       style={{ backgroundColor: 'rgba(0,145,213,0.12)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}
                       title="EA Properties — Common, Inputs, source code"

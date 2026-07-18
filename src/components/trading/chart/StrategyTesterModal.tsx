@@ -8,6 +8,7 @@
 import { useMemo, useState } from 'react';
 import { X, TrendingUp, TrendingDown } from 'lucide-react';
 import { backtestStrategy, type BacktestResult, type EASettings, type StrategyKind } from '@/lib/trading/ea-engine';
+import { effectiveEngineParams } from '@/lib/trading/ea-params';
 import type { OHLCVBar } from '@/types/trading';
 
 type Tab = 'overview' | 'trades' | 'optimize' | 'walkforward';
@@ -28,9 +29,12 @@ export default function StrategyTesterModal({
   onApplySettings?: (s: EASettings) => void;
 }) {
   const [tab, setTab] = useState<Tab>('overview');
+  // The tester uses the SAME effective engine params as live execution, so
+  // EA Properties edits are what actually gets backtested.
+  const engineParams = useMemo(() => effectiveEngineParams(strategyId, strategyKind), [strategyId, strategyKind]);
   const result: BacktestResult | null = useMemo(
-    () => (bars.length >= 80 ? backtestStrategy(bars, strategyId, strategyKind, settings) : null),
-    [bars, strategyId, strategyKind, settings],
+    () => (bars.length >= 80 ? backtestStrategy(bars, strategyId, strategyKind, settings, engineParams) : null),
+    [bars, strategyId, strategyKind, settings, engineParams],
   );
 
   // ── Optimization (§10): grid sweep over SL×TP ATR multipliers ──
@@ -42,7 +46,7 @@ export default function StrategyTesterModal({
     setTimeout(() => { // let the "running" state paint before the sweep
       const rows: OptRow[] = [];
       for (const sl of SL_GRID) for (const tp of TP_GRID) {
-        rows.push({ sl, tp, r: backtestStrategy(bars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp }) });
+        rows.push({ sl, tp, r: backtestStrategy(bars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp }, engineParams) });
       }
       rows.sort((a, b) => b.r.netProfit - a.r.netProfit);
       setOptRows(rows);
@@ -67,12 +71,12 @@ export default function StrategyTesterModal({
         // optimize on the in-sample window (best net P&L, prefer >=3 trades)
         let best: OptRow | null = null;
         for (const sl of SL_GRID) for (const tp of TP_GRID) {
-          const r = backtestStrategy(trainBars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp });
+          const r = backtestStrategy(trainBars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp }, engineParams);
           if (!best || (r.netProfit > best.r.netProfit && (r.numTrades >= 3 || best.r.numTrades < 3))) best = { sl, tp, r };
         }
         if (!best) continue;
         // test those params on the unseen out-of-sample window
-        const oos = backtestStrategy(testBars, strategyId, strategyKind, { ...settings, slAtrMult: best.sl, tpAtrMult: best.tp });
+        const oos = backtestStrategy(testBars, strategyId, strategyKind, { ...settings, slAtrMult: best.sl, tpAtrMult: best.tp }, engineParams);
         const d = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         folds.push({ label: `${d(testBars[0].time)} – ${d(testBars[testBars.length - 1].time)}`, sl: best.sl, tp: best.tp, trainNet: best.r.netProfit, oos });
       }

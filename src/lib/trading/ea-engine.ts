@@ -30,7 +30,10 @@ const TF_TO_RES: Record<string, Resolution> = {
 // Each receives the CLOSED bars (oldest → newest) and returns the
 // regime the EA wants to be positioned in right now.
 
-type Strategy = (bars: OHLCVBar[]) => EARegime;
+// §3 (EA parameter engine): every strategy takes an optional numeric
+// parameter map. Missing keys fall back to the historical defaults, so
+// behavior is IDENTICAL until a trader edits an input in EA Properties.
+type Strategy = (bars: OHLCVBar[], p?: Record<string, number>) => EARegime;
 
 const last = <T,>(arr: (T | null)[]): T | null => (arr.length ? arr[arr.length - 1] : null);
 
@@ -48,10 +51,10 @@ function series(bars: OHLCVBar[]) {
  *   SELL = downtrend             && high>=EMA9 && close<=EMA21 && bearish candle
  * Falls back to the trend bias so the EA holds a position between pullbacks.
  */
-const stratEmaPullback: Strategy = (bars) => {
+const stratEmaPullback: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const e9arr = ema(closes, 9);
-  const e21arr = ema(closes, 21);
+  const e9arr = ema(closes, p?.FastEMA ?? 9);
+  const e21arr = ema(closes, p?.SlowEMA ?? 21);
   const i = bars.length - 1;
   const e9 = e9arr[i]; const e21 = e21arr[i];
   const b = bars[i];
@@ -69,37 +72,38 @@ const stratEmaPullback: Strategy = (bars) => {
 };
 
 /** RSI + MACD momentum (ProHybridTrendReversal source: rsi>=min && macdMain>signal). */
-const stratRsiMacdMomentum: Strategy = (bars) => {
+const stratRsiMacdMomentum: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const r = last(rsi(closes, 14));
-  const m = macd(closes, 12, 26, 9);
+  const r = last(rsi(closes, p?.RSIPeriod ?? 14));
+  const m = macd(closes, p?.MACDFast ?? 12, p?.MACDSlow ?? 26, p?.MACDSignal ?? 9);
   const i = closes.length - 1;
   const line = m.macd[i]; const signal = m.signal[i];
+  const mid = p?.RSIMidline ?? 50;
   if (r == null || line == null || signal == null) return null;
-  if (r >= 50 && line > signal) return 'BUY';
-  if (r <= 50 && line < signal) return 'SELL';
+  if (r >= mid && line > signal) return 'BUY';
+  if (r <= mid && line < signal) return 'SELL';
   return null;
 };
 
 /** RSI-driven adaptive engine (Profit Predator source: RSI bands + trend). */
-const stratRsiAdaptive: Strategy = (bars) => {
+const stratRsiAdaptive: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const r = last(rsi(closes, 14));
-  const e50 = last(ema(closes, 50));
+  const r = last(rsi(closes, p?.RSIPeriod ?? 14));
+  const e50 = last(ema(closes, p?.TrendEMA ?? 50));
   const c = closes[closes.length - 1];
   if (r == null || e50 == null) return null;
   // Momentum with trend: RSI leaving the midline in the trend direction.
-  if (r > 52 && c > e50) return 'BUY';
-  if (r < 48 && c < e50) return 'SELL';
+  if (r > (p?.BuyLevel ?? 52) && c > e50) return 'BUY';
+  if (r < (p?.SellLevel ?? 48) && c < e50) return 'SELL';
   return null;
 };
 
 /** Parabolic SAR flip confirmed by EMA trend + RSI (Naughty Girl, SAR VI). */
-const stratSarFlip: Strategy = (bars) => {
+const stratSarFlip: Strategy = (bars, p) => {
   const { closes, highs, lows } = series(bars);
-  const sar = last(parabolicSAR(highs, lows, 0.02, 0.2));
-  const e50 = last(ema(closes, 50));
-  const r = last(rsi(closes, 14));
+  const sar = last(parabolicSAR(highs, lows, p?.SARStep ?? 0.02, p?.SARMax ?? 0.2));
+  const e50 = last(ema(closes, p?.TrendEMA ?? 50));
+  const r = last(rsi(closes, p?.RSIPeriod ?? 14));
   const c = closes[closes.length - 1];
   if (sar == null || e50 == null || r == null) return null;
   if (sar < c && c > e50 && r > 48) return 'BUY';
@@ -108,10 +112,10 @@ const stratSarFlip: Strategy = (bars) => {
 };
 
 /** Bollinger band + MACD confluence, mean-reversion (BOLCD). */
-const stratBollMacd: Strategy = (bars) => {
+const stratBollMacd: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const bb = bollingerBands(closes, 20, 2);
-  const m = macd(closes, 12, 26, 9);
+  const bb = bollingerBands(closes, p?.BBPeriod ?? 20, p?.BBDeviation ?? 2);
+  const m = macd(closes, p?.MACDFast ?? 12, p?.MACDSlow ?? 26, p?.MACDSignal ?? 9);
   const i = closes.length - 1;
   const lower = bb.lower[i]; const upper = bb.upper[i]; const mid = bb.middle[i];
   const h = m.histogram[i]; const hPrev = m.histogram[i - 1];
@@ -124,10 +128,10 @@ const stratBollMacd: Strategy = (bars) => {
 };
 
 /** EMA 20/50 regime flip (Bad Boy, Gentleman, Pro Hybrid, Paruthiveeran, Walter Vetrivel). */
-const stratTrendReversal: Strategy = (bars) => {
+const stratTrendReversal: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const e20 = last(ema(closes, 20));
-  const e50 = last(ema(closes, 50));
+  const e20 = last(ema(closes, p?.FastEMA ?? 20));
+  const e50 = last(ema(closes, p?.SlowEMA ?? 50));
   if (e20 == null || e50 == null) return null;
   if (e20 > e50) return 'BUY';
   if (e20 < e50) return 'SELL';
@@ -135,10 +139,10 @@ const stratTrendReversal: Strategy = (bars) => {
 };
 
 /** Fast/slow smoothing crossover, Kalman-style (BLUEBIRD, Karakattakaran, Padayappa). */
-const stratKalmanTrend: Strategy = (bars) => {
+const stratKalmanTrend: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const fast = last(ema(closes, 3));
-  const slow = last(ema(closes, 30));
+  const fast = last(ema(closes, p?.FastEMA ?? 3));
+  const slow = last(ema(closes, p?.SlowEMA ?? 30));
   if (fast == null || slow == null) return null;
   if (fast > slow) return 'BUY';
   if (fast < slow) return 'SELL';
@@ -146,9 +150,9 @@ const stratKalmanTrend: Strategy = (bars) => {
 };
 
 /** LinReg-candle colour ≈ short EMA slope (GIOLINEREG, Linegration V1/V2). */
-const stratLinReg: Strategy = (bars) => {
+const stratLinReg: Strategy = (bars, p) => {
   const { closes } = series(bars);
-  const e = ema(closes, 11);
+  const e = ema(closes, p?.EMAPeriod ?? 11);
   const cur = e[e.length - 1]; const prev = e[e.length - 2];
   if (cur == null || prev == null) return null;
   if (cur > prev) return 'BUY';
@@ -157,9 +161,9 @@ const stratLinReg: Strategy = (bars) => {
 };
 
 /** Ichimoku cloud + TK cross (Ichimokuthadi, SuperIchi, SuperIchi Annamalai). */
-const stratIchimoku: Strategy = (bars) => {
+const stratIchimoku: Strategy = (bars, p) => {
   const { closes, highs, lows } = series(bars);
-  const ic = ichimoku(highs, lows, closes, 9, 26, 52, 26);
+  const ic = ichimoku(highs, lows, closes, p?.Tenkan ?? 9, p?.Kijun ?? 26, p?.SenkouB ?? 52, p?.Displacement ?? 26);
   const i = closes.length - 1;
   const conv = ic.conversion[i]; const base = ic.base[i];
   const spanA = ic.spanA[i]; const spanB = ic.spanB[i];
@@ -173,10 +177,10 @@ const stratIchimoku: Strategy = (bars) => {
 };
 
 /** SSL channel flip (SSL Hybrid, LNL GIO, Gulliver). */
-const stratSslChannel: Strategy = (bars) => {
+const stratSslChannel: Strategy = (bars, p) => {
   const { closes, highs, lows } = series(bars);
-  const hi = last(sma(highs, 10));
-  const lo = last(sma(lows, 10));
+  const hi = last(sma(highs, p?.ChannelPeriod ?? 10));
+  const lo = last(sma(lows, p?.ChannelPeriod ?? 10));
   const c = closes[closes.length - 1];
   if (hi == null || lo == null) return null;
   if (c > hi) return 'BUY';
@@ -185,11 +189,12 @@ const stratSslChannel: Strategy = (bars) => {
 };
 
 /** Engulfing pattern at N-bar extremes (Pattern GIO, Fibonacci Bands). */
-const stratPattern: Strategy = (bars) => {
-  if (bars.length < 22) return null;
+const stratPattern: Strategy = (bars, p) => {
+  const lookback = Math.max(5, Math.round(p?.ExtremeLookback ?? 20));
+  if (bars.length < lookback + 2) return null;
   const cur = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
-  const window = bars.slice(-21, -1);
+  const window = bars.slice(-(lookback + 1), -1);
   const winHigh = Math.max(...window.map((b) => b.high));
   const winLow = Math.min(...window.map((b) => b.low));
   const bullishEngulf = cur.close > cur.open && prev.close < prev.open && cur.close > prev.open && cur.open < prev.close;
@@ -247,6 +252,36 @@ const STRATEGIES: Record<string, Strategy> = {
   'bbaec02d-b5e9-45c0-a44a-e91433a120d9': stratIchimoku,      // SuperIchi Annamalai
   '7e6cedd9-6e9f-4a33-b2b6-838c647edff2': stratIchimoku,      // SuperIchi
   '8be4d74d-e25d-4a9e-b596-66c7d226cb3a': stratTrendReversal, // Walter Vetrivel
+};
+
+// strategyId → StrategyKind (same table as STRATEGIES) so the parameter
+// layer can declare/resolve the engine inputs for built-in EAs.
+export const STRATEGY_ID_KINDS: Record<string, StrategyKind> = {
+  '1da5f188-c659-4843-b91d-4fdc003002dc': 'trend_reversal',
+  '24fa1777-47b0-48bd-af9a-2044d1010a70': 'kalman',
+  'f689e46f-b6b2-4be8-9ed8-978ef2147d4e': 'boll_macd',
+  'c11d80f8-c68a-42fc-8ada-04055df910a4': 'ema_pullback',
+  'b042aa5e-3cec-44c3-914d-ccae0bc4740c': 'pattern',
+  '7a5eb3b5-ff39-4559-a057-050386a820f0': 'trend_reversal',
+  '3fcc4545-7c16-497b-bed1-f6afc0d18f37': 'linreg',
+  '2d99660e-4168-4457-bc2d-5f121bd02a62': 'ssl',
+  'bf858c10-157f-40f1-915a-ceb23d6d162e': 'ichimoku',
+  '88bbb135-579c-418c-8795-23f6970b306b': 'kalman',
+  '1a2a7591-b872-489e-afe9-ecae05f676d9': 'ema_pullback',
+  'a1cc822a-87d9-4c24-9735-8311402b3601': 'linreg',
+  'c6dd62fa-6d15-4d8e-b577-f93642e75b0a': 'linreg',
+  '05b87485-7f6f-46f4-b522-8f51fc90f704': 'ssl',
+  'fd4b518d-c248-4889-92a5-c50394556571': 'sar_flip',
+  'be1030dc-47fa-4b9a-a176-8368ff8332f5': 'kalman',
+  '8717afe9-36dd-4ada-824d-07f2fed0c9eb': 'trend_reversal',
+  '6fb4b3e9-20e4-45cd-b3e8-911d01036a14': 'pattern',
+  'd85d1178-de66-4ed4-8349-39a98c5edc7d': 'rsi_adaptive',
+  '8cd15b06-2e6c-4e40-bbe8-1c33e7471bbf': 'rsi_macd',
+  '5792de3d-317f-4fb3-a6f0-b69f7b47be71': 'sar_flip',
+  '2c83500d-ffa7-4a28-9f0e-deaa07fcd347': 'ssl',
+  'bbaec02d-b5e9-45c0-a44a-e91433a120d9': 'ichimoku',
+  '7e6cedd9-6e9f-4a33-b2b6-838c647edff2': 'ichimoku',
+  '8be4d74d-e25d-4a9e-b596-66c7d226cb3a': 'trend_reversal',
 };
 
 // ─── Runtime ──────────────────────────────────────────────────────
@@ -311,6 +346,9 @@ export interface EARuntimeDeps {
   getAccountId: () => string | null;
   onStats: (key: string, stats: EAStats) => void;
   onRefresh: () => void;
+  /** Effective engine parameters for a strategy instance (EA Properties
+   *  overrides). Optional — absent means the declared defaults. */
+  getParams?: (strategyId: string, kind?: StrategyKind) => Record<string, number>;
 }
 
 // Default lot lives in DEFAULT_EA_SETTINGS; per-EA lot is read from inst.settings.
@@ -438,7 +476,7 @@ export class EARuntime {
       STRATEGIES[inst.strategyId] ??
       (inst.strategyKind ? STRATEGY_KINDS[inst.strategyKind] : undefined) ??
       stratTrendReversal;
-    const regime = strategy(bars);
+    const regime = strategy(bars, this.deps.getParams?.(inst.strategyId, inst.strategyKind));
     if (regime === null || regime === inst.direction) return;
     // Direction filter (Long only / Short only / Long & Short).
     if (inst.settings.direction === 'long' && regime === 'SELL') return;
@@ -526,6 +564,7 @@ export function backtestStrategy(
   strategyId: string,
   strategyKind: StrategyKind | undefined,
   settings: EASettings,
+  params?: Record<string, number>,
 ): BacktestResult {
   const strat = STRATEGIES[strategyId] ?? (strategyKind ? STRATEGY_KINDS[strategyKind] : undefined) ?? stratTrendReversal;
   const START = 60;
@@ -553,7 +592,7 @@ export function backtestStrategy(
         else if (pos.tp != null && bar.low <= pos.tp) close(pos.tp, bar.time, 'TP');
       }
     }
-    const regime = strat(bars.slice(0, i + 1));
+    const regime = strat(bars.slice(0, i + 1), params);
     if (regime === null) continue;
     if (settings.direction === 'long' && regime === 'SELL') continue;
     if (settings.direction === 'short' && regime === 'BUY') continue;
