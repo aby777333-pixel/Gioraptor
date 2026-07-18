@@ -50,16 +50,19 @@ export interface CustomEA {
   status: string;
   custom: true;
   strategyKind: StrategyKind;
-  sourceKind: 'mq5' | 'ex5';
+  sourceKind: 'mq5' | 'ex5' | 'pine';
   // Library registration metadata (§16/§31) — absent on EAs uploaded before this
   // version; all consumers must treat these as optional.
   inputs?: ExtractedInput[];
   report?: ConversionReport;
-  source?: string;          // .mq5 source (capped); never present for .ex5
+  source?: string;          // .mq5/.pine source (capped); never present for .ex5
   checksum?: string;
   uploadedAt?: number;
   version?: string;
   author?: string;
+  /** Pine indicators only: supported plot() expressions transpiled to a
+   *  runnable Raptor Script (plots on the RAPTOR chart via the script engine). */
+  raptorScript?: string;
 }
 
 const STORAGE_KEY = 'raptor-custom-eas';
@@ -80,11 +83,11 @@ function count(src: string, re: RegExp): number {
 const DETECTORS: Detector[] = [
   {
     kind: 'boll_macd', type: 'reversal',
-    test: (s) => (count(s, /iBands|Bollinger/gi) > 0 && count(s, /iMACD|MACD/gi) > 0 ? 6 : 0),
+    test: (s) => (count(s, /iBands|Bollinger|ta\.bb/gi) > 0 && count(s, /iMACD|MACD/gi) > 0 ? 6 : 0),
   },
   {
     kind: 'sar_flip', type: 'scalper',
-    test: (s) => count(s, /iSAR|ParabolicSAR|Parabolic\s*SAR/gi) > 0 ? 5 : 0,
+    test: (s) => count(s, /iSAR|ParabolicSAR|Parabolic\s*SAR|ta\.sar/gi) > 0 ? 5 : 0,
   },
   {
     kind: 'ichimoku', type: 'trend',
@@ -125,6 +128,89 @@ const DETECTORS: Detector[] = [
   },
 ];
 
+// ─── Pine Script support ───────────────────────────────────────────
+// Pine strategies convert like MQL5 EAs (mapped onto a platform engine);
+// Pine indicators additionally get their supported plot() expressions
+// transpiled into a runnable Raptor Script.
+
+export function isPineSource(filename: string, content: string): boolean {
+  if (/\.(pine|pinescript)$/i.test(filename)) return true;
+  return /\/\/@version=\d/.test(content) && /\b(indicator|strategy|study)\s*\(/.test(content);
+}
+
+const PINE_INPUT_RE = /(\w+)\s*=\s*input(?:\.(int|float|bool|string|timeframe|symbol|color|price|session|source|time))?\s*\(\s*([^,)\n]+)\s*(?:,\s*(?:title\s*=\s*)?["']([^"'\n]+)["'])?/g;
+
+export function extractPineInputs(src: string): ExtractedInput[] {
+  const out: ExtractedInput[] = [];
+  let m: RegExpExecArray | null;
+  PINE_INPUT_RE.lastIndex = 0;
+  while ((m = PINE_INPUT_RE.exec(src)) !== null && out.length < 200) {
+    out.push({
+      name: m[1],
+      mqlType: m[2] ? `input.${m[2]}` : 'input',
+      defaultValue: m[3].trim(),
+      label: (m[4] || m[1].replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ')).trim(),
+    });
+  }
+  return out;
+}
+
+/** First string argument of indicator("…")/strategy("…") as the display name. */
+function extractPineName(src: string, filename: string): string {
+  const m = src.match(/\b(?:indicator|strategy|study)\s*\(\s*["']([^"'\n]+)["']/);
+  if (m && m[1].length <= 60) return m[1].trim();
+  return filename.replace(/\.(pine|pinescript|txt)$/i, '').replace(/[_]+/g, ' ').trim() || 'Pine Script';
+}
+
+// Transpile supported Pine plot() expressions → Raptor Script lines. Honest
+// subset: bare series (close/open/high/low) and single ta.* calls the script
+// engine has helpers for. Everything else is kept as a SKIPPED comment so
+// nothing is silently dropped.
+const PINE_PLOT_COLORS = ['#0091D5', '#F5A623', '#7ED321', '#BD10E0', '#50E3C2', '#FF5252'];
+
+function transpilePineExpr(expr: string): string | null {
+  const e = expr.trim();
+  if (/^(close|open|high|low)$/.test(e)) return e;
+  let m = e.match(/^ta\.(sma|ema|rsi)\s*\(\s*(close|open|high|low)\s*,\s*(\d+)\s*\)$/);
+  if (m) return `${m[1]}(${m[2]}, ${m[3]})`;
+  m = e.match(/^ta\.atr\s*\(\s*(\d+)\s*\)$/);
+  if (m) return `atr(high, low, close, ${m[1]})`;
+  m = e.match(/^ta\.(highest|lowest)\s*\(\s*(close|open|high|low)\s*,\s*(\d+)\s*\)$/);
+  if (m) return `${m[1]}(${m[2]}, ${m[3]})`;
+  m = e.match(/^ta\.mom\s*\(\s*(close|open|high|low)\s*,\s*(\d+)\s*\)$/);
+  if (m) return `momentum(${m[1]}, ${m[2]})`;
+  return null;
+}
+
+export function transpilePineToRaptorScript(src: string, name: string): { script: string; converted: number; skipped: number } {
+  const lines: string[] = [`// Converted from Pine Script: ${name}`];
+  let converted = 0, skipped = 0;
+  const plotRe = /^\s*plot\s*\(([^\n]*)\)\s*$/gm;
+  let m: RegExpExecArray | null;
+  while ((m = plotRe.exec(src)) !== null && converted + skipped < 24) {
+    // first top-level argument (up to the first comma not inside parens)
+    const args = m[1];
+    let depth = 0, cut = args.length;
+    for (let i = 0; i < args.length; i++) {
+      const c = args[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      else if (c === ',' && depth === 0) { cut = i; break; }
+    }
+    const expr = args.slice(0, cut).trim();
+    const title = (args.match(/title\s*=\s*["']([^"']+)["']/) || [])[1];
+    const js = transpilePineExpr(expr);
+    if (js) {
+      lines.push(`plot(${js}, { color: '${PINE_PLOT_COLORS[converted % PINE_PLOT_COLORS.length]}' });${title ? ` // ${title}` : ''}`);
+      converted++;
+    } else {
+      lines.push(`// SKIPPED (unsupported expression): plot(${expr})`);
+      skipped++;
+    }
+  }
+  return { script: lines.join('\n'), converted, skipped };
+}
+
 // ─── §7 Parameter extraction: parse MQL5 `input` declarations ──────
 
 const INPUT_RE = /^\s*(?:input|sinput)\s+([A-Za-z_][\w<>:]*)\s+([A-Za-z_]\w*)\s*=\s*([^;]+);\s*(?:\/\/\s*(.*))?$/gm;
@@ -151,8 +237,11 @@ function has(src: string, re: RegExp): boolean { return re.test(src); }
 export function buildConversionReport(
   filename: string, src: string, engine: StrategyKind, engineScore: number,
 ): ConversionReport {
-  const compiled = !/\.(mq5|mq4)$/i.test(filename) || !src;
-  const isIndicator = !compiled && (has(src, /#property\s+indicator_/i) || (has(src, /\bOnCalculate\s*\(/) && !has(src, /\bOnTick\s*\(/)));
+  const compiled = !src;
+  const pine = !compiled && isPineSource(filename, src);
+  const isIndicator = !compiled && (pine
+    ? (has(src, /\b(indicator|study)\s*\(/) && !has(src, /\bstrategy\s*\(/))
+    : (has(src, /#property\s+indicator_/i) || (has(src, /\bOnCalculate\s*\(/) && !has(src, /\bOnTick\s*\(/))));
 
   if (compiled) {
     return {
@@ -170,6 +259,43 @@ export function buildConversionReport(
   const ev = (re: RegExp, item: string, status: ConversionItem['status'], note: string) => {
     if (has(src, re)) events.push({ item, status, note });
   };
+
+  if (pine) {
+    // ── Pine Script branch ──
+    ev(/\bstrategy\s*\(/, 'strategy() declaration', 'converted', 'Mapped to the platform EA lifecycle (attach/detach + bar-close evaluation).');
+    ev(/\b(indicator|study)\s*\(/, 'indicator() declaration', 'converted', 'Registered as an indicator; supported plots transpiled to a Raptor Script (see Script).');
+    ev(/\bstrategy\.(entry|order|close|exit)\s*\(/, 'strategy.entry/exit/close', 'converted', 'Mapped to the platform order service via the strategy engine.');
+    ev(/\bplot(candle|char|shape|arrow)?\s*\(/, 'plot() series', 'approximated', 'Supported expressions (close/open/high/low, ta.sma/ema/rsi/atr/highest/lowest/mom) transpile to Raptor Script; the rest are kept as SKIPPED comments.');
+    ev(/request\.security\s*\(/, 'request.security (multi-timeframe)', 'unsupported', 'Cross-timeframe series requests are not executed in the web runtime.');
+    ev(/\balert(condition)?\s*\(/, 'alert / alertcondition', 'approximated', 'Recreate alerts with the platform Alerts menu (price-level engine).');
+    ev(/\b(varip|barstate\.)/, 'varip / barstate', 'approximated', 'Bar-state semantics follow the platform bar-close model.');
+    ev(/\b(array|matrix|map)\.\w+\s*\(/, 'array/matrix/map API', 'manual-review', 'Pine collection APIs are not auto-translated.');
+    ev(/\bstrategy\.risk\./, 'strategy.risk rules', 'manual-review', 'Configure equivalents in EA Properties (Risk tab).');
+
+    const features: ConversionItem[] = [];
+    const ft = (re: RegExp, item: string, status: ConversionItem['status'], note: string) => {
+      if (has(src, re)) features.push({ item, status, note });
+    };
+    ft(/ta\.(sma|ema|rsi|macd|atr|bb|stoch|sar|highest|lowest|mom)/, 'ta.* indicator calls', 'converted', 'Mapped to platform indicator calculations.');
+    ft(/StopLoss|stop\s*=|loss\s*=/i, 'Stop-loss logic', 'approximated', 'Replaced by ATR-scaled SL from EA Properties (editable).');
+    ft(/TakeProfit|limit\s*=|profit\s*=/i, 'Take-profit logic', 'approximated', 'Replaced by ATR-scaled TP from EA Properties (editable).');
+    ft(/trail/i, 'Trailing stop', 'unsupported', 'Server-side trailing is not implemented in the web runtime.');
+
+    const securityFlags: string[] = [];
+    if (has(src, /request\.security/)) securityFlags.push('request.security() call found (not executed).');
+
+    const hasUnsupported = [...events, ...features].some((i) => i.status === 'unsupported');
+    const hasReview = [...events, ...features].some((i) => i.status === 'manual-review');
+    return {
+      fileKind: isIndicator ? 'indicator-source' : 'ea-source',
+      sourceAvailable: true,
+      detectedEngine: engine, engineScore,
+      events, features, securityFlags,
+      overall: hasUnsupported || hasReview ? 'partial' : 'converted',
+      convertedAt: Date.now(),
+    };
+  }
+
   ev(/\bOnInit\s*\(/, 'OnInit', 'converted', 'Mapped to the runtime attach/initialisation lifecycle.');
   ev(/\bOnDeinit\s*\(/, 'OnDeinit', 'converted', 'Mapped to the runtime detach lifecycle.');
   ev(/\bOnTick\s*\(/, 'OnTick', 'approximated', 'Runs on platform ticks, evaluated on bar close (bar-level model, not every raw tick).');
@@ -244,24 +370,42 @@ function extractDescription(src: string): string | null {
  * filename and default to a trend engine (no source to inspect).
  */
 export function convertUploadedEA(filename: string, content: string): CustomEA {
-  const isMq5 = /\.mq5$/i.test(filename);
-  const src = isMq5 ? content : '';
+  const pine = isPineSource(filename, content);
+  const isMq5 = !pine && /\.mq5$/i.test(filename);
+  const hasSource = pine || isMq5;
+  const src = hasSource ? content : '';
 
   let best: Detector = DETECTORS[DETECTORS.length - 1];
   let bestScore = 0;
-  if (isMq5) {
+  if (hasSource) {
     for (const d of DETECTORS) {
       const score = d.test(src);
       if (score > bestScore) { bestScore = score; best = d; }
     }
   }
 
-  const name = isMq5 ? extractName(src, filename) : filename.replace(/\.(mq5|ex5)$/i, '').replace(/[_]+/g, ' ').trim();
+  const name = pine
+    ? extractPineName(src, filename)
+    : isMq5 ? extractName(src, filename) : filename.replace(/\.(mq5|ex5)$/i, '').replace(/[_]+/g, ' ').trim();
+  const lang = pine ? 'Pine Script' : isMq5 ? 'MQL5 source' : 'compiled EA';
   const desc = (isMq5 && extractDescription(src)) ||
-    `Uploaded ${isMq5 ? 'MQL5 source' : 'compiled EA'} — converted to the platform's ${best.kind.replace(/_/g, ' ')} engine.`;
+    `Uploaded ${lang} — converted to the platform's ${best.kind.replace(/_/g, ' ')} engine.`;
 
-  const versionMatch = isMq5 ? src.match(/#property\s+version\s+"([^"]+)"/i) : null;
+  const versionMatch = pine ? src.match(/\/\/@version=(\d+)/) : isMq5 ? src.match(/#property\s+version\s+"([^"]+)"/i) : null;
   const authorMatch = isMq5 ? src.match(/#property\s+copyright\s+"([^"]+)"/i) : null;
+
+  const report = buildConversionReport(filename, src, best.kind, bestScore);
+  // Pine indicators: transpile supported plots into a runnable Raptor Script.
+  let raptorScript: string | undefined;
+  if (pine && report.fileKind === 'indicator-source') {
+    const t = transpilePineToRaptorScript(src, name);
+    if (t.converted > 0) raptorScript = t.script;
+    report.features.push({
+      item: 'Raptor Script transpile',
+      status: t.converted > 0 ? (t.skipped > 0 ? 'approximated' : 'converted') : 'manual-review',
+      note: `${t.converted} plot(s) transpiled, ${t.skipped} skipped. ${t.converted > 0 ? 'Apply it from the Script tab.' : 'No supported plot expressions found — build it in the Raptor Script editor.'}`,
+    });
+  }
 
   return {
     id: `custom-${genId()}`,
@@ -274,16 +418,35 @@ export function convertUploadedEA(filename: string, content: string): CustomEA {
     status: 'available',
     custom: true,
     strategyKind: best.kind,
-    sourceKind: isMq5 ? 'mq5' : 'ex5',
+    sourceKind: pine ? 'pine' : isMq5 ? 'mq5' : 'ex5',
     // §7/§2/§16/§31 — extraction, report, source, registration metadata
-    inputs: isMq5 ? extractInputs(src) : [],
-    report: buildConversionReport(filename, src, best.kind, bestScore),
-    source: isMq5 ? src.slice(0, MAX_STORED_SOURCE) : undefined,
-    checksum: checksumOf(isMq5 ? src : filename),
+    inputs: pine ? extractPineInputs(src) : isMq5 ? extractInputs(src) : [],
+    report,
+    source: hasSource ? src.slice(0, MAX_STORED_SOURCE) : undefined,
+    checksum: checksumOf(hasSource ? src : filename),
     uploadedAt: Date.now(),
-    version: versionMatch?.[1],
+    version: pine && versionMatch ? `Pine v${versionMatch[1]}` : versionMatch?.[1],
     author: authorMatch?.[1],
+    raptorScript,
   };
+}
+
+/** Re-convert an edited source in place: re-runs extraction, engine detection,
+ *  the conversion report and (for Pine indicators) the script transpile,
+ *  preserving the EA's identity. Returns the updated EA, or null. */
+export function reconvertCustomEA(id: string, newSource: string): CustomEA | null {
+  const list = loadCustomEAs();
+  const idx = list.findIndex((e) => e.id === id);
+  if (idx < 0) return null;
+  const prev = list[idx];
+  if (prev.sourceKind === 'ex5') return null; // compiled-only stays read-only
+  const pseudoName = `${prev.name.replace(/\s+/g, '_')}.${prev.sourceKind === 'pine' ? 'pine' : 'mq5'}`;
+  const fresh = convertUploadedEA(pseudoName, newSource);
+  const updated: CustomEA = { ...fresh, id: prev.id, uploadedAt: prev.uploadedAt, sourceKind: prev.sourceKind };
+  list[idx] = updated;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+  return updated;
 }
 
 /** §31 duplicate detection: an already-uploaded file (same checksum) is rejected. */

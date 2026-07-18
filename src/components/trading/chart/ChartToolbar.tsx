@@ -521,13 +521,13 @@ export default function ChartToolbar({
               {uploadMsg.text}
             </div>
           )}
-          <input ref={fileInputRef} type="file" accept=".mq5,.ex5" className="hidden" onChange={onFileChosen} />
+          <input ref={fileInputRef} type="file" accept=".mq5,.ex5,.pine,.txt" className="hidden" onChange={onFileChosen} />
           <button
             onClick={onUploadClick}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-[11px] font-semibold transition-all hover:bg-[rgba(0,145,213,0.15)]"
             style={{ border: '1px dashed rgba(0,145,213,0.3)', color: '#0091D5' }}
           >
-            <Zap size={14} /> Upload Custom EA (.mq5, .ex5)
+            <Zap size={14} /> Upload Custom EA (.mq5, .ex5, .pine)
           </button>
         </div>
       </PortalDropdown>

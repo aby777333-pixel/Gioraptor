@@ -7,10 +7,10 @@
 // reconstructed).
 
 import { useState } from 'react';
-import { X, FileCode2, ShieldAlert, Info, ListTree } from 'lucide-react';
-import type { CustomEA, ConversionItem } from '@/lib/trading/custom-ea';
+import { X, FileCode2, ShieldAlert, Info, ListTree, Play, Pencil } from 'lucide-react';
+import { reconvertCustomEA, type CustomEA, type ConversionItem } from '@/lib/trading/custom-ea';
 
-type Tab = 'overview' | 'inputs' | 'report' | 'source';
+type Tab = 'overview' | 'inputs' | 'report' | 'source' | 'script';
 
 const STATUS_COLORS: Record<ConversionItem['status'], string> = {
   converted: '#00C27A',
@@ -26,10 +26,35 @@ const OVERALL_LABELS: Record<string, { text: string; color: string }> = {
   'manual-review': { text: 'Manual review required', color: '#FF9800' },
 };
 
-export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClose: () => void }) {
+export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: CustomEA; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
+  // Editable source (mq5/pine): edits re-run the whole conversion pipeline.
+  const [cur, setCur] = useState<CustomEA>(initial);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const ea = cur;
+  const editable = ea.sourceKind !== 'ex5' && !!ea.source;
   const report = ea.report;
   const overall = report ? OVERALL_LABELS[report.overall] : null;
+
+  const saveAndReconvert = () => {
+    const updated = reconvertCustomEA(ea.id, draft);
+    if (updated) {
+      setCur(updated);
+      setEditing(false);
+      setNotice('Source saved — inputs, engine mapping, conversion report and script were regenerated.');
+    } else {
+      setNotice('Re-conversion failed — the EA may have been removed.');
+    }
+  };
+
+  const applyScript = () => {
+    if (!ea.raptorScript) return;
+    try { localStorage.setItem('raptor_user_script', ea.raptorScript); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('raptor-apply-script', { detail: { code: ea.raptorScript } }));
+    setNotice('Script applied — open the RAPTOR chart tab to see the plots.');
+  };
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onMouseDown={onClose}>
@@ -42,7 +67,7 @@ export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClo
           <div>
             <div className="text-[13px] font-bold text-white">{ea.name}</div>
             <div className="flex items-center gap-2 text-[10px] text-white/40">
-              <span>{ea.sourceKind === 'mq5' ? 'MQL5 source' : 'Compiled .ex5'}</span>
+              <span>{ea.sourceKind === 'pine' ? 'Pine Script' : ea.sourceKind === 'mq5' ? 'MQL5 source' : 'Compiled .ex5'}</span>
               {overall && <span style={{ color: overall.color }}>· {overall.text}</span>}
             </div>
           </div>
@@ -50,14 +75,20 @@ export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClo
         </div>
 
         <div className="flex gap-0.5 border-b px-2 pt-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          {([['overview', 'Overview', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree], ['report', 'Conversion report', ShieldAlert], ['source', 'Source', FileCode2]] as const).map(([t, label, Icon]) => (
-            <button key={t} onClick={() => setTab(t as Tab)}
+          {([['overview', 'Overview', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree], ['report', 'Conversion report', ShieldAlert], ['source', 'Source', FileCode2], ...(ea.raptorScript ? [['script', 'Script', Play]] : [])] as [Tab, string, typeof Info][]).map(([t, label, Icon]) => (
+            <button key={t} onClick={() => setTab(t)}
               className="flex items-center gap-1.5 rounded-t px-3 py-1.5 text-[11px] font-medium transition-colors"
               style={{ backgroundColor: tab === t ? 'rgba(41,171,226,0.12)' : 'transparent', color: tab === t ? '#0091D5' : 'rgba(255,255,255,0.45)' }}>
               <Icon size={12} /> {label}
             </button>
           ))}
         </div>
+
+        {notice && (
+          <div className="border-b px-4 py-2 text-[10px]" style={{ borderColor: 'rgba(0,145,213,0.25)', backgroundColor: 'rgba(0,145,213,0.06)', color: '#7fc4e8' }}>
+            {notice}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4">
           {tab === 'overview' && (
@@ -67,7 +98,7 @@ export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClo
               <Row k="Author" v={ea.author ?? '—'} />
               <Row k="Strategy type" v={ea.type} />
               <Row k="Mapped engine" v={ea.strategyKind.replace(/_/g, ' ')} />
-              <Row k="Source language" v={ea.sourceKind === 'mq5' ? 'MQL5' : 'Compiled binary'} />
+              <Row k="Source language" v={ea.sourceKind === 'pine' ? 'Pine Script' : ea.sourceKind === 'mq5' ? 'MQL5' : 'Compiled binary'} />
               <Row k="Source available" v={ea.report ? (ea.report.sourceAvailable ? 'Yes' : 'No — compiled only') : ea.sourceKind === 'mq5' ? 'Yes' : 'No'} />
               <Row k="File kind" v={ea.report?.fileKind ?? (ea.sourceKind === 'mq5' ? 'ea-source' : 'compiled')} />
               <Row k="Checksum" v={ea.checksum ?? '—'} />
@@ -150,13 +181,39 @@ export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClo
               <div className="py-6 text-center text-[11px] text-white/35">
                 {ea.sourceKind === 'ex5'
                   ? 'Compiled-only file — the source code is not available and will not be reconstructed or invented. Editing is disabled.'
-                  : 'Source was not stored for this EA (uploaded before source storage existed). Re-upload the .mq5 to view it.'}
+                  : 'Source was not stored for this EA (uploaded before source storage existed). Re-upload the file to view it.'}
+              </div>
+            ) : editing ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between text-[10px] text-white/35">
+                  <span>Editing {ea.sourceKind === 'pine' ? 'Pine Script' : 'MQL5'} source — saving re-runs the full conversion</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditing(false)} className="rounded bg-white/[0.06] px-2 py-1 text-[10px] text-white/60 hover:text-white">Cancel</button>
+                    <button onClick={saveAndReconvert} className="rounded px-2 py-1 text-[10px] font-bold text-black" style={{ backgroundColor: '#0091D5' }}>Save &amp; Re-convert</button>
+                  </div>
+                </div>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  spellCheck={false}
+                  className="h-[420px] w-full resize-none rounded-md border p-3 font-mono text-[10px] leading-relaxed text-white/80 outline-none"
+                  style={{ borderColor: 'rgba(0,145,213,0.35)', backgroundColor: '#060D16' }}
+                />
               </div>
             ) : (
               <div>
                 <div className="mb-2 flex items-center justify-between text-[10px] text-white/35">
-                  <span>Read-only viewer · {ea.source.split('\n').length} lines</span>
-                  <span className="rounded bg-white/[0.06] px-1.5 py-0.5">READ-ONLY</span>
+                  <span>{editable ? 'Editable source' : 'Read-only viewer'} · {ea.source.split('\n').length} lines</span>
+                  <div className="flex items-center gap-2">
+                    {editable && (
+                      <button onClick={() => { setDraft(ea.source!); setEditing(true); }}
+                        className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold"
+                        style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}>
+                        <Pencil size={10} /> Edit
+                      </button>
+                    )}
+                    <span className="rounded bg-white/[0.06] px-1.5 py-0.5">{editable ? 'EDITABLE' : 'READ-ONLY'}</span>
+                  </div>
                 </div>
                 <pre className="max-h-[420px] overflow-auto rounded-md border p-3 font-mono text-[10px] leading-relaxed text-white/70"
                   style={{ borderColor: 'rgba(255,255,255,0.08)', backgroundColor: '#060D16' }}>
@@ -169,6 +226,26 @@ export default function CustomEAInfoModal({ ea, onClose }: { ea: CustomEA; onClo
                 </pre>
               </div>
             )
+          )}
+
+          {tab === 'script' && ea.raptorScript && (
+            <div>
+              <div className="mb-2 flex items-center justify-between text-[10px] text-white/35">
+                <span>Raptor Script transpiled from the Pine plots — runs on the RAPTOR chart</span>
+                <button onClick={applyScript}
+                  className="flex items-center gap-1 rounded px-2.5 py-1 text-[10px] font-bold text-black"
+                  style={{ backgroundColor: '#00C27A' }}>
+                  <Play size={10} /> Apply to RAPTOR chart
+                </button>
+              </div>
+              <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-md border p-3 font-mono text-[10px] leading-relaxed text-white/75"
+                style={{ borderColor: 'rgba(0,194,122,0.25)', backgroundColor: '#060D16' }}>
+                {ea.raptorScript}
+              </pre>
+              <p className="mt-2 text-[9px] text-white/25">
+                Only supported plot expressions were transpiled (SKIPPED lines list the rest). You can refine the script in the header Script editor afterwards.
+              </p>
+            </div>
           )}
         </div>
       </div>
