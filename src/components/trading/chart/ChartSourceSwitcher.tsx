@@ -11,7 +11,12 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical, Grid3x3 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Market Insights module — lazy-loaded so the terminal bundle is untouched
+// unless the trader actually opens it.
+const InsightsPanel = dynamic(() => import('../insights/InsightsPanel'), { ssr: false });
 import ChartPanel from './ChartPanel';
 import TradingViewPanel from './TradingViewPanel';
 import { type EAConfig } from './ChartToolbar';
@@ -130,6 +135,9 @@ export default function ChartSourceSwitcher({
   // Admin entitlement: when algo_trading is switched off platform-wide, the
   // Algo toggle is forced OFF and locked.
   const [algoLocked, setAlgoLocked] = useState(false);
+  // Market Insights module (lazy-loaded overlay; entitlement market_insights).
+  const [insightsEnabled, setInsightsEnabled] = useState(true);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -197,6 +205,9 @@ export default function ChartSourceSwitcher({
         setAlgoOn(false);
         setAlgoLocked(true);
       }
+      // Market Insights module (enhancement prompt §2/§3/§7): admin-toggleable,
+      // fail-open like every entitlement.
+      if (ents['market_insights'] === false) setInsightsEnabled(false);
     })();
     return () => { active = false; };
   }, []);
@@ -660,6 +671,18 @@ export default function ChartSourceSwitcher({
         {/* Markets — economic calendar, news & screener (real TradingView data) */}
         <MarketsMenu />
 
+        {/* Market Insights — heat map / sessions / regime (module, admin-toggleable) */}
+        {insightsEnabled && (
+          <button
+            onClick={() => setInsightsOpen(true)}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
+            style={{ color: insightsOpen ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+            title="Market Insights — heat map, sessions & regime (live platform data)"
+          >
+            <Grid3x3 size={12} /> Insights
+          </button>
+        )}
+
         {/* DOM — click-to-trade price ladder (real order service, both charts) */}
         <DomLadder activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />
 
@@ -922,6 +945,9 @@ export default function ChartSourceSwitcher({
 
       {/* Custom EA info panel (§16) */}
       {infoEa && <CustomEAInfoModal ea={infoEa} onClose={() => setInfoEa(null)} />}
+
+      {/* Market Insights module — display-only overlay */}
+      {insightsOpen && <InsightsPanel onClose={() => setInsightsOpen(false)} />}
 
       {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
       {disclaimerFor && (
