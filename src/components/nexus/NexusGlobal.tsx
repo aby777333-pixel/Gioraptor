@@ -163,14 +163,20 @@ export function NexusGlobal() {
             const ctx = await buildNexusContext();
             let watchlist: string[] = [];
             try { watchlist = JSON.parse(localStorage.getItem('raptor_watchlist_symbols') || '[]'); } catch { /* ignore */ }
+            const perf = ctx.performance;
             const traderMessages = evaluateTraderProactiveMessages({
               openPositions: ctx.positions.map(p => ({
                 symbol: p.symbol, pnl: p.floatingPnl, direction: p.direction,
                 volume: p.size, openTime: '', stopLoss: p.sl,
               })),
               sessionMinutes: Math.round((Date.now() - sessionStartRef.current) / 60000),
-              tradesToday: 0, avgTradesPerDay: 4, consecutiveLosses: 0,
-              lastPositionSize: 0, avgPositionSize: 0,
+              // Real closed-trade stats — the overtrading and revenge-trading
+              // detectors now run on the trader's actual history.
+              tradesToday: perf?.tradesToday ?? 0,
+              avgTradesPerDay: perf?.avgTradesPerDay || 4,
+              consecutiveLosses: perf?.currentLossStreak ?? 0,
+              lastPositionSize: perf?.lastSize ?? 0,
+              avgPositionSize: perf?.avgSize ?? 0,
               currentDrawdownPct: 0, watchlist,
               upcomingEvents: [], dayOfWeek: new Date().getDay(), hour: new Date().getHours(),
             });

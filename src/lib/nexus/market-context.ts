@@ -23,6 +23,67 @@ export interface NexusContext {
   /** Real bar-based classification — only present when the terminal's bar
    *  builder is available on this page (never fabricated elsewhere). */
   marketState: (MarketStateAssessment & { symbol: string; timeframe: string }) | null;
+  /** Real performance analytics computed from the account's closed trades. */
+  performance: NexusPerformance | null;
+}
+
+export interface NexusPerformance {
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number;          // %
+  netPnl: number;
+  profitFactor: number | null;
+  avgWin: number;
+  avgLoss: number;
+  currentLossStreak: number; // consecutive losses, most recent first
+  tradesToday: number;
+  avgTradesPerDay: number;   // over the distinct trading days in the sample
+  avgSize: number;
+  lastSize: number;
+  lastTrade: {
+    symbol: string; direction: string; size: number;
+    openPrice: number; closePrice: number; pnl: number; closedAt: string;
+  } | null;
+}
+
+/** Compute honest performance stats from real closed-position rows. */
+export function computePerformance(rows: Record<string, unknown>[]): NexusPerformance | null {
+  if (!rows || rows.length === 0) return null;
+  const trades = rows.map((r) => ({
+    symbol: String(r.symbol ?? ''),
+    direction: String(r.direction ?? ''),
+    size: Number(r.size ?? 0),
+    openPrice: Number(r.open_price ?? 0),
+    closePrice: Number(r.close_price ?? r.current_price ?? 0),
+    pnl: Number(r.realized_pnl ?? r.floating_pnl ?? 0),
+    closedAt: String(r.closed_at ?? ''),
+  }));
+  const wins = trades.filter((t) => t.pnl > 0);
+  const losses = trades.filter((t) => t.pnl < 0);
+  const grossWin = wins.reduce((s, t) => s + t.pnl, 0);
+  const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+  let streak = 0;
+  for (const t of trades) { if (t.pnl < 0) streak++; else break; }
+  const today = new Date().toDateString();
+  const tradesToday = trades.filter((t) => t.closedAt && new Date(t.closedAt).toDateString() === today).length;
+  const days = new Set(trades.filter((t) => t.closedAt).map((t) => new Date(t.closedAt).toDateString())).size || 1;
+  return {
+    totalTrades: trades.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: Math.round((wins.length / trades.length) * 100),
+    netPnl: trades.reduce((s, t) => s + t.pnl, 0),
+    profitFactor: grossLoss > 0 ? grossWin / grossLoss : null,
+    avgWin: wins.length ? grossWin / wins.length : 0,
+    avgLoss: losses.length ? grossLoss / losses.length : 0,
+    currentLossStreak: streak,
+    tradesToday,
+    avgTradesPerDay: Math.round((trades.length / days) * 10) / 10,
+    avgSize: trades.reduce((s, t) => s + t.size, 0) / trades.length,
+    lastSize: trades[0]?.size ?? 0,
+    lastTrade: trades[0] ?? null,
+  };
 }
 
 export async function buildNexusContext(): Promise<NexusContext> {
@@ -32,9 +93,14 @@ export async function buildNexusContext(): Promise<NexusContext> {
     .map((t) => ({ symbol: t.symbol, bid: t.bid, ask: t.ask, spread: t.spread }));
 
   let positions: NexusContext['positions'] = [];
+  let performance: NexusPerformance | null = null;
   let accountConnected = false;
   if (state.activeAccountId) {
     accountConnected = true;
+    try {
+      const closed = await orderService.getTradeHistory(state.activeAccountId, 50);
+      performance = computePerformance((closed ?? []) as Record<string, unknown>[]);
+    } catch { /* history unavailable — omit honestly */ }
     try {
       const open = await orderService.getOpenPositions(state.activeAccountId);
       positions = (open ?? []).map((p: Record<string, unknown>) => ({
@@ -67,6 +133,7 @@ export async function buildNexusContext(): Promise<NexusContext> {
     positions,
     accountConnected,
     marketState,
+    performance,
   };
 }
 
@@ -92,6 +159,16 @@ export function contextToText(ctx: NexusContext): string {
   }
   if (ctx.marketState) {
     lines.push(marketStateToText(ctx.marketState.symbol, ctx.marketState.timeframe, ctx.marketState));
+  }
+  if (ctx.performance) {
+    const p = ctx.performance;
+    lines.push(`Performance (real, last ${p.totalTrades} closed trades): win rate ${p.winRate}% (${p.wins}W/${p.losses}L), net P&L ${p.netPnl >= 0 ? '+' : ''}${p.netPnl.toFixed(2)}, profit factor ${p.profitFactor != null ? p.profitFactor.toFixed(2) : 'n/a'}, avg win +${p.avgWin.toFixed(2)} / avg loss -${p.avgLoss.toFixed(2)}, current loss streak ${p.currentLossStreak}, trades today ${p.tradesToday} (avg ${p.avgTradesPerDay}/day), avg size ${p.avgSize.toFixed(2)} lots`);
+    if (p.lastTrade) {
+      const t = p.lastTrade;
+      lines.push(`Last closed trade: ${t.direction} ${t.size} ${t.symbol} @ ${t.openPrice} → ${t.closePrice}, P&L ${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}, closed ${t.closedAt}`);
+    }
+  } else if (ctx.accountConnected) {
+    lines.push('Performance: no closed trades in this account yet.');
   }
   return lines.join('\n');
 }

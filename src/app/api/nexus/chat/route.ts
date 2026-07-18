@@ -120,6 +120,28 @@ function generateIntelligentFallback(input: string, history: { role: string; con
     const quoteLines = contextText.split('\n').filter((l) => /: bid /.test(l)).map((l) => l.trim());
     const positionLines = contextText.split('\n').filter((l) => /floating P&L/.test(l)).map((l) => l.trim());
 
+    if (/(review|debrief).*(trade)|last trade|last closed/.test(lower)) {
+      const lastLine = (contextText.match(/Last closed trade: ([^\n]+)/) || [])[1];
+      const perfLine = (contextText.match(/Performance \(real[^\n]+/) || [])[0];
+      if (lastLine) {
+        const pnl = parseFloat((lastLine.match(/P&L (-?\+?-?[\d.]+)/) || ['', '0'])[1]);
+        const won = !lastLine.includes('P&L -');
+        return `**Your last closed trade (real):**\n${lastLine}\n\n**Debrief questions that matter more than the P&L:**\n• Was the entry part of your plan, or an impulse?\n• Did you place the stop before entering — and leave it alone?\n• Would you take the exact same trade again with the same information?\n\n${won ? 'A win executed sloppily still needs review — grade the process, not the outcome.' : 'A loss that followed your plan is tuition, not failure. Only rule-breaks need fixing.'}\n\n${perfLine ? `**Bigger picture:** ${perfLine.replace('Performance (real, ', 'Over your ').replace('):', ':')}` : ''}\n\n⚠️ AI coaching on your real trade data, not financial advice.`;
+      }
+      if (noAccount) return 'I can\'t see your trade history — **no trading account is connected on this page**. Sign in on the terminal and I\'ll debrief your actual last trade.';
+      return 'Your account has **no closed trades yet**, so there\'s nothing to debrief. When you close your first trade, I\'ll review the entry, exit and process with you.';
+    }
+
+    if (/(win rate|profit factor|expectancy|performance|how am i (doing|trading)|my stats|track record)/.test(lower)) {
+      const perfLine = (contextText.match(/Performance \(real[^\n]+/) || [])[0];
+      if (perfLine) {
+        const facts = perfLine.replace(/^Performance \(real, /, '').replace(/\)$/, '');
+        return `**Your real performance** — computed from your closed trades on this account:\n\n${facts.split(', ').map((f) => `• ${f}`).join('\n')}\n\n**How to read it:**\n• Profit factor > 1.5 with 30+ trades is a genuinely working edge\n• Win rate alone means little — pair it with avg win vs avg loss\n• A rising loss streak is a signal to cut size, not to push harder\n\n⚠️ Real account data, AI commentary — not financial advice.`;
+      }
+      if (noAccount) return 'I can\'t compute your performance — **no trading account is connected on this page**. Sign in and I\'ll build your real stats from closed trades.';
+      return 'No closed trades on this account yet, so there are no performance stats to compute. Your record starts with the first closed trade.';
+    }
+
     if (/(market state|market regime|trend right now|trending|what.?s the (trend|state))/.test(lower)) {
       const msBlock = contextText.split('\n').filter((l) => /Market state for|State:|Evidence:|Expected scenarios/.test(l)).map((l) => l.trim());
       if (msBlock.length > 0) {
