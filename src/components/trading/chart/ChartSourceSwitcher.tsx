@@ -867,6 +867,10 @@ export default function ChartSourceSwitcher({
             strategyKind={testFor.strategyKind as StrategyKind | undefined}
             settings={settings}
             onClose={() => setTestFor(null)}
+            onApplySettings={(s) => {
+              runtimeRef.current?.setInstanceSettings(key, s);
+              showEAToast(`Optimized settings applied to "${testFor.name}" — SL ${s.slAtrMult}×ATR / TP ${s.tpAtrMult}×ATR`);
+            }}
           />
         );
       })()}

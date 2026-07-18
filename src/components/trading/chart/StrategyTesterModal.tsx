@@ -10,20 +10,78 @@ import { X, TrendingUp, TrendingDown } from 'lucide-react';
 import { backtestStrategy, type BacktestResult, type EASettings, type StrategyKind } from '@/lib/trading/ea-engine';
 import type { OHLCVBar } from '@/types/trading';
 
-type Tab = 'overview' | 'trades';
+type Tab = 'overview' | 'trades' | 'optimize' | 'walkforward';
+
+// Parameter grid for optimization (§10): SL / TP ATR multipliers.
+const SL_GRID = [1, 1.5, 2, 2.5, 3, 4];
+const TP_GRID = [1.5, 2, 3, 4, 5, 6];
+
+interface OptRow { sl: number; tp: number; r: BacktestResult }
+interface WfFold { label: string; sl: number; tp: number; trainNet: number; oos: BacktestResult }
 
 export default function StrategyTesterModal({
-  eaName, symbol, timeframe, bars, strategyId, strategyKind, settings, onClose,
+  eaName, symbol, timeframe, bars, strategyId, strategyKind, settings, onClose, onApplySettings,
 }: {
   eaName: string; symbol: string; timeframe: string; bars: OHLCVBar[];
   strategyId: string; strategyKind: StrategyKind | undefined; settings: EASettings;
   onClose: () => void;
+  onApplySettings?: (s: EASettings) => void;
 }) {
   const [tab, setTab] = useState<Tab>('overview');
   const result: BacktestResult | null = useMemo(
     () => (bars.length >= 80 ? backtestStrategy(bars, strategyId, strategyKind, settings) : null),
     [bars, strategyId, strategyKind, settings],
   );
+
+  // ── Optimization (§10): grid sweep over SL×TP ATR multipliers ──
+  const [optRows, setOptRows] = useState<OptRow[] | null>(null);
+  const [optRunning, setOptRunning] = useState(false);
+  const [appliedKey, setAppliedKey] = useState<string | null>(null);
+  const runOptimization = () => {
+    setOptRunning(true);
+    setTimeout(() => { // let the "running" state paint before the sweep
+      const rows: OptRow[] = [];
+      for (const sl of SL_GRID) for (const tp of TP_GRID) {
+        rows.push({ sl, tp, r: backtestStrategy(bars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp }) });
+      }
+      rows.sort((a, b) => b.r.netProfit - a.r.netProfit);
+      setOptRows(rows);
+      setOptRunning(false);
+    }, 30);
+  };
+
+  // ── Walk-forward (§10): rolling optimize-in-sample → test out-of-sample ──
+  const [wf, setWf] = useState<{ folds: WfFold[]; oosNet: number; robust: boolean } | null>(null);
+  const [wfRunning, setWfRunning] = useState(false);
+  const runWalkForward = () => {
+    setWfRunning(true);
+    setTimeout(() => {
+      const total = bars.length;
+      const train = Math.floor(total * 0.4);
+      const test = Math.floor(total * 0.2);
+      const folds: WfFold[] = [];
+      for (let start = 0; start + train + test <= total; start += test) {
+        const trainBars = bars.slice(start, start + train);
+        const testBars = bars.slice(start + train, start + train + test);
+        if (trainBars.length < 80 || testBars.length < 80) continue;
+        // optimize on the in-sample window (best net P&L, prefer >=3 trades)
+        let best: OptRow | null = null;
+        for (const sl of SL_GRID) for (const tp of TP_GRID) {
+          const r = backtestStrategy(trainBars, strategyId, strategyKind, { ...settings, slAtrMult: sl, tpAtrMult: tp });
+          if (!best || (r.netProfit > best.r.netProfit && (r.numTrades >= 3 || best.r.numTrades < 3))) best = { sl, tp, r };
+        }
+        if (!best) continue;
+        // test those params on the unseen out-of-sample window
+        const oos = backtestStrategy(testBars, strategyId, strategyKind, { ...settings, slAtrMult: best.sl, tpAtrMult: best.tp });
+        const d = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        folds.push({ label: `${d(testBars[0].time)} – ${d(testBars[testBars.length - 1].time)}`, sl: best.sl, tp: best.tp, trainNet: best.r.netProfit, oos });
+      }
+      const oosNet = folds.reduce((s, f) => s + f.oos.netProfit, 0);
+      const robust = folds.length > 0 && folds.filter((f) => f.oos.netProfit > 0).length >= Math.ceil(folds.length / 2);
+      setWf({ folds, oosNet, robust });
+      setWfRunning(false);
+    }, 30);
+  };
 
   const net = result?.netProfit ?? 0;
 
@@ -49,11 +107,11 @@ export default function StrategyTesterModal({
         ) : (
           <>
             <div className="flex gap-0.5 border-b px-2 pt-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              {(['overview', 'trades'] as Tab[]).map((t) => (
+              {(['overview', 'trades', 'optimize', 'walkforward'] as Tab[]).map((t) => (
                 <button key={t} onClick={() => setTab(t)}
                   className="rounded-t px-3 py-1.5 text-[11px] font-medium capitalize transition-colors"
                   style={{ backgroundColor: tab === t ? 'rgba(41,171,226,0.12)' : 'transparent', color: tab === t ? '#0091D5' : 'rgba(255,255,255,0.45)' }}>
-                  {t === 'trades' ? `Trades (${result.numTrades})` : 'Overview'}
+                  {t === 'trades' ? `Trades (${result.numTrades})` : t === 'optimize' ? 'Optimization' : t === 'walkforward' ? 'Walk-Forward' : 'Overview'}
                 </button>
               ))}
             </div>
@@ -111,6 +169,120 @@ export default function StrategyTesterModal({
                       {result.trades.length === 0 && <tr><td colSpan={7} className="py-4 text-center text-white/30">No trades generated over this history.</td></tr>}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {tab === 'optimize' && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-[10px] text-white/45">
+                      Grid sweep: SL ×ATR {'{'}{SL_GRID.join(', ')}{'}'} × TP ×ATR {'{'}{TP_GRID.join(', ')}{'}'} — {SL_GRID.length * TP_GRID.length} backtests over {result.barsTested} bars.
+                    </div>
+                    <button onClick={runOptimization} disabled={optRunning}
+                      className="shrink-0 rounded px-3 py-1.5 text-[11px] font-bold text-black disabled:opacity-50"
+                      style={{ backgroundColor: '#0091D5' }}>
+                      {optRunning ? 'Running…' : optRows ? 'Re-run' : 'Run optimization'}
+                    </button>
+                  </div>
+                  {!optRows && !optRunning && <div className="py-6 text-center text-[11px] text-white/30">Run the sweep to rank parameter combinations by net P&L.</div>}
+                  {optRows && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[10px]">
+                        <thead className="text-white/35">
+                          <tr className="text-left">
+                            <th className="py-1 pr-2">#</th><th className="pr-2">SL ×ATR</th><th className="pr-2">TP ×ATR</th>
+                            <th className="pr-2 text-right">Net P&L</th><th className="pr-2 text-right">PF</th>
+                            <th className="pr-2 text-right">Win %</th><th className="pr-2 text-right">Max DD</th>
+                            <th className="pr-2 text-right">Trades</th><th></th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-mono">
+                          {optRows.map((row, i) => {
+                            const k = `${row.sl}-${row.tp}`;
+                            const isCurrent = row.sl === settings.slAtrMult && row.tp === settings.tpAtrMult;
+                            return (
+                              <tr key={k} className="border-t border-white/[0.04]" style={{ backgroundColor: i === 0 ? 'rgba(0,194,122,0.06)' : 'transparent' }}>
+                                <td className="py-1 pr-2 text-white/30">{i + 1}{i === 0 ? ' ★' : ''}</td>
+                                <td className="pr-2 text-white/70">{row.sl}</td>
+                                <td className="pr-2 text-white/70">{row.tp}</td>
+                                <td className="pr-2 text-right" style={{ color: row.r.netProfit >= 0 ? '#00C27A' : '#FF5252' }}>${row.r.netProfit.toLocaleString()}</td>
+                                <td className="pr-2 text-right text-white/60">{row.r.profitFactor.toFixed(2)}</td>
+                                <td className="pr-2 text-right text-white/60">{row.r.winRate}%</td>
+                                <td className="pr-2 text-right text-white/60">{row.r.maxDrawdownPct}%</td>
+                                <td className="pr-2 text-right text-white/60">{row.r.numTrades}</td>
+                                <td className="text-right">
+                                  {isCurrent ? (
+                                    <span className="text-[9px] text-white/30">current</span>
+                                  ) : onApplySettings && (
+                                    <button
+                                      onClick={() => { onApplySettings({ ...settings, slAtrMult: row.sl, tpAtrMult: row.tp }); setAppliedKey(k); }}
+                                      className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                                      style={{ backgroundColor: appliedKey === k ? 'rgba(0,194,122,0.25)' : 'rgba(0,145,213,0.15)', color: appliedKey === k ? '#00C27A' : '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}>
+                                      {appliedKey === k ? 'Applied ✓' : 'Apply'}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <p className="mt-2 text-[9px] text-white/25">
+                        Same bar-level model as the single backtest. Top-ranked ≠ guaranteed — prefer parameters that also hold up in Walk-Forward.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'walkforward' && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-[10px] text-white/45">
+                      Rolling windows: optimize on 40% in-sample, test on the next 20% out-of-sample, step forward.
+                    </div>
+                    <button onClick={runWalkForward} disabled={wfRunning}
+                      className="shrink-0 rounded px-3 py-1.5 text-[11px] font-bold text-black disabled:opacity-50"
+                      style={{ backgroundColor: '#0091D5' }}>
+                      {wfRunning ? 'Running…' : wf ? 'Re-run' : 'Run walk-forward'}
+                    </button>
+                  </div>
+                  {!wf && !wfRunning && <div className="py-6 text-center text-[11px] text-white/30">Run the analysis to see how optimized parameters hold up on unseen data.</div>}
+                  {wf && wf.folds.length === 0 && <div className="py-6 text-center text-[11px] text-white/30">Not enough history for walk-forward windows (need ≥ 400 bars).</div>}
+                  {wf && wf.folds.length > 0 && (
+                    <>
+                      <div className="mb-3 grid grid-cols-3 gap-2">
+                        <Metric label="OOS net P&L (all folds)" value={`$${wf.oosNet.toLocaleString()}`} color={wf.oosNet >= 0 ? '#00C27A' : '#FF5252'} />
+                        <Metric label="Profitable folds" value={`${wf.folds.filter((f) => f.oos.netProfit > 0).length}/${wf.folds.length}`} />
+                        <Metric label="Verdict" value={wf.robust ? 'ROBUST' : 'FRAGILE'} color={wf.robust ? '#00C27A' : '#FF5252'} />
+                      </div>
+                      <table className="w-full text-[10px]">
+                        <thead className="text-white/35">
+                          <tr className="text-left">
+                            <th className="py-1 pr-2">OOS window</th><th className="pr-2">Best SL/TP</th>
+                            <th className="pr-2 text-right">IS net</th><th className="pr-2 text-right">OOS net</th>
+                            <th className="pr-2 text-right">OOS PF</th><th className="pr-2 text-right">OOS trades</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-mono">
+                          {wf.folds.map((f, i) => (
+                            <tr key={i} className="border-t border-white/[0.04]">
+                              <td className="py-1 pr-2 text-white/60">{f.label}</td>
+                              <td className="pr-2 text-white/70">{f.sl} / {f.tp}</td>
+                              <td className="pr-2 text-right text-white/50">${f.trainNet.toLocaleString()}</td>
+                              <td className="pr-2 text-right" style={{ color: f.oos.netProfit >= 0 ? '#00C27A' : '#FF5252' }}>${f.oos.netProfit.toLocaleString()}</td>
+                              <td className="pr-2 text-right text-white/60">{f.oos.profitFactor.toFixed(2)}</td>
+                              <td className="pr-2 text-right text-white/60">{f.oos.numTrades}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="mt-2 text-[9px] text-white/25">
+                        ROBUST = the in-sample-optimized parameters stayed profitable in a majority of unseen windows.
+                        FRAGILE = the edge did not transfer — likely overfitting.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
