@@ -30,6 +30,11 @@ import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
 import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
+import CustomEAInfoModal from './CustomEAInfoModal';
+import type { CustomEA } from '@/lib/trading/custom-ea';
+import EADisclaimerModal from './EADisclaimerModal';
+import { isDisclaimerAccepted, recordDisclaimerAcceptance } from '@/lib/trading/ea-disclaimer';
+import { getEntitlements } from '@/lib/trading/entitlements';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -109,6 +114,13 @@ export default function ChartSourceSwitcher({
   const [propsFor, setPropsFor] = useState<AttachedEA | null>(null);
   // Strategy Tester modal (§11).
   const [testFor, setTestFor] = useState<AttachedEA | null>(null);
+  // Custom-EA info panel (upload/conversion super-prompt §16).
+  const [infoEa, setInfoEa] = useState<CustomEA | null>(null);
+  // Mandatory risk disclaimer: EA pending acceptance before attach.
+  const [disclaimerFor, setDisclaimerFor] = useState<{ id: string; name: string; pairs?: string[]; timeframes?: string[]; strategyKind?: string; custom?: boolean } | null>(null);
+  // Admin entitlement: when algo_trading is switched off platform-wide, the
+  // Algo toggle is forced OFF and locked.
+  const [algoLocked, setAlgoLocked] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -163,6 +175,22 @@ export default function ChartSourceSwitcher({
   useEffect(() => {
     runtimeRef.current?.onTick();
   }, [prices]);
+
+  // Admin entitlements: platform-wide algo_trading OFF forces the global Algo
+  // switch off and locks it (per the admin console policy).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const ents = await getEntitlements();
+      if (!active) return;
+      if (ents['algo_trading'] === false) {
+        runtimeRef.current?.setGlobalEnabled(false);
+        setAlgoOn(false);
+        setAlgoLocked(true);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => () => runtimeRef.current?.detachAll(), []);
 
@@ -345,8 +373,14 @@ export default function ChartSourceSwitcher({
 
   const attachInFlightRef = useRef<Set<string>>(new Set());
 
-  const attachEA = useCallback(async (ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[]; strategyKind?: string; custom?: boolean }) => {
+  const attachEA = useCallback(async (ea: { id?: string; name?: string; pairs?: string[]; timeframes?: string[]; strategyKind?: string; custom?: boolean }, disclaimerAccepted = false) => {
     if (!ea?.name || !ea?.id) return;
+    // Mandatory risk disclaimer: block the attach until accepted for this EA
+    // under the current disclaimer version.
+    if (!disclaimerAccepted && !isDisclaimerAccepted(ea.id)) {
+      setDisclaimerFor({ id: ea.id, name: ea.name, pairs: ea.pairs, timeframes: ea.timeframes, strategyKind: ea.strategyKind, custom: ea.custom });
+      return;
+    }
     const key = `${ea.id}-${activeSymbol}`;
     if (attachInFlightRef.current.has(key)) return;
     if (attachedEAs.some((a) => a.strategyId === ea.id && a.symbol === activeSymbol)) {
@@ -468,11 +502,15 @@ export default function ChartSourceSwitcher({
         {/* Global Algo Trading switch — pauses/resumes all EAs on this chart */}
         <button
           onClick={() => {
+            if (algoLocked) return;
             const next = !algoOn;
             runtimeRef.current?.setGlobalEnabled(next);
             setAlgoOn(next);
           }}
-          title={algoOn ? 'Algo Trading is ON — EAs run automatically. Click to pause.' : 'Algo Trading is OFF — EAs paused. Click to resume.'}
+          disabled={algoLocked}
+          title={algoLocked
+            ? 'Algo Trading has been disabled platform-wide by the administrator.'
+            : algoOn ? 'Algo Trading is ON — EAs run automatically. Click to pause.' : 'Algo Trading is OFF — EAs paused. Click to resume.'}
           className="ml-auto flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-colors"
           style={{
             backgroundColor: algoOn ? 'rgba(0,194,122,0.15)' : 'rgba(255,82,82,0.15)',
@@ -648,13 +686,22 @@ export default function ChartSourceSwitcher({
                       <p className="mt-0.5 line-clamp-2 text-[9px] leading-relaxed text-white/40">{ea.description}</p>
                     </div>
                     {ea.custom && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
-                        className="shrink-0 text-white/30 hover:text-red-400"
-                        title="Remove custom EA"
-                      >
-                        <Trash2 size={11} />
-                      </button>
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setInfoEa(ea as unknown as CustomEA); setEaMenuOpen(false); }}
+                          className="shrink-0 text-white/30 hover:text-[#0091D5]"
+                          title="EA info — inputs, conversion report, source"
+                        >
+                          <Info size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
+                          className="shrink-0 text-white/30 hover:text-red-400"
+                          title="Remove custom EA"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => { void attachEA(ea); setEaMenuOpen(false); }}
@@ -849,6 +896,25 @@ export default function ChartSourceSwitcher({
           />
         );
       })()}
+
+      {/* Custom EA info panel (§16) */}
+      {infoEa && <CustomEAInfoModal ea={infoEa} onClose={() => setInfoEa(null)} />}
+
+      {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
+      {disclaimerFor && (
+        <EADisclaimerModal
+          eaName={disclaimerFor.name}
+          environment={activeAccountId ? 'Live' : 'Demo'}
+          account={activeAccountId ? `…${String(activeAccountId).slice(-6)}` : 'Local demo'}
+          onCancel={() => setDisclaimerFor(null)}
+          onAccept={() => {
+            const ea = disclaimerFor;
+            recordDisclaimerAcceptance({ eaId: ea.id, eaName: ea.name, environment: activeAccountId ? 'live' : 'demo', symbol: activeSymbol });
+            setDisclaimerFor(null);
+            void attachEA(ea, true);
+          }}
+        />
+      )}
 
       {/* Strategy Tester modal (§11) */}
       {testFor && (() => {

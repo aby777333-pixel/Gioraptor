@@ -9,7 +9,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EA_LIBRARY, type EAConfig } from './ChartToolbar';
 import {
   loadCustomEAs, onCustomEAsChanged, convertUploadedEA, saveCustomEA, removeCustomEA,
+  checksumOf, findDuplicate,
 } from '@/lib/trading/custom-ea';
+import { isEnabled } from '@/lib/trading/entitlements';
 
 export function useEALibrary() {
   const [custom, setCustom] = useState<EAConfig[]>([]);
@@ -24,6 +26,10 @@ export function useEALibrary() {
   const all: EAConfig[] = [...custom, ...EA_LIBRARY];
 
   const handleFile = useCallback(async (file: File): Promise<{ ok: boolean; name?: string; error?: string }> => {
+    // Admin entitlement: EA uploads can be disabled platform-wide.
+    if (!(await isEnabled('ea_upload'))) {
+      return { ok: false, error: 'EA uploads are currently disabled by the administrator.' };
+    }
     if (!/\.(mq5|ex5)$/i.test(file.name)) {
       return { ok: false, error: 'Please choose a .mq5 or .ex5 file.' };
     }
@@ -33,6 +39,9 @@ export function useEALibrary() {
     try {
       // .ex5 is binary — read as text anyway (we only key off the filename for it).
       const content = /\.mq5$/i.test(file.name) ? await file.text() : '';
+      // §31 duplicate detection by checksum before converting.
+      const dup = findDuplicate(checksumOf(content || file.name));
+      if (dup) return { ok: false, error: `Already in your library as "${dup.name}" — duplicate upload skipped.` };
       const ea = convertUploadedEA(file.name, content);
       saveCustomEA(ea);
       return { ok: true, name: ea.name };

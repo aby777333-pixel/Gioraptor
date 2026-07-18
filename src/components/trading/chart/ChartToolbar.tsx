@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import { INDICATOR_DEFS, type IndicatorId } from './IndicatorPanel';
 import { useEALibrary } from './useEALibrary';
+import CustomEAInfoModal from './CustomEAInfoModal';
+import type { CustomEA } from '@/lib/trading/custom-ea';
+import { Info } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -250,6 +253,8 @@ export default function ChartToolbar({
   const layoutRef = useRef<HTMLButtonElement>(null);
   const eaRef = useRef<HTMLButtonElement>(null);
   const objectsRef = useRef<HTMLButtonElement>(null);
+  // Custom-EA info panel (§16)
+  const [infoEa, setInfoEa] = useState<CustomEA | null>(null);
 
   const toggle = useCallback((id: string) => setOpenDropdown((p) => p === id ? null : id), []);
   const close = useCallback(() => setOpenDropdown(null), []);
@@ -470,8 +475,15 @@ export default function ChartToolbar({
                       <>
                         <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
                         <button
+                          onClick={(e) => { e.stopPropagation(); setInfoEa(ea as unknown as CustomEA); close(); }}
+                          className="ml-auto shrink-0 text-[rgba(255,255,255,0.3)] hover:text-[#0091D5]"
+                          title="EA info — inputs, conversion report, source"
+                        >
+                          <Info size={11} />
+                        </button>
+                        <button
                           onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
-                          className="ml-auto shrink-0 text-[rgba(255,255,255,0.3)] hover:text-red-400"
+                          className="shrink-0 text-[rgba(255,255,255,0.3)] hover:text-red-400"
                           title="Remove custom EA"
                         >
                           <Trash2 size={11} />
@@ -526,6 +538,9 @@ export default function ChartToolbar({
       <button onClick={onClearAll} className={`${btn} text-red-400 hover:bg-red-500/10 hover:text-red-300`} title="Clear all indicators, EAs and drawings">
         <Trash2 size={14} /> Clear All
       </button>
+
+      {/* Custom EA info panel (§16) */}
+      {infoEa && <CustomEAInfoModal ea={infoEa} onClose={() => setInfoEa(null)} />}
     </div>
   );
 }
