@@ -8,11 +8,16 @@
 
 import { useRef, useState } from 'react';
 import { X, FileCode2, ShieldAlert, Info, ListTree, Play, Pencil, RotateCcw, Upload, Download, Search } from 'lucide-react';
+import { useTradingStore } from '@/stores/trading';
 import {
   reconvertCustomEA, validateInputValue, effectiveInputValue,
   loadInputOverrides, saveInputOverrides, exportSetFile, parseSetFile,
   type CustomEA, type ConversionItem, type ExtractedInput,
 } from '@/lib/trading/custom-ea';
+
+/** Built-in library EAs open the same Properties window; they carry this
+ *  marker so the modal shows honest metadata instead of a fake editor. */
+export type PropertiesEA = CustomEA & { builtin?: boolean; pairs?: string[]; timeframes?: string[]; rating?: number };
 
 type Tab = 'overview' | 'inputs' | 'report' | 'source' | 'script';
 
@@ -30,8 +35,11 @@ const OVERALL_LABELS: Record<string, { text: string; color: string }> = {
   'manual-review': { text: 'Manual review required', color: '#FF9800' },
 };
 
-export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: CustomEA; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('overview');
+export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: PropertiesEA; onClose: () => void }) {
+  const [tab, setTab] = useState<Tab>(initial.builtin ? 'overview' : (initial.inputs?.length ? 'inputs' : 'overview'));
+  // MT5-style title context: "Name (SYMBOL, TF)".
+  const activeSymbol = useTradingStore((s) => s.activeSymbol);
+  const activeTimeframe = useTradingStore((s) => s.activeTimeframe);
   // Editable source (mq5/pine): edits re-run the whole conversion pipeline.
   const [cur, setCur] = useState<CustomEA>(initial);
   const [editing, setEditing] = useState(false);
@@ -84,8 +92,9 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
     saveInputOverrides(cur.id, next);
     setNotice(`.set imported: ${applied} value(s) applied.${unmatched.length ? ` Not applied: ${unmatched.slice(0, 6).join(', ')}${unmatched.length > 6 ? '…' : ''}.` : ''}`);
   };
-  const ea = cur;
-  const editable = ea.sourceKind !== 'ex5' && !!ea.source;
+  const ea = cur as PropertiesEA;
+  const isBuiltin = !!ea.builtin;
+  const editable = !isBuiltin && ea.sourceKind !== 'ex5' && !!ea.source;
   const report = ea.report;
   const overall = report ? OVERALL_LABELS[report.overall] : null;
 
@@ -116,9 +125,11 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
       >
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div>
-            <div className="text-[13px] font-bold text-white">{ea.name}</div>
+            <div className="text-[13px] font-bold text-white">
+              {ea.name}{ea.version ? ` ${ea.version}` : ''} <span className="font-normal text-white/40">({activeSymbol}, {activeTimeframe})</span>
+            </div>
             <div className="flex items-center gap-2 text-[10px] text-white/40">
-              <span>{ea.sourceKind === 'pine' ? 'Pine Script' : ea.sourceKind === 'mq5' ? 'MQL5 source' : 'Compiled .ex5'}</span>
+              <span>{isBuiltin ? 'Built-in RAPTOR strategy' : ea.sourceKind === 'pine' ? 'Pine Script' : ea.sourceKind === 'mq5' ? 'MQL5 source' : 'Compiled .ex5'}</span>
               {overall && <span style={{ color: overall.color }}>· {overall.text}</span>}
             </div>
           </div>
@@ -126,7 +137,10 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
         </div>
 
         <div className="flex gap-0.5 border-b px-2 pt-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          {([['overview', 'Overview', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree], ['report', 'Conversion report', ShieldAlert], ['source', 'Source', FileCode2], ...(ea.raptorScript ? [['script', 'Script', Play]] : [])] as [Tab, string, typeof Info][]).map(([t, label, Icon]) => (
+          {((isBuiltin
+            ? [['overview', 'Common', Info], ['inputs', 'Inputs', ListTree]]
+            : [['overview', 'Common', Info], ['inputs', `Inputs (${ea.inputs?.length ?? 0})`, ListTree], ['report', 'Conversion report', ShieldAlert], ['source', 'Source', FileCode2], ...(ea.raptorScript ? [['script', 'Script', Play]] : [])]
+          ) as [Tab, string, typeof Info][]).map(([t, label, Icon]) => (
             <button key={t} onClick={() => setTab(t)}
               className="flex items-center gap-1.5 rounded-t px-3 py-1.5 text-[11px] font-medium transition-colors"
               style={{ backgroundColor: tab === t ? 'rgba(41,171,226,0.12)' : 'transparent', color: tab === t ? '#0091D5' : 'rgba(255,255,255,0.45)' }}>
@@ -142,7 +156,30 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
         )}
 
         <div className="flex-1 overflow-y-auto p-4">
-          {tab === 'overview' && (
+          {tab === 'overview' && isBuiltin && (
+            <div className="text-[11px]">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                <Row k="Name" v={ea.name} />
+                <Row k="Strategy type" v={ea.type ?? '—'} />
+                <Row k="Engine" v={(ea.strategyKind ?? '—').replace(/_/g, ' ')} />
+                <Row k="Pairs" v={(ea.pairs ?? []).join(', ') || '—'} />
+                <Row k="Timeframes" v={(ea.timeframes ?? []).join(', ') || '—'} />
+                <Row k="Rating" v={ea.rating != null ? `${ea.rating} / 5` : '—'} />
+              </div>
+              <div className="mt-3 text-[10px] leading-relaxed text-white/45">{ea.description}</div>
+              <div className="mt-4 rounded-md border p-3 text-[10px] leading-relaxed text-white/50" style={{ borderColor: 'rgba(0,145,213,0.25)', backgroundColor: 'rgba(0,145,213,0.05)' }}>
+                This strategy is <b className="text-white/75">built into the RAPTOR engine</b> — it has no user-editable source code or
+                declared MQL inputs, so the parameter engine and code editor do not apply here.
+                Its executed lot / SL / TP / direction are set per attached instance via the EA&apos;s
+                Properties on the chart, and it can be tuned in the Strategy Tester.
+                To use the <b className="text-white/75">full parameter engine and code editor</b> (like the MT5 Inputs window),
+                upload your own <b className="text-white/75">.mq5 or .pine</b> EA — every declared input becomes editable, with
+                .set import/export and an editable source view.
+              </div>
+            </div>
+          )}
+
+          {tab === 'overview' && !isBuiltin && (
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px]">
               <Row k="Name" v={ea.name} />
               <Row k="Version" v={ea.version ?? '—'} />
@@ -163,7 +200,9 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
           {tab === 'inputs' && (
             (ea.inputs?.length ?? 0) === 0 ? (
               <div className="py-6 text-center text-[11px] text-white/35">
-                {ea.sourceKind !== 'ex5'
+                {isBuiltin
+                  ? 'Built-in strategy — no declared MQL inputs to edit. Executed lot / SL / TP / direction are per-instance (EA Properties on the chart). Upload a .mq5 or .pine EA to use the full parameter engine.'
+                  : ea.sourceKind !== 'ex5'
                   ? 'No input declarations were found in the source.'
                   : 'Compiled binary — input parameters cannot be read from an .ex5 file. Runtime execution uses the EA Properties window (lot / SL / TP / direction).'}
               </div>
@@ -369,6 +408,29 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
               </p>
             </div>
           )}
+        </div>
+
+        {/* MT5-style bottom action bar. Overrides save as you type, so OK and
+            Cancel both just close; Reset restores the EA's declared defaults. */}
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-2.5" style={{ borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+          {!isBuiltin && (ea.inputs?.length ?? 0) > 0 && (
+            <button onClick={restoreAllDefaults}
+              className="rounded px-3 py-1.5 text-[11px] text-white/55 hover:text-white"
+              style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+              Reset
+            </button>
+          )}
+          <div className="flex-1" />
+          <button onClick={onClose}
+            className="rounded px-3 py-1.5 text-[11px] text-white/55 hover:text-white"
+            style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+            Cancel
+          </button>
+          <button onClick={onClose}
+            className="rounded px-4 py-1.5 text-[11px] font-bold text-black"
+            style={{ backgroundColor: '#0091D5' }}>
+            OK
+          </button>
         </div>
       </div>
     </div>

@@ -14,7 +14,6 @@ import { INDICATOR_DEFS, type IndicatorId } from './IndicatorPanel';
 import { useEALibrary } from './useEALibrary';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
-import { Info } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -472,23 +471,24 @@ export default function ChartToolbar({
                     <span className="text-[12px] font-semibold text-white truncate">{ea.name}</span>
                     <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: `${EA_TYPE_COLORS[ea.type]}20`, color: EA_TYPE_COLORS[ea.type] }}>{ea.type}</span>
                     {ea.custom && (
-                      <>
-                        <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setInfoEa(ea as unknown as CustomEA); close(); }}
-                          className="ml-auto shrink-0 text-[rgba(255,255,255,0.3)] hover:text-[#0091D5]"
-                          title="EA info — inputs, conversion report, source"
-                        >
-                          <Info size={11} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
-                          className="shrink-0 text-[rgba(255,255,255,0.3)] hover:text-red-400"
-                          title="Remove custom EA"
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      </>
+                      <span className="text-[8px] px-1 py-0.5 rounded uppercase font-bold shrink-0" style={{ backgroundColor: 'rgba(0,194,122,0.15)', color: '#00C27A' }}>Custom</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom } as unknown as CustomEA); close(); }}
+                      className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide"
+                      style={{ backgroundColor: 'rgba(0,145,213,0.12)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}
+                      title="EA Properties — Common, Inputs, source code"
+                    >
+                      Properties
+                    </button>
+                    {ea.custom && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
+                        className="shrink-0 text-[rgba(255,255,255,0.3)] hover:text-red-400"
+                        title="Remove custom EA"
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     )}
                   </div>
                   <div className="text-[10px] mb-1.5" style={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>{ea.description}</div>

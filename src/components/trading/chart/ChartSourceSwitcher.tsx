@@ -424,11 +424,19 @@ export default function ChartSourceSwitcher({
     attachInFlightRef.current.add(key);
     setTimeout(() => attachInFlightRef.current.delete(key), 3000);
 
+    // MT5 behavior: attaching an EA opens its Properties window (Common /
+    // Inputs / source) so the trader reviews parameters right away.
+    const openProperties = () => {
+      const full = eaList.find((e) => e.id === ea.id);
+      if (full) setInfoEa({ ...full, builtin: !full.custom } as unknown as CustomEA);
+    };
+
     // Uploaded custom EAs live in the browser (localStorage) and their id is
     // not a DB uuid — attach them locally; they still trade via the runtime.
     if (ea.custom) {
       setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol, strategyKind: ea.strategyKind }]);
       showEAToast(`Custom EA "${ea.name}" attached to ${activeSymbol} — running`);
+      openProperties();
       return;
     }
 
@@ -464,7 +472,8 @@ export default function ChartSourceSwitcher({
       setAttachedEAs((prev) => [...prev, { instanceId: null, strategyId: ea.id!, name: ea.name!, symbol: activeSymbol, strategyKind: ea.strategyKind }]);
       showEAToast(`EA "${ea.name}" attached to ${activeSymbol}`);
     }
-  }, [attachedEAs, activeSymbol, showEAToast]);
+    openProperties();
+  }, [attachedEAs, activeSymbol, showEAToast, eaList]);
 
   const handleEADrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -700,23 +709,22 @@ export default function ChartSourceSwitcher({
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-[9px] leading-relaxed text-white/40">{ea.description}</p>
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setInfoEa({ ...ea, builtin: !ea.custom } as unknown as CustomEA); setEaMenuOpen(false); }}
+                      className="shrink-0 rounded px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors"
+                      style={{ backgroundColor: 'rgba(0,145,213,0.12)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}
+                      title="EA Properties — Common, Inputs, source code"
+                    >
+                      Properties
+                    </button>
                     {ea.custom && (
-                      <>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setInfoEa(ea as unknown as CustomEA); setEaMenuOpen(false); }}
-                          className="shrink-0 text-white/30 hover:text-[#0091D5]"
-                          title="EA info — inputs, conversion report, source"
-                        >
-                          <Info size={11} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
-                          className="shrink-0 text-white/30 hover:text-red-400"
-                          title="Remove custom EA"
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      </>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeCustom(ea.id); }}
+                        className="shrink-0 text-white/30 hover:text-red-400"
+                        title="Remove custom EA"
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     )}
                     <button
                       onClick={() => { void attachEA(ea); setEaMenuOpen(false); }}
