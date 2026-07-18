@@ -29,6 +29,7 @@ import TemplatesMenu from './TemplatesMenu';
 import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
 import RaptorScriptMenu from './RaptorScriptMenu';
+import HeaderPortal from './HeaderPortal';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -502,8 +503,9 @@ export default function ChartSourceSwitcher({
             const bid = t?.bid, ask = t?.ask;
             const digits = bid != null && bid < 20 ? 5 : bid != null && bid < 500 ? 3 : 2;
             return (
+              <HeaderPortal open={quickOpen} anchorRef={quickRef}>
               <div
-                className="absolute right-0 top-full z-50 mt-1 w-[260px] rounded-lg border p-3 shadow-2xl"
+                className="w-[260px] rounded-lg border p-3 shadow-2xl"
                 style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}
               >
                 <div className="mb-2 flex items-center justify-between">
@@ -579,6 +581,7 @@ export default function ChartSourceSwitcher({
                   </div>
                 </div>
               </div>
+              </HeaderPortal>
             );
           })()}
         </div>
@@ -613,9 +616,9 @@ export default function ChartSourceSwitcher({
             >
               <Bot size={12} /> EAs / Robots <ChevronDown size={10} />
             </button>
-            {eaMenuOpen && (
+            <HeaderPortal open={eaMenuOpen} anchorRef={eaMenuRef}>
               <div
-                className="absolute right-0 top-full z-50 mt-1 w-[340px] overflow-y-auto rounded-lg border shadow-2xl"
+                className="w-[340px] overflow-y-auto rounded-lg border shadow-2xl"
                 style={{ maxHeight: 420, backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.08)' }}
               >
                 <div className="border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
@@ -683,7 +686,7 @@ export default function ChartSourceSwitcher({
                   </button>
                 </div>
               </div>
-            )}
+            </HeaderPortal>
           </div>
         )}
       </div>

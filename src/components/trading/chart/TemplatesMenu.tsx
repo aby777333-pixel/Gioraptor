@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LayoutTemplate, Plus, Trash2, ChevronDown, Download, Check } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
+import HeaderPortal from './HeaderPortal';
 
 interface ChartTemplate {
   id: string;
@@ -92,8 +93,8 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
       >
         <LayoutTemplate size={12} /> <span className="hidden 2xl:inline">Templates</span> <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           {/* Save current */}
           <div className="border-b p-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <div className="mb-1.5 text-[10px] uppercase tracking-wide text-white/35">Save current view</div>
@@ -146,7 +147,7 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
             })}
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }

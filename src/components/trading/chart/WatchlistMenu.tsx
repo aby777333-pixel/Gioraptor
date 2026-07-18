@@ -1,5 +1,7 @@
 'use client';
 
+import HeaderPortal from './HeaderPortal';
+
 // Watchlist (super-prompt §13). Shared-header symbol list with live bid/ask/
 // spread and up/down tick colouring. Clicking a row switches the active symbol,
 // which drives BOTH the TradingView and RAPTOR charts. Symbols persist in
@@ -69,8 +71,8 @@ export default function WatchlistMenu({
       >
         <List size={12} /> <span className="hidden 2xl:inline">Watchlist</span> <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           <div className="flex items-center gap-1.5 border-b p-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
               placeholder="Add symbol (e.g. GBPJPY)" className="flex-1 rounded bg-white/[0.06] px-2 py-1 text-[11px] uppercase text-white placeholder:text-white/25 outline-none" />
@@ -106,7 +108,7 @@ export default function WatchlistMenu({
             {rows.length === 0 && <div className="py-3 text-center text-[10px] text-white/30">Watchlist empty — add a symbol above.</div>}
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }

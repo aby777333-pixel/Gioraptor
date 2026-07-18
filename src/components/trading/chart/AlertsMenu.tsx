@@ -1,5 +1,7 @@
 'use client';
 
+import HeaderPortal from './HeaderPortal';
+
 // Price Alerts engine (super-prompt §10). Lives in the shared chart header, so
 // it works over BOTH the TradingView and RAPTOR charts. Alerts are evaluated
 // live against streaming prices and fire an in-app (and optional desktop)
@@ -113,8 +115,8 @@ export default function AlertsMenu({
       >
         <Bell size={12} /> <span className="hidden 2xl:inline">Alerts</span>{activeCount > 0 ? ` (${activeCount})` : ''} <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[280px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="w-[280px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           <div className="mb-2 text-[11px] font-bold text-white">New alert · {activeSymbol}</div>
           <div className="mb-2 flex gap-1.5">
             {(['above', 'below'] as const).map((c) => (
@@ -152,7 +154,7 @@ export default function AlertsMenu({
             ))}
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }

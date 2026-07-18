@@ -1,5 +1,7 @@
 'use client';
 
+import HeaderPortal from './HeaderPortal';
+
 // DOM / Level-2 price ladder (super-prompt §12). A cTrader-style click-to-trade
 // ladder built from REAL top-of-book bid/ask (we don't fabricate depth). Each
 // price level is a real market level; clicking BUY/SELL at a level places a real
@@ -141,8 +143,8 @@ export default function DomLadder({
       >
         <AlignJustify size={12} /> <span className="hidden 2xl:inline">DOM</span> <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[280px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="w-[280px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           {/* Header */}
           <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <span className="text-[12px] font-bold text-white">{activeSymbol}</span>
@@ -212,7 +214,7 @@ export default function DomLadder({
             <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white"><X size={12} /></button>
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }

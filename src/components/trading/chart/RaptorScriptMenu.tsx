@@ -1,5 +1,7 @@
 'use client';
 
+import HeaderPortal from './HeaderPortal';
+
 // Raptor Script editor (super-prompt §5). A lightweight custom-indicator editor:
 // write a short script against the real bar series (close/high/low/open/volume)
 // using built-in helpers (sma/ema/rsi/atr/macd/bb/kama/kalman/momentum/highest/
@@ -75,8 +77,8 @@ export default function RaptorScriptMenu({
       >
         <Code2 size={12} /> <span className="hidden 2xl:inline">Script</span> <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[380px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="w-[380px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <span className="text-[12px] font-bold text-white">Raptor Script</span>
             <span className="text-[9px] text-white/35">plots on the RAPTOR chart</span>
@@ -110,7 +112,7 @@ export default function RaptorScriptMenu({
             </p>
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }

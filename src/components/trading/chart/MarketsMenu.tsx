@@ -1,5 +1,7 @@
 'use client';
 
+import HeaderPortal from './HeaderPortal';
+
 // Markets data hub (super-prompt §14–17): Economic Calendar, Market News and a
 // multi-asset Screener — all real data via TradingView's free embed widgets (no
 // API keys). Rendered as an integrated shared-header dropdown (not a disconnected
@@ -85,8 +87,8 @@ export default function MarketsMenu() {
       >
         <Radar size={12} /> <span className="hidden 2xl:inline">Markets</span> <ChevronDown size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 flex h-[460px] w-[380px] flex-col overflow-hidden rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
+      <HeaderPortal open={open} anchorRef={ref}>
+        <div className="flex h-[460px] w-[380px] flex-col overflow-hidden rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           <div className="flex shrink-0 gap-0.5 border-b p-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             {TABS.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
@@ -101,7 +103,7 @@ export default function MarketsMenu() {
             Live market data
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }
