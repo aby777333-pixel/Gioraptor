@@ -9,6 +9,7 @@ import AccountBar from '@/components/trading/account-summary/AccountBar';
 import RightPanel from '@/components/trading/RightPanel';
 import KeyboardShortcuts from '@/components/trading/KeyboardShortcuts';
 import dynamic from 'next/dynamic';
+import { loadWorkspacePrefs, applyWorkspacePrefs } from '@/lib/insights/workspace';
 
 // Command palette (§30) — lazy: costs nothing until Ctrl/Cmd+K.
 const CommandPalette = dynamic(() => import('@/components/trading/CommandPalette'), { ssr: false });
@@ -37,6 +38,10 @@ export default function TerminalPage() {
   const [rightHidden, setRightHidden] = useState(false);
   useEffect(() => {
     try { setRightHidden(localStorage.getItem('raptor_right_panel_hidden') === '1'); } catch { /* default shown */ }
+    // §35 workspace prefs: UI scale + high contrast, applied on load and
+    // removed again when leaving the terminal.
+    try { applyWorkspacePrefs(loadWorkspacePrefs()); } catch { /* stock look */ }
+    return () => { applyWorkspacePrefs({ scale: 1, highContrast: false }); };
   }, []);
   const toggleRightPanel = useCallback((hide: boolean) => {
     setRightHidden(hide);
@@ -58,8 +63,17 @@ export default function TerminalPage() {
     return () => window.removeEventListener('raptor-toggle-right-panel', onToggleRight);
   }, []);
 
-  // ── Resizable positions panel ──
+  // ── Resizable positions panel (height persisted for layout recovery §35) ──
   const [panelHeight, setPanelHeight] = useState(240);
+  useEffect(() => {
+    try {
+      const h = parseInt(localStorage.getItem('raptor_positions_panel_height') || '', 10);
+      if (h >= 100 && h <= 600) setPanelHeight(h);
+    } catch { /* default */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('raptor_positions_panel_height', String(panelHeight)); } catch { /* ignore */ }
+  }, [panelHeight]);
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(240);

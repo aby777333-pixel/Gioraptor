@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, ArrowRight } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
+import { adjustScale, setScale, toggleHighContrast, resetLayout, loadWorkspacePrefs, SCALE_STEP } from '@/lib/insights/workspace';
 
 interface Command {
   id: string;
@@ -67,6 +68,18 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       { id: 'nexus-brief', group: 'NEXUS', label: 'NEXUS: Daily Briefing', run: () => dispatch('nexus-ask', { question: 'Give me my daily briefing' }) },
       { id: 'nexus-scan', group: 'NEXUS', label: 'NEXUS: Trade Ideas (scan)', run: () => dispatch('nexus-ask', { question: 'Give me 3 trade setups right now' }) },
       { id: 'nav-lab', group: 'Navigate', label: 'Open AI Strategy Lab', hint: 'new tab', run: () => window.open('/ai-lab/', '_blank') },
+    );
+    // §35 workspace: scale / contrast / layout recovery (all reversible).
+    const wp = loadWorkspacePrefs();
+    cmds.push(
+      { id: 'ws-larger', group: 'Workspace', label: 'UI size: larger', hint: `now ${Math.round(wp.scale * 100)}%`, run: () => adjustScale(SCALE_STEP) },
+      { id: 'ws-smaller', group: 'Workspace', label: 'UI size: smaller', hint: `now ${Math.round(wp.scale * 100)}%`, run: () => adjustScale(-SCALE_STEP) },
+      { id: 'ws-reset-scale', group: 'Workspace', label: 'UI size: reset to 100%', run: () => setScale(1) },
+      { id: 'ws-contrast', group: 'Workspace', label: `High contrast: turn ${wp.highContrast ? 'off' : 'on'}`, run: () => toggleHighContrast() },
+      {
+        id: 'ws-reset-layout', group: 'Workspace', label: 'Reset layout', hint: 'panels + scale, then reload',
+        run: () => { if (window.confirm('Reset layout? Panel sizes, hidden panels, UI scale and contrast return to stock. Trading data, alerts, journals and watchlists are untouched.')) resetLayout(); },
+      },
     );
     return cmds;
   }, [prices, activeSymbol, setActiveSymbol]);
