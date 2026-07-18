@@ -18,6 +18,11 @@ export interface ExtractedInput {
   label: string;        // trailing comment when present, else the name
   mqlType: string;      // int / double / bool / string / ENUM_* / color / datetime …
   defaultValue: string; // as written in source
+  /** `input group "…"` the declaration belongs to (order-preserving). */
+  group?: string;
+  /** Allowed members for enum-typed inputs (custom enums parsed from source,
+   *  plus built-in ENUM_TIMEFRAMES). */
+  enumValues?: string[];
 }
 
 // Per-event / per-feature conversion outcome (§2/§4): never silently omitted.
@@ -145,11 +150,20 @@ export function extractPineInputs(src: string): ExtractedInput[] {
   let m: RegExpExecArray | null;
   PINE_INPUT_RE.lastIndex = 0;
   while ((m = PINE_INPUT_RE.exec(src)) !== null && out.length < 200) {
+    // group="…" named arg later in the same input(...) call, if present
+    const lineEnd = src.indexOf('\n', m.index);
+    const rest = src.slice(m.index, lineEnd < 0 ? src.length : lineEnd);
+    const g = rest.match(/group\s*=\s*["']([^"']+)["']/);
+    const optionsMatch = rest.match(/options\s*=\s*\[([^\]]+)\]/);
     out.push({
       name: m[1],
       mqlType: m[2] ? `input.${m[2]}` : 'input',
-      defaultValue: m[3].trim(),
+      defaultValue: m[3].trim().replace(/^["']|["']$/g, ''),
       label: (m[4] || m[1].replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ')).trim(),
+      group: g?.[1],
+      enumValues: m[2] === 'bool'
+        ? undefined
+        : optionsMatch?.[1].split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean),
     });
   }
   return out;
@@ -213,19 +227,126 @@ export function transpilePineToRaptorScript(src: string, name: string): { script
 
 // ─── §7 Parameter extraction: parse MQL5 `input` declarations ──────
 
-const INPUT_RE = /^\s*(?:input|sinput)\s+([A-Za-z_][\w<>:]*)\s+([A-Za-z_]\w*)\s*=\s*([^;]+);\s*(?:\/\/\s*(.*))?$/gm;
+const INPUT_LINE_RE = /^\s*(?:input|sinput|extern)\s+([A-Za-z_][\w<>:]*)\s+([A-Za-z_]\w*)\s*=\s*([^;]+);\s*(?:\/\/\s*(.*))?$/;
+const GROUP_LINE_RE = /^\s*input\s+group\s+"([^"]*)"/;
+const ENUM_DECL_RE = /enum\s+([A-Za-z_]\w*)\s*\{([^}]*)\}/g;
+
+/** Built-in MQL enums the UI can offer as dropdowns. */
+export const BUILTIN_ENUMS: Record<string, string[]> = {
+  ENUM_TIMEFRAMES: ['PERIOD_M1', 'PERIOD_M5', 'PERIOD_M15', 'PERIOD_M30', 'PERIOD_H1', 'PERIOD_H4', 'PERIOD_D1', 'PERIOD_W1', 'PERIOD_MN1'],
+  ENUM_APPLIED_PRICE: ['PRICE_CLOSE', 'PRICE_OPEN', 'PRICE_HIGH', 'PRICE_LOW', 'PRICE_MEDIAN', 'PRICE_TYPICAL', 'PRICE_WEIGHTED'],
+  ENUM_MA_METHOD: ['MODE_SMA', 'MODE_EMA', 'MODE_SMMA', 'MODE_LWMA'],
+  ENUM_ORDER_TYPE_FILLING: ['ORDER_FILLING_FOK', 'ORDER_FILLING_IOC', 'ORDER_FILLING_RETURN'],
+};
+
+/** Custom `enum Name { A, B = 2, C };` declarations → member-name lists. */
+export function extractEnumDecls(src: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  let m: RegExpExecArray | null;
+  ENUM_DECL_RE.lastIndex = 0;
+  while ((m = ENUM_DECL_RE.exec(src)) !== null) {
+    const members = m[2]
+      .split(',')
+      .map((p) => p.split('=')[0].split('//')[0].trim())
+      .filter((p) => /^[A-Za-z_]\w*$/.test(p));
+    if (members.length > 0) out[m[1]] = members;
+  }
+  return out;
+}
 
 export function extractInputs(src: string): ExtractedInput[] {
   const out: ExtractedInput[] = [];
-  let m: RegExpExecArray | null;
-  INPUT_RE.lastIndex = 0;
-  while ((m = INPUT_RE.exec(src)) !== null && out.length < 200) {
+  const enums = extractEnumDecls(src);
+  let group: string | undefined;
+  for (const line of src.split('\n')) {
+    if (out.length >= 200) break;
+    const g = line.match(GROUP_LINE_RE);
+    if (g) { group = g[1].replace(/^[=\s]+|[=\s]+$/g, '') || g[1]; continue; }
+    const m = line.match(INPUT_LINE_RE);
+    if (!m) continue;
+    const mqlType = m[1];
     out.push({
-      mqlType: m[1],
+      mqlType,
       name: m[2],
       defaultValue: m[3].trim(),
-      label: (m[4] || m[2].replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ')).trim(),
+      label: (m[4] || m[2].replace(/^Inp/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ')).trim(),
+      group,
+      enumValues: enums[mqlType] ?? BUILTIN_ENUMS[mqlType],
     });
+  }
+  return out;
+}
+
+// ─── §5/§25 blank-safe validation + §23 MT5 .set files ─────────────
+
+const INT_TYPES = new Set(['int', 'uint', 'long', 'ulong', 'short', 'ushort', 'char', 'uchar', 'input.int']);
+const FLOAT_TYPES = new Set(['double', 'float', 'input.float', 'input.price']);
+const BOOL_TYPES = new Set(['bool', 'input.bool']);
+
+/** Validate a trader-entered override. Empty string = "use EA default" and is
+ *  always valid (§5). Returns a clear message, or null when valid. */
+export function validateInputValue(inp: ExtractedInput, value: string): string | null {
+  const v = value.trim();
+  if (v === '') return null; // blank optional → EA default applies
+  if (INT_TYPES.has(inp.mqlType)) {
+    if (!/^-?\d+$/.test(v)) return `${inp.name} must be a whole number (${inp.mqlType}).`;
+    if (inp.mqlType.startsWith('u') && v.startsWith('-')) return `${inp.name} cannot be negative (${inp.mqlType}).`;
+    return null;
+  }
+  if (FLOAT_TYPES.has(inp.mqlType)) {
+    return /^-?\d+(\.\d+)?$/.test(v) ? null : `${inp.name} must be a number (${inp.mqlType}).`;
+  }
+  if (BOOL_TYPES.has(inp.mqlType)) {
+    return /^(true|false)$/i.test(v) ? null : `${inp.name} must be true or false.`;
+  }
+  if (inp.enumValues) {
+    return inp.enumValues.includes(v) ? null : `${inp.name} must be one of: ${inp.enumValues.join(', ')}.`;
+  }
+  return null; // string/color/datetime/etc. accept free text
+}
+
+/** Effective value: trader override when set, else the EA's declared default. */
+export function effectiveInputValue(inp: ExtractedInput, overrides: Record<string, string>): string {
+  const o = overrides[inp.name];
+  return o !== undefined && o !== '' ? o : inp.defaultValue.replace(/^"|"$/g, '');
+}
+
+const OVERRIDES_KEY = 'raptor_ea_input_overrides';
+
+export function loadInputOverrides(eaId: string): Record<string, string> {
+  try {
+    const all = JSON.parse(window.localStorage.getItem(OVERRIDES_KEY) || '{}');
+    return all[eaId] ?? {};
+  } catch { return {}; }
+}
+
+export function saveInputOverrides(eaId: string, overrides: Record<string, string>): void {
+  try {
+    const all = JSON.parse(window.localStorage.getItem(OVERRIDES_KEY) || '{}');
+    all[eaId] = overrides;
+    window.localStorage.setItem(OVERRIDES_KEY, JSON.stringify(all));
+  } catch { /* ignore quota */ }
+}
+
+/** Export the effective parameter set as an MT5-style .set file. */
+export function exportSetFile(ea: CustomEA, overrides: Record<string, string>): string {
+  const lines = [`; ${ea.name} — exported from RAPTOR ${new Date().toISOString()}`, ';'];
+  for (const inp of ea.inputs ?? []) {
+    lines.push(`${inp.name}=${effectiveInputValue(inp, overrides)}`);
+  }
+  return lines.join('\r\n');
+}
+
+/** Parse an MT5 .set file into name→value pairs (comments/sections ignored). */
+export function parseSetFile(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith(';') || line.startsWith('#') || line.startsWith('[')) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    // MT5 optimisation suffixes (Name,F=1||start||step||stop||Y) — keep the base value
+    out[line.slice(0, eq).trim().replace(/,F$/, '')] = line.slice(eq + 1).split('||')[0].trim();
   }
   return out;
 }

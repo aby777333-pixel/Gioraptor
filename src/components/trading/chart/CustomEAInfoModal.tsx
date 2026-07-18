@@ -6,9 +6,13 @@
 // Source (read-only viewer — never shown for compiled-only files, and never
 // reconstructed).
 
-import { useState } from 'react';
-import { X, FileCode2, ShieldAlert, Info, ListTree, Play, Pencil } from 'lucide-react';
-import { reconvertCustomEA, type CustomEA, type ConversionItem } from '@/lib/trading/custom-ea';
+import { useRef, useState } from 'react';
+import { X, FileCode2, ShieldAlert, Info, ListTree, Play, Pencil, RotateCcw, Upload, Download, Search } from 'lucide-react';
+import {
+  reconvertCustomEA, validateInputValue, effectiveInputValue,
+  loadInputOverrides, saveInputOverrides, exportSetFile, parseSetFile,
+  type CustomEA, type ConversionItem, type ExtractedInput,
+} from '@/lib/trading/custom-ea';
 
 type Tab = 'overview' | 'inputs' | 'report' | 'source' | 'script';
 
@@ -33,6 +37,53 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  // §5/§7 editable parameter engine: blank = EA default; overrides persist.
+  const [overrides, setOverrides] = useState<Record<string, string>>(() =>
+    typeof window !== 'undefined' ? loadInputOverrides(initial.id) : {});
+  const [inputSearch, setInputSearch] = useState('');
+  const setFileRef = useRef<HTMLInputElement>(null);
+
+  const setOverride = (name: string, value: string) => {
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (value === '') delete next[name]; else next[name] = value;
+      saveInputOverrides(cur.id, next);
+      return next;
+    });
+  };
+
+  const restoreAllDefaults = () => {
+    setOverrides({});
+    saveInputOverrides(cur.id, {});
+    setNotice('All parameters restored to the EA\'s declared defaults.');
+  };
+
+  const doExportSet = () => {
+    const blob = new Blob([exportSetFile(cur, overrides)], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cur.name.replace(/\s+/g, '_')}.set`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setNotice('.set file exported with the effective parameter values.');
+  };
+
+  const doImportSet = async (file: File) => {
+    const values = parseSetFile(await file.text());
+    const byName = new Map((cur.inputs ?? []).map((i) => [i.name, i]));
+    const next: Record<string, string> = { ...overrides };
+    let applied = 0;
+    const unmatched: string[] = [];
+    for (const [name, value] of Object.entries(values)) {
+      const inp = byName.get(name);
+      if (!inp) { unmatched.push(name); continue; }
+      if (validateInputValue(inp, value) === null) { next[name] = value; applied++; }
+      else unmatched.push(`${name} (invalid value "${value}")`);
+    }
+    setOverrides(next);
+    saveInputOverrides(cur.id, next);
+    setNotice(`.set imported: ${applied} value(s) applied.${unmatched.length ? ` Not applied: ${unmatched.slice(0, 6).join(', ')}${unmatched.length > 6 ? '…' : ''}.` : ''}`);
+  };
   const ea = cur;
   const editable = ea.sourceKind !== 'ex5' && !!ea.source;
   const report = ea.report;
@@ -112,29 +163,100 @@ export default function CustomEAInfoModal({ ea: initial, onClose }: { ea: Custom
           {tab === 'inputs' && (
             (ea.inputs?.length ?? 0) === 0 ? (
               <div className="py-6 text-center text-[11px] text-white/35">
-                {ea.sourceKind === 'mq5'
+                {ea.sourceKind !== 'ex5'
                   ? 'No input declarations were found in the source.'
                   : 'Compiled binary — input parameters cannot be read from an .ex5 file. Runtime execution uses the EA Properties window (lot / SL / TP / direction).'}
               </div>
             ) : (
-              <table className="w-full text-[10px]">
-                <thead className="text-white/35">
-                  <tr className="text-left">
-                    <th className="py-1 pr-2">Name</th><th className="pr-2">Label</th>
-                    <th className="pr-2">Type</th><th className="text-right">Default</th>
-                  </tr>
-                </thead>
-                <tbody className="font-mono">
-                  {ea.inputs!.map((p) => (
-                    <tr key={p.name} className="border-t border-white/[0.04]">
-                      <td className="py-1 pr-2 text-white/80">{p.name}</td>
-                      <td className="pr-2 text-white/50">{p.label}</td>
-                      <td className="pr-2" style={{ color: '#0091D5' }}>{p.mqlType}</td>
-                      <td className="text-right text-white/70">{p.defaultValue}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="text-[11px]">
+                {/* Toolbar: search + preset/.set controls */}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-[160px] flex-1 items-center gap-1.5 rounded-md border px-2 py-1" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    <Search size={11} className="shrink-0 text-white/30" />
+                    <input value={inputSearch} onChange={(e) => setInputSearch(e.target.value)} placeholder="Search parameters…"
+                      className="w-full bg-transparent text-[11px] text-white outline-none placeholder:text-white/25" />
+                  </div>
+                  <button onClick={restoreAllDefaults} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/50 hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                    <RotateCcw size={10} /> Restore defaults
+                  </button>
+                  <input ref={setFileRef} type="file" accept=".set,.txt" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void doImportSet(f); }} />
+                  <button onClick={() => setFileRef.current?.click()} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/50 hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                    <Upload size={10} /> Import .set
+                  </button>
+                  <button onClick={doExportSet} className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold" style={{ backgroundColor: 'rgba(0,145,213,0.15)', color: '#0091D5', border: '1px solid rgba(0,145,213,0.3)' }}>
+                    <Download size={10} /> Export .set
+                  </button>
+                </div>
+                <p className="mb-3 text-[9px] leading-snug text-white/30">
+                  Blank = the EA&apos;s declared default applies. {Object.keys(overrides).length} override(s) set — stored with this EA and included in .set export.
+                  Web-engine execution maps the strategy onto a platform engine; use EA Properties for the executed lot/SL/TP.
+                </p>
+                {(() => {
+                  const q = inputSearch.trim().toLowerCase();
+                  const visible = (ea.inputs ?? []).filter((p) =>
+                    !q || p.name.toLowerCase().includes(q) || p.label.toLowerCase().includes(q) || (p.group ?? '').toLowerCase().includes(q));
+                  if (visible.length === 0) return <div className="py-4 text-center text-[10px] text-white/30">No parameters match the search.</div>;
+                  const groups: { name: string; items: ExtractedInput[] }[] = [];
+                  for (const p of visible) {
+                    const gname = p.group ?? 'Parameters';
+                    const g = groups.find((x) => x.name === gname);
+                    if (g) g.items.push(p); else groups.push({ name: gname, items: [p] });
+                  }
+                  return groups.map((g) => (
+                    <div key={g.name} className="mb-3">
+                      <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-white/35">{g.name}</div>
+                      {g.items.map((p) => {
+                        const override = overrides[p.name] ?? '';
+                        const err = validateInputValue(p, override);
+                        const isBool = p.mqlType === 'bool' || p.mqlType === 'input.bool';
+                        const effective = effectiveInputValue(p, overrides);
+                        return (
+                          <div key={p.name} className="border-t border-white/[0.04] py-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[11px] text-white/80">{p.label}</span>
+                                <span className="ml-2 font-mono text-[9px] text-white/30">{p.name} · {p.mqlType}</span>
+                              </div>
+                              {isBool ? (
+                                <select value={effective.toLowerCase() === 'true' ? 'true' : 'false'}
+                                  onChange={(e) => setOverride(p.name, e.target.value)}
+                                  className="rounded border bg-[#060D16] px-1.5 py-0.5 font-mono text-[10px] text-white outline-none"
+                                  style={{ borderColor: overrides[p.name] !== undefined ? 'rgba(0,145,213,0.5)' : 'rgba(255,255,255,0.12)' }}>
+                                  <option value="true">true</option>
+                                  <option value="false">false</option>
+                                </select>
+                              ) : p.enumValues ? (
+                                <select value={effective}
+                                  onChange={(e) => setOverride(p.name, e.target.value)}
+                                  className="max-w-[180px] rounded border bg-[#060D16] px-1.5 py-0.5 font-mono text-[10px] text-white outline-none"
+                                  style={{ borderColor: overrides[p.name] !== undefined ? 'rgba(0,145,213,0.5)' : 'rgba(255,255,255,0.12)' }}>
+                                  {!p.enumValues.includes(effective) && <option value={effective}>{effective}</option>}
+                                  {p.enumValues.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+                                </select>
+                              ) : (
+                                <input value={override} placeholder={p.defaultValue.replace(/^"|"$/g, '')}
+                                  onChange={(e) => setOverride(p.name, e.target.value)}
+                                  type={p.mqlType === 'color' ? 'text' : 'text'}
+                                  className="w-[140px] rounded border bg-[#060D16] px-1.5 py-0.5 text-right font-mono text-[10px] text-white outline-none placeholder:text-white/25"
+                                  style={{ borderColor: err ? 'rgba(255,82,82,0.6)' : overrides[p.name] !== undefined ? 'rgba(0,145,213,0.5)' : 'rgba(255,255,255,0.12)' }} />
+                              )}
+                              <span className="w-14 shrink-0 text-right text-[8px] uppercase" style={{ color: overrides[p.name] !== undefined ? '#0091D5' : 'rgba(255,255,255,0.25)' }}>
+                                {overrides[p.name] !== undefined ? 'override' : 'default'}
+                              </span>
+                              <button onClick={() => setOverride(p.name, '')} disabled={overrides[p.name] === undefined}
+                                title="Reset to EA default" className="shrink-0 text-white/25 hover:text-white disabled:opacity-20">
+                                <RotateCcw size={10} />
+                              </button>
+                            </div>
+                            {err && <div className="mt-0.5 text-[9px]" style={{ color: '#FF5252' }}>{err}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
+              </div>
             )
           )}
 
