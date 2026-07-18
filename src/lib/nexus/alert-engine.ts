@@ -28,6 +28,8 @@ export interface NexusAlert {
 export interface ActiveNexusConfig {
   enabled: boolean;
   level: 'observe' | 'alert';
+  /** §19 Voice Alert Mode: speak warning/critical alerts via speechSynthesis. */
+  voice?: boolean;
 }
 
 const CONFIG_KEY = 'raptor_nexus_active';

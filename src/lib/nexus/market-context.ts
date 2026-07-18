@@ -10,6 +10,8 @@ import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { getOhlcvBuilder } from '@/lib/nexus/market-data-bridge';
 import { classifyMarketState, marketStateToText, type MarketStateAssessment } from '@/lib/nexus/market-state';
+import { computeEntryZone, assessPosition, type EntryZoneAssessment, type NoSetupAssessment } from '@/lib/nexus/entry-exit';
+import { atr } from '@/lib/trading/indicators';
 
 export interface NexusContext {
   activeSymbol: string | null;
@@ -25,6 +27,10 @@ export interface NexusContext {
   marketState: (MarketStateAssessment & { symbol: string; timeframe: string }) | null;
   /** Real performance analytics computed from the account's closed trades. */
   performance: NexusPerformance | null;
+  /** §5 entry-zone assessment for the active symbol (terminal only). */
+  entryZone: (EntryZoneAssessment | NoSetupAssessment) | null;
+  /** §6 per-position management assessments (terminal only). */
+  positionNotes: { symbol: string; direction: string; headline: string; action: string; reasons: string[] }[];
 }
 
 export interface NexusPerformance {
@@ -118,13 +124,32 @@ export async function buildNexusContext(): Promise<NexusContext> {
 
   // Market-state classification from REAL bars (terminal page only).
   let marketState: NexusContext['marketState'] = null;
+  let entryZone: NexusContext['entryZone'] = null;
+  const positionNotes: NexusContext['positionNotes'] = [];
   const builder = getOhlcvBuilder();
   if (builder && state.activeSymbol) {
     try {
       const bars = builder.getAllBars(state.activeSymbol, '60');
       const ms = classifyMarketState(bars);
-      if (ms) marketState = { ...ms, symbol: state.activeSymbol, timeframe: 'H1' };
+      if (ms) {
+        marketState = { ...ms, symbol: state.activeSymbol, timeframe: 'H1' };
+        const tick = state.prices?.[state.activeSymbol];
+        if (tick) entryZone = computeEntryZone(state.activeSymbol, bars, ms, tick.mid);
+      }
     } catch { /* classification optional */ }
+  }
+  // §6: reassess every open position against its own symbol's current regime.
+  if (builder) {
+    for (const p of positions) {
+      try {
+        const bars = builder.getAllBars(p.symbol, '60');
+        const ms = classifyMarketState(bars);
+        const closes = bars.map((b) => b.close);
+        const av = atr(bars.map((b) => b.high), bars.map((b) => b.low), closes, 14).filter((v): v is number => v != null);
+        const a = assessPosition(p, ms, av[av.length - 1] ?? null);
+        positionNotes.push({ symbol: p.symbol, direction: p.direction, headline: a.headline, action: a.action, reasons: a.reasons });
+      } catch { /* per-position assessment optional */ }
+    }
   }
 
   return {
@@ -134,6 +159,8 @@ export async function buildNexusContext(): Promise<NexusContext> {
     accountConnected,
     marketState,
     performance,
+    entryZone,
+    positionNotes,
   };
 }
 
@@ -159,6 +186,17 @@ export function contextToText(ctx: NexusContext): string {
   }
   if (ctx.marketState) {
     lines.push(marketStateToText(ctx.marketState.symbol, ctx.marketState.timeframe, ctx.marketState));
+  }
+  if (ctx.entryZone) {
+    if ('direction' in ctx.entryZone) {
+      const z = ctx.entryZone;
+      lines.push(`Entry-zone assessment for ${z.symbol} (H1, real bars): ${z.direction} zone — aggressive ${z.aggressive} (market), preferred ${z.preferred} (EMA20 pullback), conservative ${z.conservative}; stop ${z.stop}; targets ${z.target1} / ${z.target2}; R:R ${z.riskReward1}; confidence ${z.confidence}%. Invalidation: ${z.invalidation} Note: ${z.note}`);
+    } else {
+      lines.push(`Entry-zone assessment for ${ctx.entryZone.symbol}: no high-quality setup — ${ctx.entryZone.reason}`);
+    }
+  }
+  for (const n of ctx.positionNotes) {
+    lines.push(`Position management (${n.direction} ${n.symbol}): ${n.headline} — ${n.action} Reasons: ${n.reasons.join(' | ')}`);
   }
   if (ctx.performance) {
     const p = ctx.performance;

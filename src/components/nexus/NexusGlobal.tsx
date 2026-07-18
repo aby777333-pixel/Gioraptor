@@ -17,7 +17,7 @@ import {
   loadActiveConfig, saveActiveConfig, loadAlertFeed, dismissAlert, clearAlertFeed,
   runActiveScan, SEVERITY_STYLES, type ActiveNexusConfig, type NexusAlert,
 } from '@/lib/nexus/alert-engine';
-import { Bell, ShieldCheck } from 'lucide-react';
+import { Bell, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 
 interface NexusMessage {
   id: string;
@@ -42,6 +42,8 @@ const EXCLUDED_PATHS = [
 ];
 
 const QUICK_ACTIONS = [
+  { label: 'Entry Zone', prompt: 'Where is the best entry zone for my active symbol right now?', icon: <Target className="h-3 w-3" /> },
+  { label: 'Manage Trades', prompt: 'Should I hold or exit my open positions? Give me management suggestions.', icon: <Shield className="h-3 w-3" /> },
   { label: 'Market State', prompt: 'What is the current market state for my active symbol?', icon: <TrendingUp className="h-3 w-3" /> },
   { label: 'Trade Ideas', prompt: 'Give me 3 trade setups right now', icon: <Lightbulb className="h-3 w-3" /> },
   { label: 'Analyze Position', prompt: 'Analyze my open positions and risk', icon: <Shield className="h-3 w-3" /> },
@@ -147,6 +149,13 @@ export function NexusGlobal() {
         const sentiment: NexusSentiment = top.severity === 'critical' ? 'urgent' : top.severity === 'warning' ? 'warning' : top.severity === 'opportunity' ? 'celebratory' : 'informational';
         setMessages(prev => prev.some(m => m.id === top.id) ? prev
           : [{ id: top.id, text: top.title, sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev]);
+        // §19 Voice Alert Mode: speak warning/critical alerts when enabled.
+        if (activeCfg.voice && (top.severity === 'critical' || top.severity === 'warning')) {
+          try {
+            const u = new SpeechSynthesisUtterance(`${top.severity === 'critical' ? 'Warning. ' : ''}${top.title}`);
+            window.speechSynthesis.speak(u);
+          } catch { /* voice unsupported — silent */ }
+        }
       }
     } catch { if (manual) setScanNote('Scan failed — platform data unavailable on this page.'); }
   };
@@ -370,6 +379,16 @@ export function NexusGlobal() {
                     <option value="observe">Observe</option>
                     <option value="alert">Alert</option>
                   </select>
+                )}
+                {activeCfg.enabled && activeCfg.level === 'alert' && (
+                  <button
+                    onClick={() => updateActiveCfg({ voice: !activeCfg.voice })}
+                    title={activeCfg.voice ? 'Voice alerts ON — warning/critical alerts are spoken' : 'Enable spoken alerts for warning/critical severity'}
+                    className="rounded-full p-1.5 transition-colors"
+                    style={{ color: activeCfg.voice ? '#00dc82' : 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    {activeCfg.voice ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+                  </button>
                 )}
                 <div className="flex-1" />
                 <button

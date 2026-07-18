@@ -120,6 +120,35 @@ function generateIntelligentFallback(input: string, history: { role: string; con
     const quoteLines = contextText.split('\n').filter((l) => /: bid /.test(l)).map((l) => l.trim());
     const positionLines = contextText.split('\n').filter((l) => /floating P&L/.test(l)).map((l) => l.trim());
 
+    if (/(entry zone|best entry|where.*(enter|entry)|good entry)/.test(lower)) {
+      const zoneLine = (contextText.match(/Entry-zone assessment for [^\n]+/) || [null])[0];
+      if (zoneLine) {
+        if (zoneLine.includes('no high-quality setup')) {
+          return `**${zoneLine.split(':')[0]}**\n\n${zoneLine.split(': no high-quality setup — ')[1]}\n\nNo setup is a valid answer — forcing entries in an unsuitable regime is how good accounts leak. I\'ll flag it when conditions change.\n\n⚠️ Evidence-based assessment, not advice.`;
+        }
+        const parts = zoneLine.replace(/^Entry-zone assessment for /, '');
+        const header = parts.split(':')[0];
+        const body = parts.slice(header.length + 2);
+        const [zonePart, invalidationPart] = body.split(' Invalidation: ');
+        const [invText, notePart] = (invalidationPart ?? '').split(' Note: ');
+        return `**Entry zone — ${header}**\n\n${zonePart.split('; ').map((s) => `• ${s}`).join('\n')}\n\n**Invalidation:** ${invText ?? '—'}\n\n${notePart ?? ''}\n\n⚠️ Zone plan from live platform bars — never guaranteed, size so the stop is survivable.`;
+      }
+      return 'I compute entry zones from real chart data on the **terminal** page. Open the terminal with your symbol active and ask again.';
+    }
+
+    if (/(should i (hold|exit|close)|manage my (trade|position)|exit suggestion|hold or (close|exit)|trail|break.?even)/.test(lower)) {
+      const noteLines = contextText.split('\n').filter((l) => l.startsWith('Position management ('));
+      if (noteLines.length > 0) {
+        return `**Live position management (real data):**\n\n${noteLines.map((l) => {
+          const m = l.match(/^Position management \(([^)]+)\): ([^—]+)— (.*?) Reasons: (.*)$/);
+          if (!m) return `• ${l}`;
+          return `**${m[1]} → ${m[2].trim()}**\n${m[3].trim()}\n${m[4].split(' | ').map((r) => `  • ${r}`).join('\n')}`;
+        }).join('\n\n')}\n\n⚠️ Management assessment from live regime data — the decision and the risk remain yours.`;
+      }
+      if (noAccount) return 'I can\'t assess your trades — **no trading account is connected on this page**. Sign in on the terminal and I\'ll reassess each open position against its live regime.';
+      return 'You have **no open positions to manage** right now. When you do, I\'ll reassess each one continuously against its symbol\'s live regime.';
+    }
+
     if (/(review|debrief).*(trade)|last trade|last closed/.test(lower)) {
       const lastLine = (contextText.match(/Last closed trade: ([^\n]+)/) || [])[1];
       const perfLine = (contextText.match(/Performance \(real[^\n]+/) || [])[0];
