@@ -1619,7 +1619,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
             )}
             {replayActive && (
               <div
-                className="absolute bottom-2 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg px-3 py-2 shadow-2xl"
+                className="absolute bottom-2 right-3 z-30 flex max-w-[92%] items-center gap-2 overflow-x-auto rounded-lg px-3 py-2 shadow-2xl"
                 style={{ backgroundColor: 'rgba(10,15,26,0.96)', border: '1px solid rgba(41,171,226,0.35)' }}
               >
                 <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#0091D5' }}>Replay</span>

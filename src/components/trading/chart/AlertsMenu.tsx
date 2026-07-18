@@ -8,7 +8,13 @@ import HeaderPortal from './HeaderPortal';
 // notification once. Persisted in localStorage so they survive reloads.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Plus, Trash2, ChevronDown, Check } from 'lucide-react';
+import { Bell, Plus, Trash2, ChevronDown, Check, Activity, RotateCcw } from 'lucide-react';
+import { getOhlcvBuilder } from '@/lib/nexus/market-data-bridge';
+import { pushExternalAlert } from '@/lib/nexus/alert-engine';
+import {
+  loadConditionAlerts, saveConditionAlerts, evaluateConditionAlerts,
+  describeCondition, KIND_LABELS, type ConditionAlert, type ConditionKind,
+} from '@/lib/insights/condition-alerts';
 
 export interface PriceAlert {
   id: string;
@@ -87,6 +93,80 @@ export default function AlertsMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prices]);
 
+  // ── §10 condition alerts (EMA cross / RSI / volume spike, real H1 bars) ──
+  const [condAlerts, setCondAlerts] = useState<ConditionAlert[]>([]);
+  const [condKind, setCondKind] = useState<ConditionKind>('ema_cross');
+  const [condP1, setCondP1] = useState('9');   // fast / period / mult
+  const [condP2, setCondP2] = useState('21');  // slow / level
+  const condRef = useRef<ConditionAlert[]>([]);
+  condRef.current = condAlerts;
+
+  useEffect(() => { setCondAlerts(loadConditionAlerts()); }, []);
+
+  const persistCond = useCallback((next: ConditionAlert[]) => {
+    setCondAlerts(next);
+    saveConditionAlerts(next);
+  }, []);
+
+  // Evaluate every 30s (and once on mount) against real closed bars.
+  useEffect(() => {
+    const evalNow = () => {
+      const fired = evaluateConditionAlerts(condRef.current, getOhlcvBuilder());
+      if (fired.length === 0) return;
+      const now = Date.now();
+      const next = condRef.current.map((a) => {
+        const hit = fired.find((f) => f.alert.id === a.id);
+        return hit ? { ...a, triggered: true, triggeredAt: now, message: hit.message } : a;
+      });
+      persistCond(next);
+      for (const f of fired) {
+        onToast(`📈 ${f.message}`);
+        try {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('RAPTOR condition alert', { body: f.message });
+          }
+        } catch { /* ignore */ }
+        // Feed the NEXUS Alert Center through the shared dedup/cooldown gate.
+        pushExternalAlert({
+          key: `cond-${f.alert.id}`, severity: 'opportunity', symbol: f.alert.symbol,
+          title: `${KIND_LABELS[f.alert.kind]} — ${f.alert.symbol}`, detail: f.message,
+          evidence: [describeCondition(f.alert), 'Evaluated on closed H1 bars (platform feed)'],
+          source: 'condition-alert',
+        });
+      }
+    };
+    evalNow();
+    const id = setInterval(evalNow, 30_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addCondition = () => {
+    const n1 = parseFloat(condP1), n2 = parseFloat(condP2);
+    const a: ConditionAlert = {
+      id: `${activeSymbol}-${condKind}-${Date.now()}`,
+      symbol: activeSymbol, kind: condKind, createdAt: Date.now(), triggered: false,
+      ...(condKind === 'ema_cross' ? { fast: n1 > 0 ? Math.round(n1) : 9, slow: n2 > 0 ? Math.round(n2) : 21 } : {}),
+      ...(condKind === 'rsi_ob' || condKind === 'rsi_os' ? { period: n1 > 0 ? Math.round(n1) : 14, level: n2 > 0 ? n2 : condKind === 'rsi_ob' ? 70 : 30 } : {}),
+      ...(condKind === 'vol_spike' ? { mult: n1 > 0 ? n1 : 3 } : {}),
+    };
+    persistCond([a, ...condAlerts]);
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    onToast(`Condition alert set: ${describeCondition(a)} on ${activeSymbol}`);
+  };
+  const removeCondition = (id: string) => persistCond(condAlerts.filter((a) => a.id !== id));
+  const rearmCondition = (id: string) => persistCond(condAlerts.map((a) => (a.id === id ? { ...a, triggered: false, triggeredAt: undefined, message: undefined } : a)));
+
+  const onKindChange = (k: ConditionKind) => {
+    setCondKind(k);
+    if (k === 'ema_cross') { setCondP1('9'); setCondP2('21'); }
+    else if (k === 'rsi_ob') { setCondP1('14'); setCondP2('70'); }
+    else if (k === 'rsi_os') { setCondP1('14'); setCondP2('30'); }
+    else { setCondP1('3'); setCondP2(''); }
+  };
+
   const add = () => {
     const p = parseFloat(price);
     if (!(p > 0)) { onToast('Enter a valid alert price'); return; }
@@ -103,7 +183,7 @@ export default function AlertsMenu({
     onToast(`Alert set: ${activeSymbol} ${condition} ${p}`);
   };
   const remove = (id: string) => persist(alerts.filter((a) => a.id !== id));
-  const activeCount = alerts.filter((a) => !a.triggered).length;
+  const activeCount = alerts.filter((a) => !a.triggered).length + condAlerts.filter((a) => !a.triggered).length;
 
   return (
     <div className="relative ml-1" ref={ref}>
@@ -138,7 +218,7 @@ export default function AlertsMenu({
             <Plus size={12} /> Add alert
           </button>
 
-          <div className="max-h-[180px] overflow-y-auto">
+          <div className="max-h-[150px] overflow-y-auto">
             {alerts.length === 0 && <div className="py-2 text-center text-[10px] text-white/30">No alerts yet.</div>}
             {alerts.map((a) => (
               <div key={a.id} className="flex items-center gap-2 border-t py-1.5 text-[10px]" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
@@ -152,6 +232,52 @@ export default function AlertsMenu({
                 <button onClick={() => remove(a.id)} className="shrink-0 text-white/30 hover:text-red-400"><Trash2 size={11} /></button>
               </div>
             ))}
+          </div>
+
+          {/* §10 condition alerts — indicator conditions on real closed H1 bars */}
+          <div className="mt-2 border-t pt-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold text-white">
+              <Activity size={11} style={{ color: '#0091D5' }} /> Condition alert · {activeSymbol}
+              <span className="ml-auto text-[8px] font-normal uppercase text-white/30">closed H1 bars</span>
+            </div>
+            <div className="mb-1.5 flex gap-1.5">
+              <select value={condKind} onChange={(e) => onKindChange(e.target.value as ConditionKind)}
+                className="flex-1 rounded border bg-[#060D16] px-1.5 py-1 text-[10px] text-white outline-none" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+                {(Object.keys(KIND_LABELS) as ConditionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+              </select>
+              <input value={condP1} onChange={(e) => setCondP1(e.target.value)} inputMode="decimal"
+                title={condKind === 'ema_cross' ? 'Fast EMA period' : condKind === 'vol_spike' ? 'Multiple of the 20-bar average volume' : 'RSI period'}
+                className="w-12 rounded border bg-[#060D16] px-1.5 py-1 text-center font-mono text-[10px] text-white outline-none" style={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+              {condKind !== 'vol_spike' && (
+                <input value={condP2} onChange={(e) => setCondP2(e.target.value)} inputMode="decimal"
+                  title={condKind === 'ema_cross' ? 'Slow EMA period' : 'RSI trigger level'}
+                  className="w-12 rounded border bg-[#060D16] px-1.5 py-1 text-center font-mono text-[10px] text-white outline-none" style={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+              )}
+              <button onClick={addCondition} className="rounded px-2 text-[10px] font-bold text-black" style={{ backgroundColor: '#0091D5' }}><Plus size={11} /></button>
+            </div>
+            <div className="max-h-[130px] overflow-y-auto">
+              {condAlerts.length === 0 && <div className="py-1.5 text-center text-[9px] text-white/25">No condition alerts — checked every 30s while the terminal is open.</div>}
+              {condAlerts.map((a) => (
+                <div key={a.id} className="border-t py-1.5 text-[10px]" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                  <div className="flex items-center gap-2">
+                    {a.triggered
+                      ? <Check size={11} className="shrink-0 text-[#00C27A]" />
+                      : <Activity size={11} className="shrink-0 text-white/40" />}
+                    <span className="font-mono text-white/80">{a.symbol}</span>
+                    <span className="truncate text-white/45">{describeCondition(a)}</span>
+                    <span className="ml-auto shrink-0 text-[9px] text-white/30">{a.triggered ? 'fired' : 'armed'}</span>
+                    {a.triggered && (
+                      <button onClick={() => rearmCondition(a.id)} title="Re-arm" className="shrink-0 text-white/30 hover:text-[#0091D5]"><RotateCcw size={10} /></button>
+                    )}
+                    <button onClick={() => removeCondition(a.id)} className="shrink-0 text-white/30 hover:text-red-400"><Trash2 size={11} /></button>
+                  </div>
+                  {a.triggered && a.message && <div className="mt-0.5 pl-5 text-[9px] leading-snug text-white/40">{a.message}</div>}
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 text-[8px] leading-snug text-white/25">
+              Fires once on the cross/spike (closed bars, real feed), then needs re-arming. Fired conditions also appear in the NEXUS Alert Center.
+            </div>
           </div>
         </div>
       </HeaderPortal>

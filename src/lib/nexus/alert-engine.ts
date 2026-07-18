@@ -78,6 +78,12 @@ export function clearAlertFeed(): void {
   saveFeed([]);
 }
 
+/** External producers (e.g. §10 condition alerts) can add to the Alert
+ *  Center feed through the same dedup/cooldown gate as the scanners. */
+export function pushExternalAlert(a: Omit<NexusAlert, 'id' | 'ts'>): void {
+  pushAlerts([a]);
+}
+
 /** Append new alerts respecting dedup + cooldown; returns {feed, fresh}. */
 function pushAlerts(candidates: Omit<NexusAlert, 'id' | 'ts'>[]): { feed: NexusAlert[]; fresh: NexusAlert[] } {
   const feed = loadAlertFeed();

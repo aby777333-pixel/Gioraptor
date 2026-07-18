@@ -167,8 +167,13 @@ export default function TerminalPage() {
             <button
               onClick={() => toggleRightPanel(true)}
               title="Hide panel — the blinking light at the right edge brings it back"
-              className="absolute left-0 top-1/2 z-40 -translate-y-1/2 rounded-r px-0.5 py-3 text-white/30 transition-colors hover:text-white"
-              style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRight: '1px solid var(--border)' }}
+              className="absolute left-0 top-1/2 z-40 flex -translate-y-1/2 items-center justify-center rounded-r-md transition-colors hover:text-white"
+              style={{
+                width: 16, height: 64,
+                backgroundColor: 'rgba(0,145,213,0.18)',
+                border: '1px solid rgba(0,145,213,0.45)', borderLeft: 'none',
+                color: '#0091D5', fontSize: 14, fontWeight: 700,
+              }}
             >
               ›
             </button>
