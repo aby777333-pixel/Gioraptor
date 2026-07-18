@@ -58,6 +58,81 @@ import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { OHLCVBar } from '@/types/trading';
 import { TF_TO_RESOLUTION } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
+
+// ─── §11 replay practice trading: types + rule-based grader ───────
+// Trades are judged against the ACTUAL bars that followed each entry;
+// every number below is measured, the grade formula is shown to the user.
+
+interface ReplayTrade {
+  dir: 'BUY' | 'SELL';
+  entryIdx: number;
+  entryPrice: number;
+  exitIdx: number | null;
+  exitPrice: number | null;
+  autoClosed?: boolean;
+}
+
+interface GradedTrade extends ReplayTrade {
+  pnlPct: number;
+  barsHeld: number;
+  mfePct: number;   // max favorable excursion while held
+  maePct: number;   // max adverse excursion while held
+  capture: number | null; // pnl / MFE (how much of the available move was kept)
+}
+
+interface ReplayReport {
+  trades: GradedTrade[];
+  wins: number;
+  winRate: number;
+  totalPnlPct: number;
+  avgCapture: number | null;
+  grade: string;
+  observations: string[];
+}
+
+function gradeReplayTrades(trades: ReplayTrade[], bars: OHLCVBar[]): ReplayReport {
+  const graded: GradedTrade[] = trades.map((t) => {
+    const exitIdx = t.exitIdx as number;
+    const exitPrice = t.exitPrice as number;
+    const sign = t.dir === 'BUY' ? 1 : -1;
+    const pnlPct = t.entryPrice > 0 ? (sign * (exitPrice - t.entryPrice) / t.entryPrice) * 100 : 0;
+    let best = 0, worst = 0;
+    for (let i = t.entryIdx; i <= Math.min(exitIdx, bars.length - 1); i++) {
+      const fav = t.entryPrice > 0 ? (sign * ((t.dir === 'BUY' ? bars[i].high : bars[i].low) - t.entryPrice) / t.entryPrice) * 100 : 0;
+      const adv = t.entryPrice > 0 ? (sign * ((t.dir === 'BUY' ? bars[i].low : bars[i].high) - t.entryPrice) / t.entryPrice) * 100 : 0;
+      best = Math.max(best, fav);
+      worst = Math.min(worst, adv);
+    }
+    return {
+      ...t, pnlPct,
+      barsHeld: exitIdx - t.entryIdx,
+      mfePct: best, maePct: worst,
+      capture: best > 0.0001 ? pnlPct / best : null,
+    };
+  });
+  const wins = graded.filter((t) => t.pnlPct > 0).length;
+  const winRate = graded.length ? (wins / graded.length) * 100 : 0;
+  const totalPnlPct = graded.reduce((s, t) => s + t.pnlPct, 0);
+  const captures = graded.map((t) => t.capture).filter((c): c is number => c != null);
+  const avgCapture = captures.length ? captures.reduce((s, c) => s + c, 0) / captures.length : null;
+  // Transparent grade: profitable + ≥60% wins = A, profitable = B,
+  // roughly flat = C, losing = D, losing with <30% wins = F.
+  const grade = totalPnlPct > 0.02 && winRate >= 60 ? 'A'
+    : totalPnlPct > 0.02 ? 'B'
+    : Math.abs(totalPnlPct) <= 0.02 ? 'C'
+    : winRate < 30 ? 'F' : 'D';
+  const observations: string[] = [];
+  const bigMae = graded.filter((t) => t.pnlPct < 0 && t.maePct < 2 * t.pnlPct);
+  if (bigMae.length > 0) observations.push(`${bigMae.length} losing trade(s) went at least twice as far against you as the final loss — earlier exits or tighter invalidation would have cut those.`);
+  if (avgCapture != null && avgCapture < 0.4) observations.push(`On average you kept ${(avgCapture * 100).toFixed(0)}% of the best move available while in the trade — exits gave back most of the favorable excursion.`);
+  if (avgCapture != null && avgCapture >= 0.7) observations.push(`You captured ${(avgCapture * 100).toFixed(0)}% of the available favorable move — strong exit timing.`);
+  const quickies = graded.filter((t) => t.barsHeld <= 1);
+  if (quickies.length > graded.length / 2 && graded.length >= 2) observations.push('Most trades were closed within a bar — scalping the replay rarely reflects a real plan; try letting the setup breathe.');
+  const auto = graded.filter((t) => t.autoClosed).length;
+  if (auto > 0) observations.push(`${auto} trade(s) were still open at replay end and auto-closed at the last bar — plan the exit before the entry.`);
+  if (observations.length === 0) observations.push('No systematic issue detected in this small sample — repeat the drill on other periods before drawing conclusions.');
+  return { trades: graded, wins, winRate, totalPnlPct, avgCapture, grade, observations };
+}
 import IndicatorPanel, {
   INDICATOR_DEFS,
   type IndicatorId,
@@ -589,13 +664,80 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     replayTotalRef.current = all.length;
     setReplayIndex(Math.max(10, Math.floor(all.length * 0.6)));
     setReplayPlaying(false);
+    setReplayTrades([]);
+    setReplayReport(null);
     setReplayActive(true);
   }, [ohlcvBuilder, selectedTf, activeSymbol]);
 
+  // §11 replay practice trading — mark Buy/Sell against history and get an
+  // honest, rule-based scorecard computed from the ACTUAL later bars.
+  // Display-only: practice trades never touch the order service.
+  const [replayTrades, setReplayTrades] = useState<ReplayTrade[]>([]);
+  const [replayReport, setReplayReport] = useState<ReplayReport | null>(null);
+  const replayEntryLineRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']> | null>(null);
+
+  const getReplayBars = useCallback((): OHLCVBar[] => {
+    if (!ohlcvBuilder) return [];
+    const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution;
+    return resolution ? ohlcvBuilder.getAllBars(activeSymbol, resolution) : [];
+  }, [ohlcvBuilder, selectedTf, activeSymbol]);
+
+  const clearReplayEntryLine = useCallback(() => {
+    if (replayEntryLineRef.current) {
+      try { candleSeriesRef.current?.removePriceLine(replayEntryLineRef.current); } catch { /* noop */ }
+      replayEntryLineRef.current = null;
+    }
+  }, []);
+
+  const closeOpenReplayTrade = useCallback((atIdx: number, atPrice: number) => {
+    setReplayTrades((prev) => prev.map((t) =>
+      t.exitIdx == null && atIdx >= t.entryIdx ? { ...t, exitIdx: atIdx, exitPrice: atPrice } : t));
+    clearReplayEntryLine();
+  }, [clearReplayEntryLine]);
+
+  const markReplayTrade = useCallback((dir: 'BUY' | 'SELL' | 'CLOSE') => {
+    const bars = getReplayBars();
+    const idx = Math.min(replayIndex, bars.length) - 1;
+    const bar = bars[idx];
+    if (!bar) return;
+    const open = replayTrades.find((t) => t.exitIdx == null);
+    if (dir === 'CLOSE') {
+      if (open && idx >= open.entryIdx) closeOpenReplayTrade(idx, bar.close);
+      return;
+    }
+    if (open) {
+      if (open.dir === dir) return; // already in that direction
+      if (idx >= open.entryIdx) closeOpenReplayTrade(idx, bar.close); // reverse
+      else return;
+    }
+    setReplayTrades((prev) => [...prev, { dir, entryIdx: idx, entryPrice: bar.close, exitIdx: null, exitPrice: null }]);
+    clearReplayEntryLine();
+    try {
+      replayEntryLineRef.current = candleSeriesRef.current?.createPriceLine({
+        price: bar.close, color: dir === 'BUY' ? '#00C27A' : '#FF5252', lineWidth: 1 as const,
+        lineStyle: LineStyle.Dashed, lineVisible: true, axisLabelVisible: true,
+        title: `practice ${dir}`, axisLabelColor: dir === 'BUY' ? '#00C27A' : '#FF5252', axisLabelTextColor: '#ffffff',
+      }) ?? null;
+    } catch { /* noop */ }
+  }, [getReplayBars, replayIndex, replayTrades, closeOpenReplayTrade, clearReplayEntryLine]);
+
   const exitReplay = useCallback(() => {
     setReplayPlaying(false);
+    // Grade marked trades against the real bars before leaving.
+    const bars = getReplayBars();
+    setReplayTrades((trades) => {
+      if (trades.length > 0 && bars.length > 0) {
+        const endIdx = Math.min(replayIndex, bars.length) - 1;
+        const closed = trades.map((t) => (t.exitIdx == null
+          ? { ...t, exitIdx: Math.max(t.entryIdx, endIdx), exitPrice: bars[Math.max(t.entryIdx, endIdx)].close, autoClosed: true }
+          : t));
+        setReplayReport(gradeReplayTrades(closed, bars));
+      }
+      return [];
+    });
+    clearReplayEntryLine();
     setReplayActive(false);
-  }, []);
+  }, [getReplayBars, replayIndex, clearReplayEntryLine]);
 
   const replayStep = useCallback((dir: 1 | -1) => {
     setReplayIndex((i) => Math.min(replayTotalRef.current, Math.max(10, i + dir)));
@@ -1500,6 +1642,25 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
                   className="w-40 accent-[#0091D5]"
                 />
                 <span className="font-mono text-[10px] text-white/50">{replayIndex}/{replayTotalRef.current}</span>
+                {/* §11 practice trading — judged on exit against the real bars */}
+                <div className="ml-1 flex items-center gap-1 border-l pl-2" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+                  <button onClick={() => markReplayTrade('BUY')} title="Practice BUY at this bar's close"
+                    className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: 'rgba(0,194,122,0.18)', color: '#00C27A', border: '1px solid rgba(0,194,122,0.35)' }}>
+                    BUY
+                  </button>
+                  <button onClick={() => markReplayTrade('SELL')} title="Practice SELL at this bar's close"
+                    className="rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: 'rgba(255,82,82,0.18)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.35)' }}>
+                    SELL
+                  </button>
+                  <button onClick={() => markReplayTrade('CLOSE')} title="Close the open practice trade"
+                    disabled={!replayTrades.some((t) => t.exitIdx == null)}
+                    className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white/60 disabled:opacity-25" style={{ border: '1px solid rgba(255,255,255,0.2)' }}>
+                    CLOSE
+                  </button>
+                  <span className="font-mono text-[9px] text-white/40" title="Practice trades marked (graded when you exit replay)">
+                    {replayTrades.length}{replayTrades.some((t) => t.exitIdx == null) ? '·open' : ''}
+                  </span>
+                </div>
                 <div className="flex items-center gap-0.5">
                   {[0.5, 1, 2, 5].map((s) => (
                     <button
@@ -1512,7 +1673,69 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
                     </button>
                   ))}
                 </div>
-                <button onClick={exitReplay} title="Exit replay" className="ml-1 text-white/50 hover:text-red-400"><X size={14} /></button>
+                <button onClick={exitReplay} title="Exit replay — graded scorecard appears if you marked trades" className="ml-1 text-white/50 hover:text-red-400"><X size={14} /></button>
+              </div>
+            )}
+
+            {/* §11 replay scorecard — rule-based, computed from real bars */}
+            {replayReport && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} onMouseDown={() => setReplayReport(null)}>
+                <div className="max-h-[85%] w-[520px] max-w-[94%] overflow-y-auto rounded-xl border p-4 shadow-2xl"
+                  style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.12)' }} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-[13px] font-bold text-white">Replay scorecard</div>
+                      <div className="text-[9px] text-white/40">Rule-based — measured from your marked trades vs the actual bars. Not an opinion.</div>
+                    </div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full text-[20px] font-black"
+                      style={{
+                        color: ['A', 'B'].includes(replayReport.grade) ? '#00C27A' : replayReport.grade === 'C' ? '#FFD700' : '#FF5252',
+                        border: `2px solid ${['A', 'B'].includes(replayReport.grade) ? 'rgba(0,194,122,0.5)' : replayReport.grade === 'C' ? 'rgba(255,215,0,0.5)' : 'rgba(255,82,82,0.5)'}`,
+                      }}>
+                      {replayReport.grade}
+                    </div>
+                  </div>
+                  <div className="mb-3 grid grid-cols-4 gap-2 text-center">
+                    {([
+                      ['Trades', String(replayReport.trades.length)],
+                      ['Win rate', `${replayReport.winRate.toFixed(0)}%`],
+                      ['Total P&L', `${replayReport.totalPnlPct >= 0 ? '+' : ''}${replayReport.totalPnlPct.toFixed(2)}%`],
+                      ['Move captured', replayReport.avgCapture != null ? `${(replayReport.avgCapture * 100).toFixed(0)}%` : '—'],
+                    ] as [string, string][]).map(([k, v]) => (
+                      <div key={k} className="rounded-md border px-1 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                        <div className="text-[8px] uppercase tracking-wide text-white/35">{k}</div>
+                        <div className="font-mono text-[12px] font-bold text-white/85">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mb-3">
+                    {replayReport.trades.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 border-t border-white/[0.05] py-1 font-mono text-[10px]">
+                        <span className="w-9" style={{ color: t.dir === 'BUY' ? '#00C27A' : '#FF5252' }}>{t.dir}</span>
+                        <span className="w-28 text-white/45">{t.entryPrice} → {t.exitPrice}</span>
+                        <span className="w-14 text-white/40">{t.barsHeld} bar{t.barsHeld === 1 ? '' : 's'}</span>
+                        <span className="w-16 text-right font-bold" style={{ color: t.pnlPct > 0 ? '#00C27A' : t.pnlPct < 0 ? '#FF5252' : 'rgba(255,255,255,0.5)' }}>
+                          {t.pnlPct >= 0 ? '+' : ''}{t.pnlPct.toFixed(2)}%
+                        </span>
+                        <span className="flex-1 text-right text-[9px] text-white/35" title="Max favorable / adverse excursion while held">
+                          MFE +{t.mfePct.toFixed(2)}% · MAE {t.maePct.toFixed(2)}%{t.autoClosed ? ' · auto-closed' : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mb-3 space-y-1">
+                    {replayReport.observations.map((o, i) => (
+                      <div key={i} className="text-[10px] leading-snug text-white/55">• {o}</div>
+                    ))}
+                  </div>
+                  <div className="mb-3 text-[8.5px] leading-snug text-white/30">
+                    Grade rule: profitable &amp; ≥60% wins = A · profitable = B · flat = C · losing = D · losing &amp; &lt;30% wins = F.
+                    Practice trades never touch your account. Small samples prove little — repeat on different periods.
+                  </div>
+                  <button onClick={() => setReplayReport(null)} className="w-full rounded py-1.5 text-[11px] font-bold text-black" style={{ backgroundColor: '#0091D5' }}>
+                    Back to live chart
+                  </button>
+                </div>
               </div>
             )}
           </div>
