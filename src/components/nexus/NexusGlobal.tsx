@@ -49,7 +49,7 @@ const QUICK_ACTIONS: { label: string; prompt: string; icon: ReactNode; special?:
   { label: 'Trade Ideas', prompt: 'Give me 3 trade setups right now', icon: <Lightbulb className="h-3 w-3" /> },
   { label: 'Analyze Position', prompt: 'Analyze my open positions and risk', icon: <Shield className="h-3 w-3" /> },
   { label: 'SL/TP Suggestion', prompt: 'Where should my stop loss and take profit be?', icon: <Target className="h-3 w-3" /> },
-  { label: 'Market Briefing', prompt: 'Give me a quick market briefing for today', icon: <BarChart3 className="h-3 w-3" /> },
+  { label: 'Daily Briefing', prompt: 'Give me my daily briefing', icon: <BarChart3 className="h-3 w-3" /> },
   { label: 'Review Last Trade', prompt: 'Let\'s debrief my last closed trade', icon: <Clock className="h-3 w-3" /> },
   { label: 'Pre-trade Check', prompt: 'Run pre-trade checklist for my current setup', icon: <TrendingUp className="h-3 w-3" /> },
 ];

@@ -28,6 +28,17 @@ export default function TerminalPage() {
   // TradingView (real data) chart is displayed to avoid mismatched quotes.
   const [chartSource, setChartSource] = useState<'tradingview' | 'raptor'>('tradingview');
 
+  // Collapsible right panel: hidden state persists; a pulsing light at the
+  // right edge brings it back.
+  const [rightHidden, setRightHidden] = useState(false);
+  useEffect(() => {
+    try { setRightHidden(localStorage.getItem('raptor_right_panel_hidden') === '1'); } catch { /* default shown */ }
+  }, []);
+  const toggleRightPanel = useCallback((hide: boolean) => {
+    setRightHidden(hide);
+    try { localStorage.setItem('raptor_right_panel_hidden', hide ? '1' : '0'); } catch { /* ignore */ }
+  }, []);
+
   // ── Resizable positions panel ──
   const [panelHeight, setPanelHeight] = useState(240);
   const isDragging = useRef(false);
@@ -109,7 +120,7 @@ export default function TerminalPage() {
         style={{
           display: 'grid',
           gridTemplateRows: `1fr auto ${panelHeight}px 30px`,
-          gridTemplateColumns: chartSource === 'tradingview' ? '240px 1fr' : '240px 1fr 280px',
+          gridTemplateColumns: chartSource === 'tradingview' || rightHidden ? '240px 1fr' : '240px 1fr 280px',
         }}
       >
         {/* Watchlist - left sidebar (hidden on mobile) */}
@@ -123,9 +134,18 @@ export default function TerminalPage() {
         </div>
 
         {/* Right Panel (hidden on mobile; hidden entirely on the TradingView tab
-            because its quotes come from the RAPTOR feed) */}
-        {chartSource !== 'tradingview' && (
-          <div className="border-l border-[var(--border)] overflow-hidden hidden xl:block">
+            because its quotes come from the RAPTOR feed). Collapsible — the
+            handle on its left edge hides it; a pulsing light restores it. */}
+        {chartSource !== 'tradingview' && !rightHidden && (
+          <div className="relative border-l border-[var(--border)] overflow-hidden hidden xl:block">
+            <button
+              onClick={() => toggleRightPanel(true)}
+              title="Hide panel — the blinking light at the right edge brings it back"
+              className="absolute left-0 top-1/2 z-40 -translate-y-1/2 rounded-r px-0.5 py-3 text-white/30 transition-colors hover:text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRight: '1px solid var(--border)' }}
+            >
+              ›
+            </button>
             <RightPanel />
           </div>
         )}
@@ -172,6 +192,25 @@ export default function TerminalPage() {
           <AccountBar />
         </div>
       </div>
+
+      {/* Blinking restore light — appears only while the right panel is
+          hidden on the RAPTOR tab; clicking brings the panel back. */}
+      {chartSource !== 'tradingview' && rightHidden && (
+        <button
+          onClick={() => toggleRightPanel(false)}
+          title="Show Order / Account / Tools panel"
+          className="fixed right-1.5 top-1/2 z-[60] hidden -translate-y-1/2 items-center justify-center xl:flex"
+          style={{
+            width: 24, height: 24, borderRadius: '50%',
+            backgroundColor: 'rgba(10,15,26,0.92)',
+            border: '1px solid rgba(0,145,213,0.5)',
+            boxShadow: '0 0 12px rgba(0,145,213,0.55)',
+          }}
+        >
+          <span className="absolute h-2 w-2 animate-ping rounded-full" style={{ backgroundColor: '#0091D5' }} />
+          <span className="relative h-2 w-2 rounded-full" style={{ backgroundColor: '#0091D5' }} />
+        </button>
+      )}
 
       {/* Mobile-only: make chart take full width */}
       <style dangerouslySetInnerHTML={{ __html: `

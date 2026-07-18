@@ -205,8 +205,29 @@ function generateIntelligentFallback(input: string, history: { role: string; con
       return 'I checked your account: **no open positions right now.** Flat is a position too — often the best one. Want me to look at the current market quotes instead?';
     }
 
-    if (/(market brief|briefing|market today|market overview|what.?s moving)/.test(lower) && quoteLines.length > 0) {
-      return `**Live market snapshot** (real-time platform feed):\n\n${quoteLines.slice(0, 10).map((q) => `• ${q}`).join('\n')}\n\nAsk me about any of these symbols and I\'ll go deeper — or open the RAPTOR chart to see structure and indicators.\n\n⚠️ Live data, AI commentary — not financial advice.`;
+    if (/(market brief|briefing|daily brief|market today|market overview|what.?s moving)/.test(lower) && quoteLines.length > 0) {
+      // §27 time-aware daily briefing, composed from the live context lines.
+      const now = new Date();
+      const day = now.getUTCDay();
+      const hour = now.getUTCHours();
+      const kind = day === 0 || day === 6 ? 'Weekend review'
+        : hour < 12 ? 'Morning briefing' : hour < 16 ? 'Midday briefing' : 'Closing-bell briefing';
+      const sessionsLine = (contextText.match(/Sessions now \(UTC\): [^\n]+/) || [null])[0];
+      const scanLine = (contextText.match(/Opportunity scan \(real bars[^\n]+/) || [null])[0];
+      const stateLine = (contextText.match(/Market state[^\n]+/) || [null])[0];
+      const perfLine = (contextText.match(/Performance[^\n]+/) || [null])[0];
+      const parts: string[] = [`**${kind}** — built from your live platform data (${now.toUTCString().slice(17, 22)} UTC).`];
+      if (sessionsLine) parts.push(`🕐 ${sessionsLine.replace('Sessions now (UTC): ', '')}`);
+      if (day === 0 || day === 6) parts.push('Markets are closed for most FX/index symbols — a good moment to journal last week and plan, not to force crypto trades out of boredom.');
+      if (stateLine) parts.push(`📊 ${stateLine}`);
+      if (scanLine) parts.push(`🎯 ${scanLine.includes('no trending setups') ? scanLine.replace('Opportunity scan (real bars, ', 'Scan (') : `Top setups — ${scanLine.replace(/^Opportunity scan \(real bars, \d+ symbols\): /, '').split(' | ').slice(0, 3).join(' | ')}`}`);
+      if (positionLines.length > 0) parts.push(`💼 Open positions:\n${positionLines.slice(0, 5).map((p) => `• ${p}`).join('\n')}`);
+      else parts.push('💼 You are flat — no open risk.');
+      if (perfLine) parts.push(`📈 ${perfLine}`);
+      parts.push(kind === 'Closing-bell briefing'
+        ? 'Before you close the day: journal any trade you closed, and let winners already protected by stops run rather than micro-managing them.'
+        : 'Ask "trade ideas" for the full ranked scan or "entry zone" on any symbol for a concrete plan.');
+      return `${parts.join('\n\n')}\n\n⚠️ Live data, AI commentary — not financial advice.`;
     }
 
     if (/(stop loss|sl\b|take profit|tp\b|sl\/tp)/.test(lower)) {

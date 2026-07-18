@@ -12,6 +12,7 @@ import { getOhlcvBuilder } from '@/lib/nexus/market-data-bridge';
 import { classifyMarketState, marketStateToText, type MarketStateAssessment } from '@/lib/nexus/market-state';
 import { computeEntryZone, assessPosition, type EntryZoneAssessment, type NoSetupAssessment } from '@/lib/nexus/entry-exit';
 import { atr } from '@/lib/trading/indicators';
+import { sessionStatuses, activeOverlaps, fmtCountdown } from '@/lib/insights/sessions';
 
 export interface NexusContext {
   activeSymbol: string | null;
@@ -31,6 +32,8 @@ export interface NexusContext {
   entryZone: (EntryZoneAssessment | NoSetupAssessment) | null;
   /** §6 per-position management assessments (terminal only). */
   positionNotes: { symbol: string; direction: string; headline: string; action: string; reasons: string[] }[];
+  /** §27 daily-briefing support: live session clock (pure UTC math). */
+  sessions: { open: string[]; overlaps: string[]; nextChange: string } | null;
   /** §15 opportunity scan across all streamed symbols (terminal only). */
   opportunities: {
     ranked: { symbol: string; direction: string; preferred: number; stop: number; target1: number; riskReward1: number; confidence: number; state: string }[];
@@ -144,6 +147,19 @@ export async function buildNexusContext(): Promise<NexusContext> {
       }
     } catch { /* classification optional */ }
   }
+  // §27: session clock — pure UTC math plus measured ranges from real bars.
+  let sessions: NexusContext['sessions'] = null;
+  try {
+    const st = sessionStatuses(new Date(), state.activeSymbol ?? 'EURUSD', builder);
+    const openNames = st.filter((s) => s.open).map((s) => s.name);
+    const soonest = [...st].sort((a, b) => a.minutesToChange - b.minutesToChange)[0];
+    sessions = {
+      open: openNames,
+      overlaps: activeOverlaps(st),
+      nextChange: soonest ? `${soonest.name} ${soonest.open ? 'closes' : 'opens'} in ${fmtCountdown(soonest.minutesToChange)}` : '',
+    };
+  } catch { /* optional */ }
+
   // §15: opportunity scan — classify EVERY streamed symbol and rank the
   // trending setups by confidence. Range-bound symbols are counted honestly
   // rather than forced into fake setups.
@@ -195,6 +211,7 @@ export async function buildNexusContext(): Promise<NexusContext> {
     performance,
     entryZone,
     positionNotes,
+    sessions,
     opportunities,
   };
 }
@@ -232,6 +249,9 @@ export function contextToText(ctx: NexusContext): string {
   }
   for (const n of ctx.positionNotes) {
     lines.push(`Position management (${n.direction} ${n.symbol}): ${n.headline} — ${n.action} Reasons: ${n.reasons.join(' | ')}`);
+  }
+  if (ctx.sessions) {
+    lines.push(`Sessions now (UTC): ${ctx.sessions.open.length > 0 ? `${ctx.sessions.open.join(', ')} open` : 'all major sessions closed'}${ctx.sessions.overlaps.length > 0 ? ` — overlap: ${ctx.sessions.overlaps.join(' / ')}` : ''}. Next change: ${ctx.sessions.nextChange}.`);
   }
   if (ctx.opportunities) {
     const o = ctx.opportunities;
