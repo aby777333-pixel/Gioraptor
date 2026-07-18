@@ -13,6 +13,11 @@ import { evaluateTraderProactiveMessages, evaluateBrokerProactiveMessages } from
 import { NexusAgreementModal } from '@/components/nexus/NexusAgreementModal';
 import { isNexusAgreementAccepted, recordNexusAgreement } from '@/lib/nexus/nexus-agreement';
 import { buildNexusContext, contextToText } from '@/lib/nexus/market-context';
+import {
+  loadActiveConfig, saveActiveConfig, loadAlertFeed, dismissAlert, clearAlertFeed,
+  runActiveScan, SEVERITY_STYLES, type ActiveNexusConfig, type NexusAlert,
+} from '@/lib/nexus/alert-engine';
+import { Bell, ShieldCheck } from 'lucide-react';
 
 interface NexusMessage {
   id: string;
@@ -113,8 +118,49 @@ export function NexusGlobal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Real session length for the proactive engine (marathon-session warnings).
   const sessionStartRef = useRef<number>(Date.now());
+  // Active NEXUS Mode (additive super-prompt §1/§21): continuous monitoring,
+  // switchable, with Observe (feed-only) vs Alert (feed + pop-ups) levels.
+  const [activeCfg, setActiveCfg] = useState<ActiveNexusConfig>({ enabled: false, level: 'alert' });
+  const [alertFeed, setAlertFeed] = useState<NexusAlert[]>([]);
+  const [showAlertCenter, setShowAlertCenter] = useState(false);
+  const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  useEffect(() => { setActiveCfg(loadActiveConfig()); setAlertFeed(loadAlertFeed()); }, []);
+
+  const updateActiveCfg = (patch: Partial<ActiveNexusConfig>) => {
+    setActiveCfg(prev => { const next = { ...prev, ...patch }; saveActiveConfig(next); return next; });
+  };
+
+  const runScan = async (manual = false) => {
+    try {
+      const ctx = await buildNexusContext();
+      const { feed, fresh } = runActiveScan(ctx);
+      setAlertFeed([...feed]);
+      if (manual) {
+        setScanNote(fresh.length > 0
+          ? `Scan complete — ${fresh.length} new alert(s).`
+          : `Scan complete — no new alerts. Watching ${ctx.quotes.length} symbol(s), ${ctx.positions.length} open position(s)${ctx.marketState ? `, ${ctx.marketState.symbol} state "${ctx.marketState.state}" unchanged` : ''}.`);
+      }
+      // Level 2 (Alert): surface fresh alerts as orb pop-ups too.
+      if (activeCfg.level === 'alert' && fresh.length > 0) {
+        const top = [...fresh].sort((a, b) => (a.severity === 'critical' ? -1 : 1) - (b.severity === 'critical' ? -1 : 1))[0];
+        const sentiment: NexusSentiment = top.severity === 'critical' ? 'urgent' : top.severity === 'warning' ? 'warning' : top.severity === 'opportunity' ? 'celebratory' : 'informational';
+        setMessages(prev => prev.some(m => m.id === top.id) ? prev
+          : [{ id: top.id, text: top.title, sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev]);
+      }
+    } catch { if (manual) setScanNote('Scan failed — platform data unavailable on this page.'); }
+  };
 
   const isExcluded = EXCLUDED_PATHS.includes(pathname) || pathname.startsWith('/features/');
+
+  // Continuous monitoring loop (async, non-blocking, only while enabled).
+  useEffect(() => {
+    if (isExcluded || !activeCfg.enabled) return;
+    void runScan();
+    const t = setInterval(() => { void runScan(); }, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCfg.enabled, activeCfg.level, isExcluded, pathname]);
 
   useEffect(() => {
     if (isExcluded) return;
@@ -299,6 +345,105 @@ export function NexusGlobal() {
                 </button>
               </div>
 
+              {/* Active NEXUS controls (§1/§21): switchable monitoring + Alert Center */}
+              <div className="flex items-center gap-2 border-b border-white/[0.04] bg-white/[0.015] px-4 py-2">
+                <button
+                  onClick={() => updateActiveCfg({ enabled: !activeCfg.enabled })}
+                  className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors"
+                  style={{
+                    backgroundColor: activeCfg.enabled ? 'rgba(0,220,130,0.12)' : 'rgba(255,255,255,0.05)',
+                    color: activeCfg.enabled ? '#00dc82' : 'rgba(255,255,255,0.35)',
+                    border: `1px solid ${activeCfg.enabled ? 'rgba(0,220,130,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                  }}
+                  title={activeCfg.enabled ? 'Active NEXUS is monitoring — click to switch off' : 'Enable continuous monitoring (state changes, trade guardian, spread anomalies)'}
+                >
+                  <ShieldCheck className="h-3 w-3" /> Active {activeCfg.enabled ? 'ON' : 'OFF'}
+                </button>
+                {activeCfg.enabled && (
+                  <select
+                    value={activeCfg.level}
+                    onChange={(e) => updateActiveCfg({ level: e.target.value as ActiveNexusConfig['level'] })}
+                    className="rounded border bg-[#0a0c10] px-1.5 py-1 text-[10px] text-white/60 outline-none"
+                    style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+                    title="Observe = feed only. Alert = feed + pop-ups."
+                  >
+                    <option value="observe">Observe</option>
+                    <option value="alert">Alert</option>
+                  </select>
+                )}
+                <div className="flex-1" />
+                <button
+                  onClick={() => setShowAlertCenter(v => !v)}
+                  className="relative flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors"
+                  style={{
+                    backgroundColor: showAlertCenter ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)',
+                    color: showAlertCenter ? '#8b5cf6' : 'rgba(255,255,255,0.4)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  <Bell className="h-3 w-3" /> Alerts
+                  {alertFeed.filter(a => !a.dismissed).length > 0 && (
+                    <span className="flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[8px] text-white">
+                      {alertFeed.filter(a => !a.dismissed).length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {showAlertCenter ? (
+              /* NEXUS Alert Center (§23) */
+              <div className="flex-1 overflow-y-auto px-4 py-3 scrollbar-thin">
+                <div className="mb-2 flex items-center gap-2">
+                  <button onClick={() => void runScan(true)}
+                    className="rounded px-2.5 py-1 text-[10px] font-bold text-black" style={{ backgroundColor: '#8b5cf6' }}>
+                    Run check now
+                  </button>
+                  <button onClick={() => { clearAlertFeed(); setAlertFeed([]); setScanNote(null); }}
+                    className="rounded px-2.5 py-1 text-[10px] text-white/40 hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                    Clear all
+                  </button>
+                </div>
+                {scanNote && <div className="mb-2 rounded-md border border-[#8b5cf6]/25 bg-[#8b5cf6]/5 px-2.5 py-1.5 text-[10px] text-white/60">{scanNote}</div>}
+                {alertFeed.length === 0 && (
+                  <div className="py-8 text-center text-[11px] text-white/25">
+                    No alerts yet. {activeCfg.enabled ? 'Active NEXUS is watching — alerts appear here when real conditions trigger them.' : 'Enable Active NEXUS to start continuous monitoring.'}
+                  </div>
+                )}
+                {alertFeed.map(a => (
+                  <div key={a.id} className="mb-2 rounded-lg border p-2.5"
+                    style={{ borderColor: `${SEVERITY_STYLES[a.severity].color}33`, backgroundColor: `${SEVERITY_STYLES[a.severity].color}08`, opacity: a.dismissed ? 0.45 : 1 }}>
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase"
+                        style={{ backgroundColor: `${SEVERITY_STYLES[a.severity].color}22`, color: SEVERITY_STYLES[a.severity].color }}>
+                        {SEVERITY_STYLES[a.severity].label}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <button onClick={() => setExpandedAlert(expandedAlert === a.id ? null : a.id)} className="text-left text-[11px] leading-snug text-white/75 hover:text-white">
+                          {a.title}
+                        </button>
+                        <div className="mt-0.5 text-[8px] text-white/25">{new Date(a.ts).toLocaleTimeString()} · {a.source}{a.confidence != null ? ` · confidence ${a.confidence}%` : ''}</div>
+                        {expandedAlert === a.id && (
+                          <div className="mt-1.5 text-[10px] leading-relaxed text-white/50">
+                            {a.detail}
+                            {a.evidence && a.evidence.length > 0 && (
+                              <ul className="mt-1 space-y-0.5">
+                                {a.evidence.map((e, i) => <li key={i} className="text-[9px] text-white/35">• {e}</li>)}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {!a.dismissed && (
+                        <button onClick={() => setAlertFeed(dismissAlert(a.id))} className="shrink-0 text-white/20 hover:text-white/60">
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              ) : (
+              <>
               {/* Chat Messages */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
                 {chatMessages.map(msg => (
@@ -376,6 +521,8 @@ export function NexusGlobal() {
                   NEXUS provides AI analysis, not financial advice. Trading involves risk.
                 </p>
               </div>
+              </>
+              )}
               </>
               )}
             </motion.div>
