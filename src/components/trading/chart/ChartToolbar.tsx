@@ -15,13 +15,23 @@ import { useEALibrary } from './useEALibrary';
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type ChartType = 'candlestick' | 'bar' | 'line' | 'area' | 'heikinashi';
+export type ChartType =
+  | 'candlestick' | 'hollow' | 'bar' | 'line' | 'area' | 'baseline'
+  | 'heikinashi' | 'renko' | 'linebreak' | 'kagi' | 'pnf' | 'rangebar';
 export type LayoutType = 'single' | 'split' | 'vsplit' | 'h3' | 'v3' | 'quarters' | 'onefive' | 'table3x2';
 
 const TIMEFRAMES = [
-  { label: '1 Minute', value: '1m' }, { label: '5 Minutes', value: '5m' },
-  { label: '15 Minutes', value: '15m' }, { label: '30 Minutes', value: '30m' },
-  { label: '1 Hour', value: '1H' }, { label: '4 Hours', value: '4H' },
+  { label: '5 Seconds', value: '5s' }, { label: '10 Seconds', value: '10s' },
+  { label: '15 Seconds', value: '15s' }, { label: '30 Seconds', value: '30s' },
+  { label: '1 Minute', value: '1m' }, { label: '2 Minutes', value: '2m' },
+  { label: '3 Minutes', value: '3m' }, { label: '5 Minutes', value: '5m' },
+  { label: '10 Minutes', value: '10m' }, { label: '15 Minutes', value: '15m' },
+  { label: '20 Minutes', value: '20m' }, { label: '30 Minutes', value: '30m' },
+  { label: '45 Minutes', value: '45m' },
+  { label: '1 Hour', value: '1H' }, { label: '2 Hours', value: '2H' },
+  { label: '3 Hours', value: '3H' }, { label: '4 Hours', value: '4H' },
+  { label: '6 Hours', value: '6H' }, { label: '8 Hours', value: '8H' },
+  { label: '12 Hours', value: '12H' },
   { label: '1 Day', value: '1D' }, { label: '1 Week', value: '1W' },
   { label: '1 Month', value: '1Mo' },
 ];
@@ -29,9 +39,16 @@ const TIMEFRAMES = [
 const CHART_TYPES: { label: string; value: ChartType; icon: React.ReactNode }[] = [
   { label: 'Bars', value: 'bar', icon: <BarChart3 size={16} /> },
   { label: 'Candles', value: 'candlestick', icon: <CandlestickChart size={16} /> },
+  { label: 'Hollow Candles', value: 'hollow', icon: <CandlestickChart size={16} /> },
   { label: 'Heikin Ashi', value: 'heikinashi', icon: <CandlestickChart size={16} /> },
   { label: 'Line', value: 'line', icon: <TrendingUp size={16} /> },
   { label: 'Area', value: 'area', icon: <AreaChart size={16} /> },
+  { label: 'Baseline', value: 'baseline', icon: <AreaChart size={16} /> },
+  { label: 'Renko', value: 'renko', icon: <Grid2x2 size={16} /> },
+  { label: 'Line Break', value: 'linebreak', icon: <BarChart3 size={16} /> },
+  { label: 'Kagi', value: 'kagi', icon: <Activity size={16} /> },
+  { label: 'Point & Figure', value: 'pnf', icon: <Grid3x3 size={16} /> },
+  { label: 'Range Bars', value: 'rangebar', icon: <BarChart3 size={16} /> },
 ];
 
 const DRAWING_TOOLS = [
@@ -47,7 +64,9 @@ const DRAWING_TOOLS = [
   { label: 'Head And Shoulders', icon: <Activity size={16} /> },
   { label: 'Horizontal Line', icon: <Minus size={16} /> },
   { label: 'Line', icon: <TrendingUp size={16} /> },
+  { label: 'Long Position', icon: <TrendingUp size={16} /> },
   { label: 'Parallel Channel', icon: <Columns2 size={16} /> },
+  { label: 'Short Position', icon: <TrendingUp size={16} style={{ transform: 'scaleY(-1)' }} /> },
   { label: 'Rectangle', icon: <Square size={16} /> },
   { label: 'Ruler / Measure', icon: <Ruler size={16} /> },
   { label: 'Text', icon: <MousePointer2 size={16} /> },

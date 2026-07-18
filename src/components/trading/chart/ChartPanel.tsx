@@ -7,6 +7,7 @@ import {
   BarSeries,
   LineSeries,
   AreaSeries,
+  BaselineSeries,
   HistogramSeries,
   CrosshairMode,
   LineStyle,
@@ -42,6 +43,8 @@ import {
   EyeOff,
   Trash2,
   TrendingUp,
+  TrendingDown,
+  Rows2,
   Play,
   Pause,
   StepForward,
@@ -82,7 +85,7 @@ const SYMBOL_DESCRIPTIONS: Record<string, string> = {
   UKOIL: 'UK Brent Crude Oil', NATGAS: 'Natural Gas',
 };
 
-type DrawingToolId = 'cursor' | 'crosshair' | 'trendline' | 'horizontal' | 'vertical' | 'fibonacci' | 'text' | 'rectangle' | 'measure' | 'zoomin' | 'zoomout' | 'magnet' | 'lock' | 'visibility' | 'deleteall';
+type DrawingToolId = 'cursor' | 'crosshair' | 'trendline' | 'horizontal' | 'vertical' | 'fibonacci' | 'text' | 'rectangle' | 'channel' | 'longpos' | 'shortpos' | 'measure' | 'zoomin' | 'zoomout' | 'magnet' | 'lock' | 'visibility' | 'deleteall';
 
 interface DrawingTool {
   id: DrawingToolId;
@@ -99,8 +102,48 @@ interface Drawing {
   color: string; text?: string;
 }
 
-const CANVAS_DRAWING_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'measure'];
+const CANVAS_DRAWING_TOOLS: DrawingToolId[] = ['trendline', 'horizontal', 'vertical', 'fibonacci', 'text', 'rectangle', 'channel', 'longpos', 'shortpos', 'measure'];
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+// Parallel-channel second line offset (px, perpendicular-ish vertical shift).
+const CHANNEL_OFFSET = 40;
+
+// Long/Short Position tool (§6): the drag defines entry → target; the stop is
+// mirrored at half the target distance, so the drawn bracket is a 2:1 R:R
+// (the label reflects the real drawn geometry).
+function drawPositionZones(ctx: CanvasRenderingContext2D, type: string, sx: number, sy: number, ex: number, ey: number) {
+  const left = Math.min(sx, ex);
+  const width = Math.max(12, Math.abs(ex - sx));
+  const entryY = sy, targetY = ey;
+  const reward = Math.abs(entryY - targetY);
+  const risk = Math.max(8, reward / 2);
+  const isLong = type === 'longpos';
+  const stopY = isLong ? entryY + risk : entryY - risk;
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = '#00C27A';
+  ctx.fillRect(left, Math.min(entryY, targetY), width, Math.max(1, Math.abs(targetY - entryY)));
+  ctx.fillStyle = '#C1121F';
+  ctx.fillRect(left, Math.min(entryY, stopY), width, Math.max(1, Math.abs(stopY - entryY)));
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(left, entryY); ctx.lineTo(left + width, entryY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillStyle = '#FFFFFF';
+  const rr = risk > 0 ? (reward / risk).toFixed(2) : '—';
+  ctx.fillText(`${isLong ? 'LONG' : 'SHORT'} R:R ${rr}`, left + 4, Math.min(entryY, targetY, stopY) - 4);
+}
+
+function drawChannel(ctx: CanvasRenderingContext2D, sx: number, sy: number, ex: number, ey: number) {
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx, sy + CHANNEL_OFFSET); ctx.lineTo(ex, ey + CHANNEL_OFFSET); ctx.stroke();
+  ctx.globalAlpha = 0.08;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+  ctx.lineTo(ex, ey + CHANNEL_OFFSET); ctx.lineTo(sx, sy + CHANNEL_OFFSET);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
 
 // Heikin Ashi transform (pure). Smooths OHLC using the classic recurrence:
 //   haClose = (o+h+l+c)/4;  haOpen = (prevHaOpen+prevHaClose)/2 (seed = (o+c)/2)
@@ -119,6 +162,147 @@ function toHeikinAshi(bars: { time: number; open: number; high: number; low: num
   }
   return out;
 }
+
+// ─── TV-style chart-type transforms (§8) ──────────────────────────
+// All pure functions over the raw OHLCV bars. Types that re-shape the time
+// axis (Renko / Line Break / P&F / Range Bars) emit bars stamped with the
+// source bar's time, nudged +1s where needed so times stay strictly ascending.
+
+type XBar = { time: number; open: number; high: number; low: number; close: number; volume: number };
+
+// Sizing basis for brick/box/range/reversal: last ATR(14) of the series,
+// falling back to 0.1% of the last close so tiny histories still render.
+function lastAtrOf(bars: XBar[], period = 14): number {
+  const a = atr(bars.map((b) => b.high), bars.map((b) => b.low), bars.map((b) => b.close), period);
+  for (let i = a.length - 1; i >= 0; i--) { const v = a[i]; if (v != null && v > 0) return v; }
+  const c = bars.length ? bars[bars.length - 1].close : 1;
+  return Math.abs(c) * 0.001 || 0.0001;
+}
+
+function toRenko(bars: XBar[]): XBar[] {
+  if (bars.length < 2) return bars;
+  const brick = lastAtrOf(bars);
+  const out: XBar[] = [];
+  let level = bars[0].close;
+  let lastTime = 0;
+  const push = (open: number, close: number, src: XBar) => {
+    const time = Math.max(src.time, lastTime + 1); lastTime = time;
+    out.push({ time, open, high: Math.max(open, close), low: Math.min(open, close), close, volume: src.volume });
+  };
+  for (const b of bars) {
+    while (b.close >= level + brick) { push(level, level + brick, b); level += brick; }
+    while (b.close <= level - brick) { push(level, level - brick, b); level -= brick; }
+  }
+  return out.length ? out : bars.slice(-1);
+}
+
+function toLineBreak(bars: XBar[], n = 3): XBar[] {
+  const out: XBar[] = [];
+  let lastTime = 0;
+  const mk = (open: number, close: number, src: XBar) => {
+    const time = Math.max(src.time, lastTime + 1); lastTime = time;
+    out.push({ time, open, high: Math.max(open, close), low: Math.min(open, close), close, volume: src.volume });
+  };
+  for (const b of bars) {
+    if (out.length === 0) { if (b.close !== b.open) mk(b.open, b.close, b); continue; }
+    const recent = out.slice(-n);
+    const hi = Math.max(...recent.map((l) => Math.max(l.open, l.close)));
+    const lo = Math.min(...recent.map((l) => Math.min(l.open, l.close)));
+    const prev = out[out.length - 1];
+    if (b.close > hi) mk(Math.max(prev.open, prev.close), b.close, b);
+    else if (b.close < lo) mk(Math.min(prev.open, prev.close), b.close, b);
+  }
+  return out.length ? out : bars.slice(-1);
+}
+
+// Kagi rendered as a time-preserving reversal line: the level rides with price
+// and only reverses after an ATR-sized counter-move.
+function toKagi(bars: XBar[]): { time: number; value: number }[] {
+  if (!bars.length) return [];
+  const rev = lastAtrOf(bars);
+  const out: { time: number; value: number }[] = [];
+  let dir: 1 | -1 = 1;
+  let level = bars[0].close;
+  for (const b of bars) {
+    if (dir === 1) {
+      if (b.close > level) level = b.close;
+      else if (level - b.close >= rev) { dir = -1; level = b.close; }
+    } else {
+      if (b.close < level) level = b.close;
+      else if (b.close - level >= rev) { dir = 1; level = b.close; }
+    }
+    out.push({ time: b.time, value: level });
+  }
+  return out;
+}
+
+// Point & Figure: X/O columns approximated as one up/down bar per column
+// (box = ATR/2, 3-box reversal).
+function toPointFigure(bars: XBar[]): XBar[] {
+  if (bars.length < 2) return bars;
+  const box = lastAtrOf(bars) / 2 || 0.0001;
+  const reversal = 3;
+  const out: XBar[] = [];
+  let lastTime = 0;
+  let dir: 1 | -1 = 1;
+  let colHigh = bars[0].close, colLow = bars[0].close, colVol = 0;
+  let colSrc = bars[0];
+  const flush = () => {
+    const time = Math.max(colSrc.time, lastTime + 1); lastTime = time;
+    out.push({
+      time,
+      open: dir === 1 ? colLow : colHigh,
+      high: colHigh, low: colLow,
+      close: dir === 1 ? colHigh : colLow,
+      volume: colVol,
+    });
+  };
+  for (const b of bars) {
+    colVol += b.volume;
+    if (dir === 1) {
+      if (b.close > colHigh) { colHigh = b.close; colSrc = b; }
+      else if (colHigh - b.close >= box * reversal) {
+        flush(); dir = -1;
+        colLow = b.close; colHigh = colHigh - box; colSrc = b; colVol = 0;
+      }
+    } else {
+      if (b.close < colLow) { colLow = b.close; colSrc = b; }
+      else if (b.close - colLow >= box * reversal) {
+        flush(); dir = 1;
+        colHigh = b.close; colLow = colLow + box; colSrc = b; colVol = 0;
+      }
+    }
+  }
+  flush();
+  return out.length ? out : bars.slice(-1);
+}
+
+// Range Bars: each bar closes once its high-low range reaches the ATR.
+function toRangeBars(bars: XBar[]): XBar[] {
+  if (bars.length < 2) return bars;
+  const range = lastAtrOf(bars);
+  const out: XBar[] = [];
+  let cur: XBar | null = null;
+  let lastTime = 0;
+  for (const b of bars) {
+    if (!cur) { cur = { ...b }; continue; }
+    cur.high = Math.max(cur.high, b.high);
+    cur.low = Math.min(cur.low, b.low);
+    cur.close = b.close;
+    cur.volume += b.volume;
+    if (cur.high - cur.low >= range) {
+      const time = Math.max(cur.time, lastTime + 1); lastTime = time;
+      out.push({ ...cur, time });
+      cur = null;
+    }
+  }
+  if (cur) { out.push({ ...cur, time: Math.max(cur.time, lastTime + 1) }); }
+  return out.length ? out : bars.slice(-1);
+}
+
+// Chart types whose bars can't be updated incrementally on a tick — the whole
+// series recomputes from source bars (same pattern Heikin Ashi already used).
+const TRANSFORM_CHART_TYPES: ReadonlySet<string> = new Set(['heikinashi', 'renko', 'linebreak', 'kagi', 'pnf', 'rangebar']);
 
 function getDecimals(symbol: string): number {
   if (['USDJPY', 'EURJPY', 'GBPJPY'].includes(symbol)) return 3;
@@ -162,6 +346,10 @@ function renderDrawings(ctx: CanvasRenderingContext2D, drawings: Drawing[], w: n
         ctx.setLineDash([6,3]); ctx.beginPath(); ctx.moveTo(d.startX, 0); ctx.lineTo(d.startX, h); ctx.stroke(); ctx.setLineDash([]); break;
       case 'rectangle':
         ctx.strokeRect(d.startX, d.startY, d.endX - d.startX, d.endY - d.startY); break;
+      case 'channel':
+        drawChannel(ctx, d.startX, d.startY, d.endX, d.endY); break;
+      case 'longpos': case 'shortpos':
+        drawPositionZones(ctx, d.type, d.startX, d.startY, d.endX, d.endY); break;
       case 'fibonacci': {
         const top = Math.min(d.startY, d.endY), bottom = Math.max(d.startY, d.endY), range = bottom - top;
         ctx.font = '10px JetBrains Mono, monospace';
@@ -328,7 +516,8 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       'Rectangle': 'rectangle', 'Text': 'text', 'Ruler / Measure': 'measure',
       'Arrow': 'trendline', 'Circle': 'rectangle', 'Flag': 'rectangle',
       'Forecast': 'trendline', 'Gann Box': 'rectangle', 'Gann Fan': 'trendline',
-      'Head And Shoulders': 'trendline', 'Parallel Channel': 'rectangle',
+      'Head And Shoulders': 'trendline', 'Parallel Channel': 'channel',
+      'Long Position': 'longpos', 'Short Position': 'shortpos',
       'ABCD Pattern': 'trendline',
     };
     function handleToolSelect(e: Event) {
@@ -431,6 +620,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const barSeriesRef = useRef<ISeriesApi<'Bar'> | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const areaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
+  const baselineSeriesRef = useRef<ISeriesApi<'Baseline'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const priceLineRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']> | null>(null);
   const lastBarTimeRef = useRef<number>(0);
@@ -496,6 +686,9 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     { id: 'fibonacci', label: 'Fibonacci', icon: <GitCommitHorizontal size={18} />, group: 3 },
     { id: 'text', label: 'Text', icon: <Type size={18} />, group: 3 },
     { id: 'rectangle', label: 'Rectangle', icon: <Square size={18} />, group: 3 },
+    { id: 'channel', label: 'Parallel Channel', icon: <Rows2 size={18} />, group: 3 },
+    { id: 'longpos', label: 'Long Position', icon: <TrendingUp size={18} />, group: 3 },
+    { id: 'shortpos', label: 'Short Position', icon: <TrendingDown size={18} />, group: 3 },
     { id: 'measure', label: 'Measure', icon: <Ruler size={18} />, group: 4 },
     { id: 'zoomin', label: 'Zoom In', icon: <ZoomIn size={18} />, group: 4 },
     { id: 'zoomout', label: 'Zoom Out', icon: <ZoomOut size={18} />, group: 4 },
@@ -589,6 +782,8 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
           if (activeTool === 'measure') { const dx=previewEnd.x-drawStart.x, dy=previewEnd.y-drawStart.y; ctx.font='11px JetBrains Mono, monospace'; ctx.fillStyle='#fff'; ctx.setLineDash([]); ctx.fillText(`${Math.sqrt(dx*dx+dy*dy).toFixed(0)}px`,(drawStart.x+previewEnd.x)/2+6,(drawStart.y+previewEnd.y)/2-6); }
           break;
         case 'rectangle': ctx.strokeRect(drawStart.x, drawStart.y, previewEnd.x - drawStart.x, previewEnd.y - drawStart.y); break;
+        case 'channel': drawChannel(ctx, drawStart.x, drawStart.y, previewEnd.x, previewEnd.y); break;
+        case 'longpos': case 'shortpos': drawPositionZones(ctx, activeTool, drawStart.x, drawStart.y, previewEnd.x, previewEnd.y); break;
         case 'fibonacci': {
           const top=Math.min(drawStart.y,previewEnd.y), bottom=Math.max(drawStart.y,previewEnd.y), range=bottom-top;
           ctx.font='10px JetBrains Mono, monospace';
@@ -665,6 +860,13 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     });
     areaSeriesRef.current = areaSer;
 
+    const baselineSer = chart.addSeries(BaselineSeries, {
+      topLineColor: '#00C27A', topFillColor1: 'rgba(0,194,122,0.25)', topFillColor2: 'rgba(0,194,122,0.03)',
+      bottomLineColor: '#C1121F', bottomFillColor1: 'rgba(193,18,31,0.03)', bottomFillColor2: 'rgba(193,18,31,0.25)',
+      lineWidth: 2, visible: false,
+    });
+    baselineSeriesRef.current = baselineSer;
+
     const volumeSeries = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: 'volume' });
     volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
     volumeSeriesRef.current = volumeSeries;
@@ -679,19 +881,35 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       indicatorSeriesRef.current.clear();
       chart.remove();
       chartRef.current = null; candleSeriesRef.current = null; barSeriesRef.current = null;
-      lineSeriesRef.current = null; areaSeriesRef.current = null; volumeSeriesRef.current = null;
+      lineSeriesRef.current = null; areaSeriesRef.current = null; baselineSeriesRef.current = null;
+      volumeSeriesRef.current = null;
       priceLineRef.current = null;
     };
   }, []);
 
-  // Toggle chart type visibility. Heikin Ashi reuses the candlestick series
-  // (fed transformed data in loadChartData), so it shares the candle visibility.
+  // Toggle chart type visibility. Candle-shaped types (Heikin Ashi, Hollow,
+  // Renko, Line Break, P&F, Range Bars) all reuse the candlestick series —
+  // loadChartData feeds it the transformed data. Kagi renders on the line
+  // series; Baseline has its own series.
   useEffect(() => {
-    candleSeriesRef.current?.applyOptions({ visible: chartType === 'candlestick' || chartType === 'heikinashi' });
+    const candleShaped = ['candlestick', 'hollow', 'heikinashi', 'renko', 'linebreak', 'pnf', 'rangebar'].includes(chartType);
+    candleSeriesRef.current?.applyOptions({
+      visible: candleShaped,
+      // Hollow candles: transparent up-candle body, coloured border/wick.
+      upColor: chartType === 'hollow' ? 'rgba(0,0,0,0)' : '#00C27A',
+      borderUpColor: '#00C27A',
+      wickUpColor: '#00C27A',
+    });
     barSeriesRef.current?.applyOptions({ visible: chartType === 'bar' });
-    lineSeriesRef.current?.applyOptions({ visible: chartType === 'line' });
+    lineSeriesRef.current?.applyOptions({ visible: chartType === 'line' || chartType === 'kagi' });
     areaSeriesRef.current?.applyOptions({ visible: chartType === 'area' });
+    baselineSeriesRef.current?.applyOptions({ visible: chartType === 'baseline' });
   }, [chartType]);
+
+  // Sub-minute timeframes need seconds on the time axis.
+  useEffect(() => {
+    chartRef.current?.timeScale().applyOptions({ secondsVisible: /^\d+s$/.test(selectedTf) });
+  }, [selectedTf]);
 
   // ─── Indicator series helpers ────────────────────
 
@@ -963,7 +1181,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   // ─── Load chart data ─────────────────────────────
 
   const loadChartData = useCallback(() => {
-    if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !baselineSeriesRef.current || !volumeSeriesRef.current) return;
     const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution;
     if (!resolution) return;
     const fetchedBars = ohlcvBuilder.getAllBars(activeSymbol, resolution);
@@ -972,18 +1190,34 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const allBars = replayActive ? fetchedBars.slice(0, Math.min(replayIndex, fetchedBars.length)) : fetchedBars;
     if (allBars.length === 0) return;
 
+    // TV-style chart types (§8): derive the displayed bars from the raw bars.
+    // Time-reshaping types (Renko / Line Break / P&F / Range Bars) feed both the
+    // candle series AND the indicators/script/volume, so overlays stay aligned
+    // with what's on screen. Time-preserving types keep the raw bars.
+    let displayBars = allBars;
+    if (chartType === 'renko') displayBars = toRenko(allBars);
+    else if (chartType === 'linebreak') displayBars = toLineBreak(allBars);
+    else if (chartType === 'pnf') displayBars = toPointFigure(allBars);
+    else if (chartType === 'rangebar') displayBars = toRangeBars(allBars);
+
     const candleData: CandlestickData[] = chartType === 'heikinashi'
       ? toHeikinAshi(allBars)
-      : allBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
+      : displayBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
     const barData: BarData[] = allBars.map((bar) => ({ time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }));
-    const lineData: LineData[] = allBars.map((bar) => ({ time: bar.time as Time, value: bar.close }));
+    const lineData: LineData[] = chartType === 'kagi'
+      ? toKagi(allBars).map((p) => ({ time: p.time as Time, value: p.value }))
+      : allBars.map((bar) => ({ time: bar.time as Time, value: bar.close }));
     const areaData: AreaData[] = allBars.map((bar) => ({ time: bar.time as Time, value: bar.close }));
-    const volumeData: HistogramData[] = allBars.map((bar) => ({ time: bar.time as Time, value: bar.volume, color: bar.close >= bar.open ? 'rgba(0,194,122,0.15)' : 'rgba(193,18,31,0.15)' }));
+    const volumeSrc = chartType === 'heikinashi' ? allBars : displayBars;
+    const volumeData: HistogramData[] = volumeSrc.map((bar) => ({ time: bar.time as Time, value: bar.volume, color: bar.close >= bar.open ? 'rgba(0,194,122,0.15)' : 'rgba(193,18,31,0.15)' }));
 
     candleSeriesRef.current.setData(candleData);
     barSeriesRef.current.setData(barData);
     lineSeriesRef.current.setData(lineData);
     areaSeriesRef.current.setData(areaData);
+    // Baseline pivots around the first visible close (session-open semantics).
+    baselineSeriesRef.current.applyOptions({ baseValue: { type: 'price', price: allBars[0].close } });
+    baselineSeriesRef.current.setData(areaData.map((d) => ({ time: d.time, value: d.value })));
     volumeSeriesRef.current.setData(volumeData);
 
     lastBarTimeRef.current = allBars[allBars.length - 1].time;
@@ -993,14 +1227,15 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     const lastPrice = allBars[allBars.length - 1].close;
     priceLineRef.current = candleSeriesRef.current.createPriceLine({ price: lastPrice, color: '#0091D5', lineWidth: 1 as const, lineStyle: LineStyle.Dotted, lineVisible: true, axisLabelVisible: true, axisLabelColor: '#0091D5', axisLabelTextColor: '#ffffff' });
 
-    // Apply indicators
-    const times = allBars.map((b) => b.time as Time);
-    const closes = allBars.map((b) => b.close);
-    const highs = allBars.map((b) => b.high);
-    const lows = allBars.map((b) => b.low);
-    const volumes = allBars.map((b) => b.volume);
+    // Apply indicators + user script on the same bars the chart displays.
+    const src = displayBars;
+    const times = src.map((b) => b.time as Time);
+    const closes = src.map((b) => b.close);
+    const highs = src.map((b) => b.high);
+    const lows = src.map((b) => b.low);
+    const volumes = src.map((b) => b.volume);
     applyIndicators(times, closes, highs, lows, volumes);
-    runUserScript(allBars);
+    runUserScript(src);
 
     chartRef.current?.timeScale().scrollToRealTime();
   }, [activeSymbol, selectedTf, ohlcvBuilder, applyIndicators, runUserScript, chartType, replayActive, replayIndex]);
@@ -1026,14 +1261,15 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   // Live tick updates
   useEffect(() => {
     if (replayActive) return; // frozen while replaying history
-    if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!ohlcvBuilder || !candleSeriesRef.current || !barSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current || !baselineSeriesRef.current || !volumeSeriesRef.current) return;
     const resolution = TF_TO_RESOLUTION[selectedTf] as Resolution; if (!resolution) return;
     const tick = prices[activeSymbol]; if (!tick) return;
     const currentBar = ohlcvBuilder.getCurrentBar(activeSymbol, resolution); if (!currentBar) return;
 
-    // Heikin Ashi each bar depends on the prior HA bar, so an isolated update
-    // would drift — recompute the whole series from source bars on every tick.
-    if (chartType === 'heikinashi') { loadChartData(); if (priceLineRef.current) priceLineRef.current.applyOptions({ price: tick.mid }); return; }
+    // Transform chart types (Heikin Ashi / Renko / Line Break / Kagi / P&F /
+    // Range Bars) derive every bar from the whole series, so an isolated
+    // update would drift — recompute from source bars on every tick.
+    if (TRANSFORM_CHART_TYPES.has(chartType)) { loadChartData(); if (priceLineRef.current) priceLineRef.current.applyOptions({ price: tick.mid }); return; }
 
     if (currentBar.time > lastBarTimeRef.current) { loadChartData(); }
     else {
@@ -1042,6 +1278,7 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
       barSeriesRef.current.update({ time: t, open: currentBar.open, high: currentBar.high, low: currentBar.low, close: currentBar.close });
       lineSeriesRef.current.update({ time: t, value: currentBar.close });
       areaSeriesRef.current.update({ time: t, value: currentBar.close });
+      baselineSeriesRef.current.update({ time: t, value: currentBar.close });
       volumeSeriesRef.current.update({ time: t, value: currentBar.volume, color: currentBar.close >= currentBar.open ? 'rgba(0,194,122,0.15)' : 'rgba(193,18,31,0.15)' });
     }
 

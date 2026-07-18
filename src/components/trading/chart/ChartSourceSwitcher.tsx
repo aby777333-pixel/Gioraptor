@@ -352,6 +352,25 @@ export default function ChartSourceSwitcher({
       showEAToast(`EA "${ea.name}" is already running on ${activeSymbol}`);
       return;
     }
+    // One EA per chart (§2): if another EA is running on this symbol, prompt to
+    // replace it or cancel — never run multiple EAs on the same chart.
+    const existing = attachedEAs.filter((a) => a.symbol === activeSymbol);
+    if (existing.length > 0) {
+      const ok = window.confirm(
+        `"${existing[0].name}" is already running on ${activeSymbol}.\n\n` +
+        `One EA per chart — replace it with "${ea.name}"?\n` +
+        `(The existing EA stops; its open positions stay for you to manage.)`
+      );
+      if (!ok) return;
+      // Detach inline (detachEA is declared later in this component — TDZ).
+      setAttachedEAs((prev) => prev.filter((x) => x.symbol !== activeSymbol));
+      for (const a of existing) {
+        if (a.instanceId) {
+          try { await createClient().from('ea_instances').delete().eq('id', a.instanceId); } catch { /* noop */ }
+        }
+      }
+      showEAToast(`EA "${existing[0].name}" replaced on ${activeSymbol}`);
+    }
     attachInFlightRef.current.add(key);
     setTimeout(() => attachInFlightRef.current.delete(key), 3000);
 

@@ -21,8 +21,13 @@ const TV_SYMBOLS: Record<string, string> = {
 
 // Shared TF label → TradingView interval code.
 const TV_INTERVALS: Record<string, string> = {
-  '1m': '1', '5m': '5', '15m': '15', '30m': '30',
-  '1H': '60', '4H': '240', '1D': 'D', '1W': 'W', '1Mo': 'M',
+  // Seconds are RAPTOR-chart-only (the free TV widget has no seconds bars) —
+  // map them to 1m here so the TV tab stays sensible if one is selected.
+  '5s': '1', '10s': '1', '15s': '1', '30s': '1',
+  '1m': '1', '2m': '2', '3m': '3', '5m': '5', '10m': '10', '15m': '15',
+  '20m': '20', '30m': '30', '45m': '45',
+  '1H': '60', '2H': '120', '3H': '180', '4H': '240', '6H': '360', '8H': '480', '12H': '720',
+  '1D': 'D', '1W': 'W', '1Mo': 'M',
 };
 
 export default function TradingViewPanel() {
