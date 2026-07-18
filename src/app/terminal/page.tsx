@@ -8,6 +8,10 @@ import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
 import RightPanel from '@/components/trading/RightPanel';
 import KeyboardShortcuts from '@/components/trading/KeyboardShortcuts';
+import dynamic from 'next/dynamic';
+
+// Command palette (§30) — lazy: costs nothing until Ctrl/Cmd+K.
+const CommandPalette = dynamic(() => import('@/components/trading/CommandPalette'), { ssr: false });
 import { usePriceEngine } from '@/hooks/usePriceEngine';
 import { useTradingStore } from '@/stores/trading';
 
@@ -37,6 +41,21 @@ export default function TerminalPage() {
   const toggleRightPanel = useCallback((hide: boolean) => {
     setRightHidden(hide);
     try { localStorage.setItem('raptor_right_panel_hidden', hide ? '1' : '0'); } catch { /* ignore */ }
+  }, []);
+
+  // Command palette (§30): Ctrl/Cmd+K opens; palette commands can also
+  // toggle the right panel via this event.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const onToggleRight = () => {
+      setRightHidden((prev) => {
+        const next = !prev;
+        try { localStorage.setItem('raptor_right_panel_hidden', next ? '1' : '0'); } catch { /* ignore */ }
+        return next;
+      });
+    };
+    window.addEventListener('raptor-toggle-right-panel', onToggleRight);
+    return () => window.removeEventListener('raptor-toggle-right-panel', onToggleRight);
   }, []);
 
   // ── Resizable positions panel ──
@@ -78,6 +97,13 @@ export default function TerminalPage() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Ctrl/Cmd+K opens the command palette even from inside inputs.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -192,6 +218,9 @@ export default function TerminalPage() {
           <AccountBar />
         </div>
       </div>
+
+      {/* Command palette (§30) — Ctrl/Cmd+K */}
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
 
       {/* Blinking restore light — appears only while the right panel is
           hidden on the RAPTOR tab; clicking brings the panel back. */}

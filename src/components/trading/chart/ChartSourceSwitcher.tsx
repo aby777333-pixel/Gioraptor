@@ -89,10 +89,26 @@ export default function ChartSourceSwitcher({
 
   // NEXUS can request the RAPTOR chart (zone markers can only draw on the
   // native chart — the TradingView embed is a sealed cross-origin iframe).
+  // The command palette (§30) uses the same bridge plus a TV counterpart
+  // and open-events for the module panels.
   useEffect(() => {
     const onEnsure = () => setSource('raptor');
+    const onEnsureTv = () => setSource('tradingview');
+    const onOpenInsights = () => setInsightsOpen(true);
+    const onOpenRisk = () => setRiskOpen(true);
+    const onOpenJournal = () => setJournalOpen(true);
     window.addEventListener('nexus-ensure-raptor', onEnsure);
-    return () => window.removeEventListener('nexus-ensure-raptor', onEnsure);
+    window.addEventListener('raptor-ensure-tradingview', onEnsureTv);
+    window.addEventListener('raptor-open-insights', onOpenInsights);
+    window.addEventListener('raptor-open-risk', onOpenRisk);
+    window.addEventListener('raptor-open-journal', onOpenJournal);
+    return () => {
+      window.removeEventListener('nexus-ensure-raptor', onEnsure);
+      window.removeEventListener('raptor-ensure-tradingview', onEnsureTv);
+      window.removeEventListener('raptor-open-insights', onOpenInsights);
+      window.removeEventListener('raptor-open-risk', onOpenRisk);
+      window.removeEventListener('raptor-open-journal', onOpenJournal);
+    };
   }, []);
 
   // ── EA attach lifecycle ─────────────────────────

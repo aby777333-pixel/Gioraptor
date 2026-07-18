@@ -353,8 +353,8 @@ export function NexusGlobal() {
   useEffect(() => {
     const onAsk = (e: Event) => {
       const q = (e as CustomEvent<{ question?: string }>).detail?.question;
-      if (!q) return;
       askRef.current.open();
+      if (!q) return; // open-only (command palette "Open NEXUS")
       setTimeout(() => { void askRef.current.send(q); }, 250);
     };
     window.addEventListener('nexus-ask', onAsk);
