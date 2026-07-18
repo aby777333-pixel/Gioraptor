@@ -913,6 +913,40 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
     chartRef.current?.timeScale().applyOptions({ secondsVisible: /^\d+s$/.test(selectedTf) });
   }, [selectedTf]);
 
+  // NEXUS chart markers (§16): entry-zone levels as distinct, removable
+  // price lines. Never touches or deletes trader drawings; cleared on
+  // symbol change or via nexus-clear-zone.
+  const nexusZoneLinesRef = useRef<Array<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>>>([]);
+  useEffect(() => {
+    const clearLines = () => {
+      for (const pl of nexusZoneLinesRef.current) { try { candleSeriesRef.current?.removePriceLine(pl); } catch { /* noop */ } }
+      nexusZoneLinesRef.current = [];
+    };
+    const onMark = (e: Event) => {
+      const d = (e as CustomEvent<{ symbol: string; levels: { price: number; label: string; color: string }[] }>).detail;
+      if (!d || d.symbol !== activeSymbol || !candleSeriesRef.current) return;
+      clearLines();
+      for (const lv of d.levels) {
+        try {
+          nexusZoneLinesRef.current.push(candleSeriesRef.current.createPriceLine({
+            price: lv.price, color: lv.color, lineWidth: 1 as const, lineStyle: LineStyle.LargeDashed,
+            lineVisible: true, axisLabelVisible: true, title: lv.label,
+            axisLabelColor: lv.color, axisLabelTextColor: '#ffffff',
+          }));
+        } catch { /* noop */ }
+      }
+      window.dispatchEvent(new CustomEvent('nexus-zone-marked', { detail: { count: nexusZoneLinesRef.current.length } }));
+    };
+    const onClear = () => { clearLines(); window.dispatchEvent(new CustomEvent('nexus-zone-marked', { detail: { count: 0 } })); };
+    window.addEventListener('nexus-mark-zone', onMark);
+    window.addEventListener('nexus-clear-zone', onClear);
+    return () => {
+      window.removeEventListener('nexus-mark-zone', onMark);
+      window.removeEventListener('nexus-clear-zone', onClear);
+      clearLines();
+    };
+  }, [activeSymbol]);
+
   // ─── Indicator series helpers ────────────────────
 
   const getOrCreateLineSeries = useCallback((key: string, color: string, scaleId?: string, lineWidth: number = 1): ISeriesApi<'Line'> => {

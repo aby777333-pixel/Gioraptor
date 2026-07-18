@@ -11,6 +11,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@anthropic-ai/sdk@~0.112.3",
         "npm:@hookform/resolvers@^5.2.2",
         "npm:@netlify/plugin-nextjs@^5.15.9",
         "npm:@supabase/ssr@0.10",

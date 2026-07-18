@@ -120,6 +120,18 @@ function generateIntelligentFallback(input: string, history: { role: string; con
     const quoteLines = contextText.split('\n').filter((l) => /: bid /.test(l)).map((l) => l.trim());
     const positionLines = contextText.split('\n').filter((l) => /floating P&L/.test(l)).map((l) => l.trim());
 
+    if (/(trade (setups|ideas)|scan (the )?market|opportunit|best setups|what should i trade)/.test(lower)) {
+      const scanLine = (contextText.match(/Opportunity scan \(real bars[^\n]+/) || [null])[0];
+      if (scanLine) {
+        if (scanLine.includes('no trending setups')) {
+          return `**Market scan complete** — ${scanLine.replace(/^Opportunity scan \(real bars, /, '').replace(/\):/, ' symbols):')}\n\nNo setups is a real answer: forcing trades in range-bound conditions is negative expectancy. I\'ll keep watching — the Active monitor will flag regime changes.\n\n⚠️ Evidence-based scan of live platform bars, not advice.`;
+        }
+        const [rankedPart, tail] = scanLine.replace(/^Opportunity scan \(real bars, \d+ symbols\): /, '').split(/\.\s+(?=\d+ symbol)/);
+        return `**Ranked opportunities** (live scan of your streamed symbols, confidence-sorted):\n\n${rankedPart.split(' | ').map((r) => `• ${r}`).join('\n')}\n\n${tail ?? ''}\n\nEach is a zone-based plan with a stop and invalidation — ask "entry zone" with that symbol active for the full breakdown.\n\n⚠️ Ranked by evidence, never guaranteed. Size every trade so the stop is survivable.`;
+      }
+      return 'I scan for setups using real chart data on the **terminal** page. Open the terminal and ask again — I\'ll rank every streamed symbol.';
+    }
+
     if (/(entry zone|best entry|where.*(enter|entry)|good entry)/.test(lower)) {
       const zoneLine = (contextText.match(/Entry-zone assessment for [^\n]+/) || [null])[0];
       if (zoneLine) {

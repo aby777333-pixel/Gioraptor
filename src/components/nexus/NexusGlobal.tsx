@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NexusOrb } from '@/components/nexus/NexusOrb';
@@ -41,8 +41,9 @@ const EXCLUDED_PATHS = [
   '/developer', '/onboarding', '/sandbox', '/status',
 ];
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS: { label: string; prompt: string; icon: ReactNode; special?: 'mark-zone' }[] = [
   { label: 'Entry Zone', prompt: 'Where is the best entry zone for my active symbol right now?', icon: <Target className="h-3 w-3" /> },
+  { label: 'Mark Zone on Chart', prompt: '', special: 'mark-zone', icon: <Target className="h-3 w-3" /> },
   { label: 'Manage Trades', prompt: 'Should I hold or exit my open positions? Give me management suggestions.', icon: <Shield className="h-3 w-3" /> },
   { label: 'Market State', prompt: 'What is the current market state for my active symbol?', icon: <TrendingUp className="h-3 w-3" /> },
   { label: 'Trade Ideas', prompt: 'Give me 3 trade setups right now', icon: <Lightbulb className="h-3 w-3" /> },
@@ -283,6 +284,47 @@ export function NexusGlobal() {
     }
   };
 
+  // §16: draw the computed entry zone directly on the RAPTOR chart as
+  // NEXUS price lines (entry / stop / T1 / T2). ChartPanel acks with a
+  // nexus-zone-marked event so the confirmation is honest, not assumed.
+  const handleMarkZone = async () => {
+    if (isTyping) return;
+    setIsTyping(true);
+    try {
+      const ctx = await buildNexusContext();
+      const z = ctx.entryZone;
+      const say = (text: string) =>
+        setChatMessages(prev => [...prev, { id: `n-${Date.now()}`, role: 'nexus', text, timestamp: new Date().toISOString() }]);
+      if (z && 'direction' in z) {
+        let count = 0;
+        const ack = (e: Event) => { count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0; };
+        window.addEventListener('nexus-zone-marked', ack);
+        window.dispatchEvent(new CustomEvent('nexus-mark-zone', {
+          detail: {
+            symbol: z.symbol,
+            levels: [
+              { price: z.preferred, label: `NEXUS ${z.direction} entry`, color: '#8b5cf6' },
+              { price: z.stop, label: 'NEXUS stop', color: '#ef4444' },
+              { price: z.target1, label: 'NEXUS T1', color: '#00dc82' },
+              { price: z.target2, label: 'NEXUS T2', color: '#00b47f' },
+            ],
+          },
+        }));
+        await new Promise(r => setTimeout(r, 150));
+        window.removeEventListener('nexus-zone-marked', ack);
+        say(count > 0
+          ? `Zone marked on the RAPTOR chart for ${z.symbol} — ${count} levels drawn: ${z.direction} entry ${z.preferred}, stop ${z.stop}, targets ${z.target1} / ${z.target2} (confidence ${z.confidence}%). Your own drawings are untouched; the markers clear when you switch symbols. ⚠️ Levels come from live platform bars — a plan, not a promise.`
+          : `I computed a ${z.direction} zone for ${z.symbol} (entry ${z.preferred}, stop ${z.stop}) but no RAPTOR chart acknowledged the markers — make sure the RAPTOR Chart tab is open on the terminal, then try again.`);
+      } else if (z && 'reason' in z) {
+        say(`No zone to mark right now: ${z.reason} I won't draw levels I can't defend with evidence.`);
+      } else {
+        say('I can only mark zones on the terminal page, where the live bar engine runs. Open the terminal and try again.');
+      }
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const handleSend = async (text: string) => {
     if (!text.trim() || isTyping) return;
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text: text.trim(), timestamp: new Date().toISOString() };
@@ -507,7 +549,7 @@ export function NexusGlobal() {
                   {QUICK_ACTIONS.map(qa => (
                     <button
                       key={qa.label}
-                      onClick={() => handleSend(qa.prompt)}
+                      onClick={() => (qa.special === 'mark-zone' ? handleMarkZone() : handleSend(qa.prompt))}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-[10px] text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-colors whitespace-nowrap shrink-0"
                     >
                       {qa.icon}

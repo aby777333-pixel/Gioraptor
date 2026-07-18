@@ -31,6 +31,12 @@ export interface NexusContext {
   entryZone: (EntryZoneAssessment | NoSetupAssessment) | null;
   /** §6 per-position management assessments (terminal only). */
   positionNotes: { symbol: string; direction: string; headline: string; action: string; reasons: string[] }[];
+  /** §15 opportunity scan across all streamed symbols (terminal only). */
+  opportunities: {
+    ranked: { symbol: string; direction: string; preferred: number; stop: number; target1: number; riskReward1: number; confidence: number; state: string }[];
+    rangeBound: number;
+    scanned: number;
+  } | null;
 }
 
 export interface NexusPerformance {
@@ -138,6 +144,34 @@ export async function buildNexusContext(): Promise<NexusContext> {
       }
     } catch { /* classification optional */ }
   }
+  // §15: opportunity scan — classify EVERY streamed symbol and rank the
+  // trending setups by confidence. Range-bound symbols are counted honestly
+  // rather than forced into fake setups.
+  let opportunities: NexusContext['opportunities'] = null;
+  if (builder && quotes.length > 0) {
+    const ranked: NonNullable<NexusContext['opportunities']>['ranked'] = [];
+    let rangeBound = 0;
+    for (const q of quotes) {
+      try {
+        const bars = builder.getAllBars(q.symbol, '60');
+        const ms = classifyMarketState(bars);
+        if (!ms) continue;
+        const zone = computeEntryZone(q.symbol, bars, ms, (q.bid + q.ask) / 2);
+        if ('direction' in zone) {
+          ranked.push({
+            symbol: q.symbol, direction: zone.direction,
+            preferred: zone.preferred, stop: zone.stop, target1: zone.target1,
+            riskReward1: zone.riskReward1, confidence: zone.confidence, state: ms.state,
+          });
+        } else {
+          rangeBound++;
+        }
+      } catch { /* skip symbol */ }
+    }
+    ranked.sort((a, b) => b.confidence - a.confidence);
+    opportunities = { ranked: ranked.slice(0, 5), rangeBound, scanned: quotes.length };
+  }
+
   // §6: reassess every open position against its own symbol's current regime.
   if (builder) {
     for (const p of positions) {
@@ -161,6 +195,7 @@ export async function buildNexusContext(): Promise<NexusContext> {
     performance,
     entryZone,
     positionNotes,
+    opportunities,
   };
 }
 
@@ -197,6 +232,14 @@ export function contextToText(ctx: NexusContext): string {
   }
   for (const n of ctx.positionNotes) {
     lines.push(`Position management (${n.direction} ${n.symbol}): ${n.headline} — ${n.action} Reasons: ${n.reasons.join(' | ')}`);
+  }
+  if (ctx.opportunities) {
+    const o = ctx.opportunities;
+    if (o.ranked.length > 0) {
+      lines.push(`Opportunity scan (real bars, ${o.scanned} symbols): ${o.ranked.map((r, i) => `${i + 1}. ${r.symbol} ${r.direction} — preferred ${r.preferred}, stop ${r.stop}, T1 ${r.target1}, R:R ${r.riskReward1}, confidence ${r.confidence}%, regime ${r.state}`).join(' | ')}. ${o.rangeBound} symbol(s) range-bound with no trend setup.`);
+    } else {
+      lines.push(`Opportunity scan (real bars, ${o.scanned} symbols): no trending setups right now — ${o.rangeBound} symbol(s) are range-bound/choppy.`);
+    }
   }
   if (ctx.performance) {
     const p = ctx.performance;
