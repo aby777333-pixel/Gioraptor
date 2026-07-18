@@ -344,6 +344,23 @@ export function NexusGlobal() {
     setIsTyping(false);
   };
 
+  // Other modules (e.g. the Trade Journal's "NEXUS review") can hand a
+  // question to NEXUS: open the panel and send it. Ref keeps the listener
+  // stable while always calling the latest handlers. NOTE: declared BELOW
+  // handleOpen/handleSend on purpose (TDZ).
+  const askRef = useRef({ open: handleOpen, send: handleSend });
+  askRef.current = { open: handleOpen, send: handleSend };
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = (e as CustomEvent<{ question?: string }>).detail?.question;
+      if (!q) return;
+      askRef.current.open();
+      setTimeout(() => { void askRef.current.send(q); }, 250);
+    };
+    window.addEventListener('nexus-ask', onAsk);
+    return () => window.removeEventListener('nexus-ask', onAsk);
+  }, []);
+
   return (
     <>
       {/* NEXUS Orb */}
