@@ -8,8 +8,9 @@
 // via the raptor-apply-template event.
 
 import { useEffect, useRef, useState } from 'react';
-import { LayoutTemplate, Plus, Trash2, ChevronDown, Download, Check } from 'lucide-react';
+import { LayoutTemplate, Plus, Trash2, ChevronDown, Download, Check, Cloud } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
+import { createClient } from '@/lib/supabase/client';
 import HeaderPortal from './HeaderPortal';
 
 interface ChartTemplate {
@@ -20,6 +21,8 @@ interface ChartTemplate {
   chartType: string;
   indicators: string[];
   createdAt: number;
+  /** Set when the template lives in Supabase (cloud-synced, follows the account). */
+  cloudId?: string;
 }
 
 const KEY = 'raptor_chart_templates';
@@ -40,18 +43,54 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<ChartTemplate[]>([]);
   const [name, setName] = useState('');
+  const [signedIn, setSignedIn] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setTemplates(load()); }, []);
+  // Load local templates, then (when signed in) merge the account's cloud
+  // templates on top. Signed-out or offline keeps working from localStorage.
+  useEffect(() => {
+    setTemplates(load());
+    let active = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !active) return;
+        setSignedIn(true);
+        const { data } = await supabase
+          .from('chart_templates')
+          .select('id, name, symbol, timeframe, chart_type, indicators, created_at')
+          .order('created_at', { ascending: false });
+        if (!data || !active) return;
+        const cloud: ChartTemplate[] = data.map((r) => ({
+          id: `cloud-${r.id}`,
+          cloudId: r.id as string,
+          name: r.name as string,
+          symbol: r.symbol as string,
+          timeframe: r.timeframe as string,
+          chartType: (r.chart_type as string) ?? 'candlestick',
+          indicators: Array.isArray(r.indicators) ? (r.indicators as string[]) : [],
+          createdAt: new Date(r.created_at as string).getTime(),
+        }));
+        setTemplates((prev) => [
+          ...cloud,
+          ...prev.filter((t) => !t.cloudId && !cloud.some((c) => c.name === t.name && c.symbol === t.symbol && c.timeframe === t.timeframe)),
+        ]);
+      } catch { /* signed-out / offline — local templates still work */ }
+    })();
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  // Only local (non-cloud) templates are cached in localStorage; cloud rows
+  // live in Supabase and re-merge on load.
   const persist = (next: ChartTemplate[]) => {
     setTemplates(next);
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    try { localStorage.setItem(KEY, JSON.stringify(next.filter((t) => !t.cloudId))); } catch { /* ignore */ }
   };
 
   const saveCurrent = () => {
@@ -67,7 +106,27 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
     };
     persist([t, ...templates]);
     setName('');
-    onToast(`Template saved: ${nm}`);
+    // Signed in → also sync to the account (cloud). Fire-and-forget with
+    // an honest toast either way.
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { onToast(`Template saved locally: ${nm}`); return; }
+        const { data, error } = await supabase
+          .from('chart_templates')
+          .insert({ user_id: user.id, name: nm, symbol: t.symbol, timeframe: t.timeframe, chart_type: t.chartType, indicators: t.indicators })
+          .select('id')
+          .single();
+        if (error || !data) { onToast(`Template saved locally: ${nm} (cloud sync failed)`); return; }
+        setTemplates((prev) => {
+          const next = prev.map((x) => (x.id === t.id ? { ...x, cloudId: data.id as string, id: `cloud-${data.id}` } : x));
+          try { localStorage.setItem(KEY, JSON.stringify(next.filter((x) => !x.cloudId))); } catch { /* ignore */ }
+          return next;
+        });
+        onToast(`Template saved to your account: ${nm}`);
+      } catch { onToast(`Template saved locally: ${nm}`); }
+    })();
   };
 
   const apply = (t: ChartTemplate) => {
@@ -81,7 +140,16 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
     setOpen(false);
   };
 
-  const remove = (id: string) => persist(templates.filter((t) => t.id !== id));
+  const remove = (id: string) => {
+    const t = templates.find((x) => x.id === id);
+    persist(templates.filter((x) => x.id !== id));
+    if (t?.cloudId) {
+      (async () => {
+        try { await createClient().from('chart_templates').delete().eq('id', t.cloudId); }
+        catch { /* row stays in cloud; re-merges next load */ }
+      })();
+    }
+  };
 
   return (
     <div className="relative ml-1" ref={ref}>
@@ -97,7 +165,12 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
         <div className="w-[300px] rounded-lg border shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}>
           {/* Save current */}
           <div className="border-b p-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-            <div className="mb-1.5 text-[10px] uppercase tracking-wide text-white/35">Save current view</div>
+            <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-white/35">
+              <span>Save current view</span>
+              <span className="flex items-center gap-1 normal-case" style={{ color: signedIn ? '#0091D5' : 'rgba(255,255,255,0.25)' }}>
+                <Cloud size={10} /> {signedIn ? 'syncs to account' : 'local only'}
+              </span>
+            </div>
             <div className="mb-2 flex items-center gap-2 text-[10px] text-white/50">
               <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-white/70">{activeSymbol}</span>
               <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-white/70">{activeTimeframe}</span>
@@ -128,6 +201,7 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[11px] font-semibold text-white">{t.name}</span>
+                      {t.cloudId && <Cloud size={10} className="shrink-0 text-[#0091D5]" aria-label="Synced to your account" />}
                       {isCurrent && <Check size={10} className="shrink-0 text-[#00C27A]" />}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/40">
