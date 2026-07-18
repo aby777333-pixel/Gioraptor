@@ -8,6 +8,8 @@
 
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
+import { getOhlcvBuilder } from '@/lib/nexus/market-data-bridge';
+import { classifyMarketState, marketStateToText, type MarketStateAssessment } from '@/lib/nexus/market-state';
 
 export interface NexusContext {
   activeSymbol: string | null;
@@ -18,6 +20,9 @@ export interface NexusContext {
     sl: number | null; tp: number | null;
   }[];
   accountConnected: boolean;
+  /** Real bar-based classification — only present when the terminal's bar
+   *  builder is available on this page (never fabricated elsewhere). */
+  marketState: (MarketStateAssessment & { symbol: string; timeframe: string }) | null;
 }
 
 export async function buildNexusContext(): Promise<NexusContext> {
@@ -45,11 +50,23 @@ export async function buildNexusContext(): Promise<NexusContext> {
     } catch { /* positions unavailable — report honestly as none */ }
   }
 
+  // Market-state classification from REAL bars (terminal page only).
+  let marketState: NexusContext['marketState'] = null;
+  const builder = getOhlcvBuilder();
+  if (builder && state.activeSymbol) {
+    try {
+      const bars = builder.getAllBars(state.activeSymbol, '60');
+      const ms = classifyMarketState(bars);
+      if (ms) marketState = { ...ms, symbol: state.activeSymbol, timeframe: 'H1' };
+    } catch { /* classification optional */ }
+  }
+
   return {
     activeSymbol: state.activeSymbol ?? null,
     quotes,
     positions,
     accountConnected,
+    marketState,
   };
 }
 
@@ -72,6 +89,9 @@ export function contextToText(ctx: NexusContext): string {
     for (const p of ctx.positions) {
       lines.push(`  ${p.direction} ${p.size} ${p.symbol} @ ${p.openPrice} → now ${p.currentPrice}, floating P&L ${p.floatingPnl >= 0 ? '+' : ''}${p.floatingPnl.toFixed(2)}, SL ${p.sl ?? '—'}, TP ${p.tp ?? '—'}`);
     }
+  }
+  if (ctx.marketState) {
+    lines.push(marketStateToText(ctx.marketState.symbol, ctx.marketState.timeframe, ctx.marketState));
   }
   return lines.join('\n');
 }

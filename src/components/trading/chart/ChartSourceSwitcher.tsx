@@ -35,6 +35,7 @@ import type { CustomEA } from '@/lib/trading/custom-ea';
 import EADisclaimerModal from './EADisclaimerModal';
 import { isDisclaimerAccepted, recordDisclaimerAcceptance } from '@/lib/trading/ea-disclaimer';
 import { getEntitlements } from '@/lib/trading/entitlements';
+import { registerOhlcvBuilder } from '@/lib/nexus/market-data-bridge';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import type { Resolution } from '@/lib/trading/ohlcv-builder';
 
@@ -193,6 +194,12 @@ export default function ChartSourceSwitcher({
   }, []);
 
   useEffect(() => () => runtimeRef.current?.detachAll(), []);
+
+  // Bridge the terminal's real bar builder to NEXUS (market-state engine).
+  useEffect(() => {
+    registerOhlcvBuilder(ohlcvBuilder);
+    return () => registerOhlcvBuilder(null);
+  }, [ohlcvBuilder]);
 
   useEffect(() => {
     let active = true;

@@ -120,6 +120,18 @@ function generateIntelligentFallback(input: string, history: { role: string; con
     const quoteLines = contextText.split('\n').filter((l) => /: bid /.test(l)).map((l) => l.trim());
     const positionLines = contextText.split('\n').filter((l) => /floating P&L/.test(l)).map((l) => l.trim());
 
+    if (/(market state|market regime|trend right now|trending|what.?s the (trend|state))/.test(lower)) {
+      const msBlock = contextText.split('\n').filter((l) => /Market state for|State:|Evidence:|Expected scenarios/.test(l)).map((l) => l.trim());
+      if (msBlock.length > 0) {
+        const header = msBlock.find((l) => l.startsWith('Market state for')) ?? '';
+        const state = (msBlock.find((l) => l.startsWith('State:')) ?? '').replace('State: ', '');
+        const evidence = (msBlock.find((l) => l.startsWith('Evidence:')) ?? '').replace('Evidence: ', '');
+        const scenarios = (msBlock.find((l) => l.startsWith('Expected scenarios')) ?? '').replace(/Expected scenarios[^:]*: /, '');
+        return `**${header.replace(':', '')}**\n\n**Assessment:** ${state}\n\n**Evidence (real indicator readings):**\n${evidence.split(' | ').map((e) => `• ${e}`).join('\n')}\n\n**Expected scenarios (heuristic, not predictions):**\n${scenarios.split(' | ').map((s) => `• ${s}`).join('\n')}\n\n⚠️ Evidence-based AI assessment from live platform bars — markets can invalidate any scenario.`;
+      }
+      return 'I can classify the market state from real chart data when you\'re on the **terminal** page (that\'s where the live bar engine runs). Open the terminal, then ask me again.';
+    }
+
     if (/(analy[sz]e|review).*(position|risk)|open position|my positions|my risk/.test(lower)) {
       if (hasPositions) {
         return `Here are your **real open positions** right now:\n\n${positionLines.map((p) => `• ${p}`).join('\n')}\n\n**What I'd check:**\n• Any position without a stop loss (SL —) is unprotected — consider defining one at a technical level\n• Positions in the same currency direction stack correlation risk\n• If a position's floating loss exceeds ~1-2% of your account, review whether the original thesis still holds\n\n⚠️ AI analysis of your live data, not financial advice.`;

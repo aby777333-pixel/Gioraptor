@@ -37,6 +37,7 @@ const EXCLUDED_PATHS = [
 ];
 
 const QUICK_ACTIONS = [
+  { label: 'Market State', prompt: 'What is the current market state for my active symbol?', icon: <TrendingUp className="h-3 w-3" /> },
   { label: 'Trade Ideas', prompt: 'Give me 3 trade setups right now', icon: <Lightbulb className="h-3 w-3" /> },
   { label: 'Analyze Position', prompt: 'Analyze my open positions and risk', icon: <Shield className="h-3 w-3" /> },
   { label: 'SL/TP Suggestion', prompt: 'Where should my stop loss and take profit be?', icon: <Target className="h-3 w-3" /> },
@@ -110,6 +111,8 @@ export function NexusGlobal() {
   // Mandatory NEXUS User Agreement — panel content is gated until accepted.
   const [agreementAccepted, setAgreementAccepted] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Real session length for the proactive engine (marathon-session warnings).
+  const sessionStartRef = useRef<number>(Date.now());
 
   const isExcluded = EXCLUDED_PATHS.includes(pathname) || pathname.startsWith('/features/');
 
@@ -152,22 +155,34 @@ export function NexusGlobal() {
           });
         }
       } else {
-        // B2C proactive messages (mock context — replace with real data)
-        const traderMessages = evaluateTraderProactiveMessages({
-          openPositions: [],
-          sessionMinutes: 0,
-          tradesToday: 0, avgTradesPerDay: 4, consecutiveLosses: 0,
-          lastPositionSize: 0.1, avgPositionSize: 0.1,
-          currentDrawdownPct: 0, watchlist: ['EURUSD', 'XAUUSD'],
-          upcomingEvents: [], dayOfWeek: new Date().getDay(), hour: new Date().getHours(),
-        });
-        if (traderMessages.length > 0) {
-          const top = traderMessages[0];
-          setMessages(prev => {
-            if (prev.some(m => m.id === top.id)) return prev;
-            return [{ id: top.id, text: top.message, sentiment: top.sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev];
-          });
-        }
+        // B2C proactive messages driven by the trader's REAL positions.
+        // Stats the platform can't source yet (trade counts, drawdown %) are
+        // passed as neutral values that cannot trigger false alerts.
+        void (async () => {
+          try {
+            const ctx = await buildNexusContext();
+            let watchlist: string[] = [];
+            try { watchlist = JSON.parse(localStorage.getItem('raptor_watchlist_symbols') || '[]'); } catch { /* ignore */ }
+            const traderMessages = evaluateTraderProactiveMessages({
+              openPositions: ctx.positions.map(p => ({
+                symbol: p.symbol, pnl: p.floatingPnl, direction: p.direction,
+                volume: p.size, openTime: '', stopLoss: p.sl,
+              })),
+              sessionMinutes: Math.round((Date.now() - sessionStartRef.current) / 60000),
+              tradesToday: 0, avgTradesPerDay: 4, consecutiveLosses: 0,
+              lastPositionSize: 0, avgPositionSize: 0,
+              currentDrawdownPct: 0, watchlist,
+              upcomingEvents: [], dayOfWeek: new Date().getDay(), hour: new Date().getHours(),
+            });
+            if (traderMessages.length > 0) {
+              const top = traderMessages[0];
+              setMessages(prev => {
+                if (prev.some(m => m.id === top.id)) return prev;
+                return [{ id: top.id, text: top.message, sentiment: top.sentiment, timestamp: new Date().toISOString(), isDismissed: false }, ...prev];
+              });
+            }
+          } catch { /* proactive is best-effort */ }
+        })();
       }
     };
 
