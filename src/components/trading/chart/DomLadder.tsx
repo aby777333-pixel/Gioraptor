@@ -177,10 +177,10 @@ export default function DomLadder({
                     disabled={placing}
                     onClick={() => buyOrd ? cancel(buyOrd.id) : place('BUY', price)}
                     className="flex items-center justify-center rounded-sm text-[9px] font-mono transition-colors hover:brightness-125 disabled:opacity-50"
-                    style={{ backgroundColor: buyOrd ? 'rgba(0,194,122,0.35)' : 'rgba(0,194,122,0.06)', color: '#00C27A' }}
+                    style={{ backgroundColor: buyOrd ? 'rgba(0,194,122,0.35)' : 'rgba(0,194,122,0.08)', color: buyOrd ? '#00C27A' : 'rgba(0,194,122,0.55)' }}
                     title={buyOrd ? 'Cancel this working buy order' : `Buy at ${price.toFixed(digits)}`}
                   >
-                    {buyOrd ? `✕ ${buyOrd.size}` : ''}
+                    {buyOrd ? `✕ ${buyOrd.size}` : 'Buy'}
                   </button>
                   {/* Price cell */}
                   <div
@@ -200,17 +200,17 @@ export default function DomLadder({
                     disabled={placing}
                     onClick={() => sellOrd ? cancel(sellOrd.id) : place('SELL', price)}
                     className="flex items-center justify-center rounded-sm text-[9px] font-mono transition-colors hover:brightness-125 disabled:opacity-50"
-                    style={{ backgroundColor: sellOrd ? 'rgba(193,18,31,0.35)' : 'rgba(193,18,31,0.06)', color: '#FF5252' }}
+                    style={{ backgroundColor: sellOrd ? 'rgba(193,18,31,0.35)' : 'rgba(193,18,31,0.08)', color: sellOrd ? '#FF5252' : 'rgba(255,82,82,0.55)' }}
                     title={sellOrd ? 'Cancel this working sell order' : `Sell at ${price.toFixed(digits)}`}
                   >
-                    {sellOrd ? `✕ ${sellOrd.size}` : ''}
+                    {sellOrd ? `✕ ${sellOrd.size}` : 'Sell'}
                   </button>
                 </div>
               );
             })}
           </div>
           <div className="flex items-center justify-between border-t px-3 py-1.5 text-[8px] text-white/30" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-            <span>◆ your position · ✕ working order (click to cancel)</span>
+            <span>◆ position · ✕ working order · click Buy/Sell to trade (limit/stop away from market)</span>
             <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white"><X size={12} /></button>
           </div>
         </div>
