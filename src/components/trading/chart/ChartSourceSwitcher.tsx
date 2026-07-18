@@ -11,7 +11,7 @@
 // Attached EAs persist to ea_instances and render as chips on both tabs.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical, Grid3x3, ShieldCheck, NotebookPen } from 'lucide-react';
+import { Bot, ChevronDown, GripVertical, Star, Zap, Trash2, Info, RotateCcw, Eraser, Settings2, FlaskConical, Grid3x3, ShieldCheck, NotebookPen, FileCode2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Market Insights module — lazy-loaded so the terminal bundle is untouched
@@ -903,13 +903,24 @@ export default function ChartSourceSwitcher({
                 >
                   <Info size={11} />
                 </button>
-                {/* EA properties */}
+                {/* EA properties (runtime: lot / SL / TP / direction / presets) */}
                 <button
                   onClick={() => setPropsFor(a)}
                   className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
-                  title="EA properties (inputs, risk, presets)"
+                  title="EA properties (lot, SL/TP, risk, presets)"
                 >
                   <Settings2 size={11} />
+                </button>
+                {/* Full Properties window: declared Inputs + source code editor */}
+                <button
+                  onClick={() => {
+                    const full = eaList.find((e) => e.id === a.strategyId);
+                    if (full) setInfoEa({ ...full, builtin: !full.custom } as unknown as CustomEA);
+                  }}
+                  className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                  title="EA Inputs & source code — full Properties window"
+                >
+                  <FileCode2 size={11} />
                 </button>
                 {/* Strategy tester */}
                 <button
