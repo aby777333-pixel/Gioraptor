@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import type { NexusSentiment } from '@/types/nexus';
 import { evaluateTraderProactiveMessages, evaluateBrokerProactiveMessages } from '@/lib/nexus/nexus-proactive';
+import { NexusAgreementModal } from '@/components/nexus/NexusAgreementModal';
+import { isNexusAgreementAccepted, recordNexusAgreement } from '@/lib/nexus/nexus-agreement';
+import { buildNexusContext, contextToText } from '@/lib/nexus/market-context';
 
 interface NexusMessage {
   id: string;
@@ -66,11 +69,16 @@ function getContextMessage(pathname: string): NexusMessage | null {
  */
 async function callNexusAPI(userMessage: string, conversationHistory: ChatMessage[]): Promise<string> {
   try {
+    // Real platform context (live quotes + actual open positions) rides along
+    // with every message so NEXUS answers about THIS trader's situation.
+    let context = '';
+    try { context = contextToText(await buildNexusContext()); } catch { /* context optional */ }
     const res = await fetch('/api/nexus/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: userMessage,
+        context,
         history: conversationHistory.slice(-10).map(m => ({
           role: m.role === 'nexus' ? 'assistant' : 'user',
           content: m.text,
@@ -99,6 +107,8 @@ export function NexusGlobal() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  // Mandatory NEXUS User Agreement — panel content is gated until accepted.
+  const [agreementAccepted, setAgreementAccepted] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isExcluded = EXCLUDED_PATHS.includes(pathname) || pathname.startsWith('/features/');
@@ -186,6 +196,7 @@ export function NexusGlobal() {
 
   const handleOpen = () => {
     setIsPanelOpen(true);
+    setAgreementAccepted(isNexusAgreementAccepted());
     if (chatMessages.length === 0) {
       setChatMessages([{
         id: 'welcome',
@@ -241,6 +252,13 @@ export function NexusGlobal() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-[#0a0c10] border-l border-white/[0.06] z-[61] flex flex-col shadow-2xl"
             >
+              {!agreementAccepted ? (
+                <NexusAgreementModal
+                  onAgree={() => { recordNexusAgreement(); setAgreementAccepted(true); }}
+                  onDecline={() => setIsPanelOpen(false)}
+                />
+              ) : (
+              <>
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-[#8b5cf6]/5 to-[#00b4ff]/5">
                 <div className="flex items-center gap-3">
@@ -337,6 +355,8 @@ export function NexusGlobal() {
                   NEXUS provides AI analysis, not financial advice. Trading involves risk.
                 </p>
               </div>
+              </>
+              )}
             </motion.div>
           </>
         )}

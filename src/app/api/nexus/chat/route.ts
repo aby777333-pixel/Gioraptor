@@ -1,12 +1,17 @@
 // ═══════════════════════════════════════════════════════════
 // GIO RAPTOR — NEXUS Chat API (Real Claude Integration)
-// Proxies to Anthropic Claude API — no key exposure to client
+// Proxies to the Anthropic API via the official SDK — no key exposure to the
+// client. The client sends a live platform context block (real quotes, real
+// open positions) which is appended to the system prompt so NEXUS answers
+// about THIS trader's actual situation. Without an ANTHROPIC_API_KEY, the
+// fallback engine uses the same context so answers stay data-grounded.
 // ═══════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-opus-4-8';
 
 const NEXUS_SYSTEM_PROMPT = `You are NEXUS, the AI trading companion built into GIO RAPTOR — an institutional-grade brokerage platform.
 
@@ -43,23 +48,22 @@ PERSONALITY:
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { message, history } = body;
+  const { message, history, context } = body;
 
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message required' }, { status: 400 });
   }
+  const contextText = typeof context === 'string' ? context.slice(0, 4000) : '';
 
-  // If no API key configured, use intelligent fallback
+  // If no API key configured, use the data-grounded fallback
   if (!ANTHROPIC_API_KEY) {
-    const fallback = generateIntelligentFallback(message, history ?? []);
+    const fallback = generateIntelligentFallback(message, history ?? [], contextText);
     return NextResponse.json({ response: fallback });
   }
 
   try {
     // Build messages array from history
-    const messages = [];
-
-    // Add conversation history
+    const messages: Anthropic.MessageParam[] = [];
     if (Array.isArray(history)) {
       for (const h of history.slice(-10)) {
         if (h.role && h.content) {
@@ -67,50 +71,78 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-
-    // Add current message
     messages.push({ role: 'user', content: message });
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 1024,
-        system: NEXUS_SYSTEM_PROMPT,
-        messages,
-      }),
+    // Stable system prompt first, volatile live-context block appended after.
+    const system = contextText
+      ? `${NEXUS_SYSTEM_PROMPT}\n\nLIVE PLATFORM CONTEXT (real-time data from the RAPTOR platform — use it; do not invent prices or positions beyond it):\n${contextText}`
+      : NEXUS_SYSTEM_PROMPT;
+
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const response = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      system,
+      messages,
     });
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      console.error('[NEXUS] Claude API error:', res.status, errData);
-      const fallback = generateIntelligentFallback(message, history ?? []);
-      return NextResponse.json({ response: fallback, fallback: true });
-    }
-
-    const data = await res.json();
-    const responseText = data.content?.[0]?.text ?? 'I received your message but couldn\'t generate a response.';
+    const textBlock = response.content.find((b) => b.type === 'text');
+    const responseText = textBlock && 'text' in textBlock
+      ? textBlock.text
+      : 'I received your message but couldn\'t generate a response.';
 
     return NextResponse.json({ response: responseText });
   } catch (err) {
-    console.error('[NEXUS] API call failed:', err);
-    const fallback = generateIntelligentFallback(message, history ?? []);
+    if (err instanceof Anthropic.APIError) {
+      console.error('[NEXUS] Claude API error:', err.status, err.message);
+    } else {
+      console.error('[NEXUS] API call failed:', err);
+    }
+    const fallback = generateIntelligentFallback(message, history ?? [], contextText);
     return NextResponse.json({ response: fallback, fallback: true });
   }
 }
 
 /**
- * Intelligent fallback when Claude API is unavailable
- * Actually understands context and gives varied, useful responses
+ * Intelligent fallback when Claude API is unavailable.
+ * Data-grounded: when the client supplied live platform context (real quotes,
+ * real open positions), position/risk/briefing/SLTP questions are answered
+ * from that data instead of generic templates.
  */
-function generateIntelligentFallback(input: string, history: { role: string; content: string }[]): string {
+function generateIntelligentFallback(input: string, history: { role: string; content: string }[], contextText = ''): string {
   const lower = input.toLowerCase().trim();
   const isFollowUp = history.length > 2;
+
+  // ── Data-grounded branches (real platform context) ──
+  if (contextText) {
+    const hasPositions = /Open positions \(\d+/.test(contextText);
+    const noAccount = contextText.includes('Trading account: not connected');
+    const quoteLines = contextText.split('\n').filter((l) => /: bid /.test(l)).map((l) => l.trim());
+    const positionLines = contextText.split('\n').filter((l) => /floating P&L/.test(l)).map((l) => l.trim());
+
+    if (/(analy[sz]e|review).*(position|risk)|open position|my positions|my risk/.test(lower)) {
+      if (hasPositions) {
+        return `Here are your **real open positions** right now:\n\n${positionLines.map((p) => `• ${p}`).join('\n')}\n\n**What I'd check:**\n• Any position without a stop loss (SL —) is unprotected — consider defining one at a technical level\n• Positions in the same currency direction stack correlation risk\n• If a position's floating loss exceeds ~1-2% of your account, review whether the original thesis still holds\n\n⚠️ AI analysis of your live data, not financial advice.`;
+      }
+      if (noAccount) {
+        return 'I checked the platform: **no trading account is connected on this page**, so I can\'t see open positions. Sign in and open the terminal, then ask me again and I\'ll analyze your actual positions with live data.';
+      }
+      return 'I checked your account: **no open positions right now.** Flat is a position too — often the best one. Want me to look at the current market quotes instead?';
+    }
+
+    if (/(market brief|briefing|market today|market overview|what.?s moving)/.test(lower) && quoteLines.length > 0) {
+      return `**Live market snapshot** (real-time platform feed):\n\n${quoteLines.slice(0, 10).map((q) => `• ${q}`).join('\n')}\n\nAsk me about any of these symbols and I\'ll go deeper — or open the RAPTOR chart to see structure and indicators.\n\n⚠️ Live data, AI commentary — not financial advice.`;
+    }
+
+    if (/(stop loss|sl\b|take profit|tp\b|sl\/tp)/.test(lower)) {
+      const active = (contextText.match(/Active chart symbol: (\S+)/) || [])[1];
+      const activeQuote = quoteLines.find((q) => active && q.startsWith(active));
+      const quotePart = activeQuote
+        ? `Your active symbol is **${active}** — live quote: ${activeQuote.replace(`${active}: `, '')}.\n\n`
+        : '';
+      return `${quotePart}**How I'd place SL/TP from here:**\n• Put the stop beyond a real technical level (recent swing high/low, or 1.5–2× ATR(14) from entry) — not a fixed pip count\n• Size the position so that stop = 1–2% of account risk\n• Target at least 1.5:1 reward-to-risk; the platform's Strategy Tester → Optimization tab can sweep SL/TP multipliers on real history for any EA\n\n⚠️ Framework, not a recommendation — your entry and timeframe determine the exact levels.`;
+    }
+  }
 
   // Greetings
   if (/^(hi|hey|hello|yo|sup|good morning|good evening|gm)\b/i.test(lower)) {
