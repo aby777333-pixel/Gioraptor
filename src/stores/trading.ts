@@ -54,6 +54,12 @@ interface TradingState {
   // Order ticket
   orderDirection: 'BUY' | 'SELL';
   setOrderDirection: (dir: 'BUY' | 'SELL') => void;
+
+  // 1-Click Trading — shared by the RAPTOR chart toolbar and the QuickTrade
+  // panel so both switches always act in unison. ON = orders skip the
+  // confirmation dialog.
+  oneClickTrading: boolean;
+  setOneClickTrading: (on: boolean) => void;
 }
 
 export const useTradingStore = create<TradingState>((set) => ({
@@ -112,4 +118,7 @@ export const useTradingStore = create<TradingState>((set) => ({
 
   orderDirection: 'BUY',
   setOrderDirection: (dir) => set({ orderDirection: dir }),
+
+  oneClickTrading: false,
+  setOneClickTrading: (on) => set({ oneClickTrading: on }),
 }));

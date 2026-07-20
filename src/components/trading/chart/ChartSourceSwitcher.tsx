@@ -71,7 +71,7 @@ export default function ChartSourceSwitcher({
   onSourceChange?: (source: 'tradingview' | 'raptor') => void;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
-  const { activeSymbol, prices, activeAccountId, accountSummary, triggerRefresh, setActiveSymbol } = useTradingStore();
+  const { activeSymbol, prices, activeAccountId, accountSummary, triggerRefresh, setActiveSymbol, oneClickTrading, setOneClickTrading } = useTradingStore();
 
   // Merged EA library (built-in + uploaded custom) + upload flow for the TV menu.
   const { all: eaList, fileInputRef, handleFile, remove: removeCustom } = useEALibrary();
@@ -330,7 +330,7 @@ export default function ChartSourceSwitcher({
     if (!t || t.bid == null || t.ask == null) { showEAToast(`No live price for ${activeSymbol}`); return; }
     if (!(size > 0)) { showEAToast('Enter a valid lot size'); return; }
     const fill = direction === 'BUY' ? t.ask : t.bid;
-    if (confirmTrade && !window.confirm(`${direction} ${size} ${activeSymbol} @ market (${fill})?`)) return;
+    if (confirmTrade && !useTradingStore.getState().oneClickTrading && !window.confirm(`${direction} ${size} ${activeSymbol} @ market (${fill})?`)) return;
     setPlacing(true);
     try {
       await orderService.placeMarketOrder({
@@ -364,7 +364,7 @@ export default function ChartSourceSwitcher({
     const direction: 'BUY' | 'SELL' = quickType.startsWith('buy') ? 'BUY' : 'SELL';
     const serviceType: 'limit' | 'stop' = quickType.includes('limit') ? 'limit' : 'stop';
     const label = quickType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    if (confirmTrade && !window.confirm(`${label} ${size} ${activeSymbol} @ ${orderPrice}?`)) return;
+    if (confirmTrade && !useTradingStore.getState().oneClickTrading && !window.confirm(`${label} ${size} ${activeSymbol} @ ${orderPrice}?`)) return;
     setPlacing(true);
     try {
       await orderService.placePendingOrder({
@@ -384,6 +384,37 @@ export default function ChartSourceSwitcher({
     }
   }, [activeSymbol, lot, quickType, quickPrice, quickStop, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
 
+  // Take Profit ladder: close a percentage of every open position on the
+  // active symbol (100% = full close via the canonical close path).
+  const takeProfitPct = useCallback(async (pct: number) => {
+    const acct = accountRef.current;
+    if (!acct) { showEAToast('Select a trading account first'); return; }
+    setPlacing(true);
+    try {
+      const positions = (await orderService.getOpenPositions(acct)) as Array<{ id: string; symbol: string; direction: string; size: number; open_price: number; current_price: number | null }>;
+      const targets = positions.filter((p) => p.symbol === activeSymbol);
+      if (!targets.length) { showEAToast(`No open ${activeSymbol} positions`); return; }
+      if (confirmTrade && !useTradingStore.getState().oneClickTrading &&
+          !window.confirm(`Take profit: close ${pct}% of ${targets.length} ${activeSymbol} position(s)?`)) return;
+      let done = 0;
+      for (const p of targets) {
+        const t = pricesRef.current[p.symbol];
+        const cp = p.direction === 'BUY' ? (t?.bid ?? p.current_price ?? p.open_price) : (t?.ask ?? p.current_price ?? p.open_price);
+        try {
+          if (pct >= 100) await orderService.closePosition(p.id, Number(cp));
+          else await orderService.partialClosePosition(p.id, Number(cp), pct / 100);
+          done++;
+        } catch { /* position may have closed in the meantime */ }
+      }
+      showEAToast(`✓ Took profit on ${done}/${targets.length} position(s) — ${pct}% closed`);
+      triggerRefresh();
+    } catch (err) {
+      showEAToast(`Take profit failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPlacing(false);
+    }
+  }, [activeSymbol, confirmTrade, showEAToast, triggerRefresh]);
+
   // Batch-close open positions (all / profitable / losing) via the real order
   // service. Closing a BUY sells at bid; closing a SELL buys at ask.
   const closeBatch = useCallback(async (mode: 'all' | 'profit' | 'loss') => {
@@ -396,7 +427,7 @@ export default function ChartSourceSwitcher({
       if (mode === 'profit') targets = positions.filter((p) => Number(p.floating_pnl) > 0);
       else if (mode === 'loss') targets = positions.filter((p) => Number(p.floating_pnl) < 0);
       if (!targets.length) { showEAToast('No matching positions to close'); return; }
-      if (confirmTrade && !window.confirm(`Close ${targets.length} position(s)${mode !== 'all' ? ` (${mode})` : ''}?`)) return;
+      if (confirmTrade && !useTradingStore.getState().oneClickTrading && !window.confirm(`Close ${targets.length} position(s)${mode !== 'all' ? ` (${mode})` : ''}?`)) return;
       let closed = 0;
       for (const p of targets) {
         const t = pricesRef.current[p.symbol];
@@ -420,7 +451,7 @@ export default function ChartSourceSwitcher({
     try {
       const orders = (await orderService.getPendingOrders(acct)) as Array<{ id: string }>;
       if (!orders.length) { showEAToast('No pending orders'); return; }
-      if (confirmTrade && !window.confirm(`Cancel ${orders.length} pending order(s)?`)) return;
+      if (confirmTrade && !useTradingStore.getState().oneClickTrading && !window.confirm(`Cancel ${orders.length} pending order(s)?`)) return;
       let n = 0;
       for (const o of orders) { try { await orderService.cancelOrder(o.id); n++; } catch { /* skip */ } }
       showEAToast(`✓ Cancelled ${n} pending order(s)`);
@@ -792,10 +823,29 @@ export default function ChartSourceSwitcher({
                   );
                 })()}
 
-                <label className="flex items-center gap-1.5 text-[10px] text-white/45">
-                  <input type="checkbox" checked={confirmTrade} onChange={(e) => setConfirmTrade(e.target.checked)} className="accent-[#0091D5]" />
-                  Confirm before execution
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-1.5 text-[10px] transition-opacity" style={{ color: 'rgba(255,255,255,0.45)', opacity: oneClickTrading ? 0.35 : 1 }}
+                    title={oneClickTrading ? '1-Click Trading is ON — confirmation is skipped' : 'Ask before every execution'}>
+                    <input type="checkbox" checked={confirmTrade} disabled={oneClickTrading} onChange={(e) => setConfirmTrade(e.target.checked)} className="accent-[#0091D5]" />
+                    Confirm before execution
+                  </label>
+                  {/* Same switch as the RAPTOR toolbar's 1-Click Trading — always in unison */}
+                  <button
+                    onClick={() => setOneClickTrading(!oneClickTrading)}
+                    title={oneClickTrading ? '1-Click Trading ON — orders execute instantly, no confirmation. Click to turn off.' : '1-Click Trading OFF — click to execute orders instantly without confirmation.'}
+                    className="flex shrink-0 items-center gap-1.5"
+                  >
+                    <span className="relative rounded-full transition-all" style={{
+                      width: 30, height: 16,
+                      background: oneClickTrading ? 'linear-gradient(180deg, rgba(0,145,213,0.7) 0%, rgba(0,145,213,0.35) 100%)' : 'rgba(255,255,255,0.12)',
+                      border: `1px solid ${oneClickTrading ? 'rgba(0,145,213,0.9)' : 'rgba(255,255,255,0.15)'}`,
+                      boxShadow: oneClickTrading ? '0 0 10px rgba(0,145,213,0.6), inset 0 1px 0 rgba(255,255,255,0.3)' : 'inset 0 1px 2px rgba(0,0,0,0.4)',
+                    }}>
+                      <span className="absolute top-[2px] rounded-full transition-all" style={{ width: 10, height: 10, left: oneClickTrading ? 16 : 2, backgroundColor: oneClickTrading ? '#fff' : 'rgba(255,255,255,0.5)' }} />
+                    </span>
+                    <span className="text-[9px] font-semibold" style={{ color: oneClickTrading ? '#0091D5' : 'rgba(255,255,255,0.4)' }}>1-Click</span>
+                  </button>
+                </div>
 
                 {/* Place button for pending order types */}
                 {quickType !== 'market' && (
@@ -817,6 +867,24 @@ export default function ChartSourceSwitcher({
 
                 {/* Manage open positions / pending orders */}
                 <div className="mt-2 border-t border-white/[0.06] pt-2">
+                  <div className="mb-1.5 text-[9px] uppercase tracking-wide text-white/30">Take profit — close % of {activeSymbol} positions</div>
+                  <div className="mb-2 grid grid-cols-5 gap-1">
+                    {[10, 25, 50, 75, 100].map((pct) => (
+                      <button key={pct}
+                        onClick={() => takeProfitPct(pct)}
+                        disabled={placing}
+                        className="rounded py-1.5 text-[9px] font-bold transition-all hover:brightness-125 disabled:opacity-50"
+                        style={{
+                          backgroundColor: pct === 100 ? 'rgba(0,194,122,0.22)' : 'rgba(0,194,122,0.10)',
+                          color: '#00C27A',
+                          border: `1px solid rgba(0,194,122,${pct === 100 ? 0.55 : 0.3})`,
+                        }}
+                        title={`Close ${pct}% of every open ${activeSymbol} position${pct === 100 ? ' (full close)' : ' — the rest keeps running'}`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
                   <div className="mb-1.5 text-[9px] uppercase tracking-wide text-white/30">Manage positions</div>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button onClick={() => closeBatch('all')} disabled={placing}

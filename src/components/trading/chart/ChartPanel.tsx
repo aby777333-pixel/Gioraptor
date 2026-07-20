@@ -555,7 +555,9 @@ export default function ChartPanel({ ohlcvBuilder, isLiveData = false }: ChartPa
   const setRaptorIndicators = useTradingStore((s) => s.setRaptorIndicators);
   const [selectedTf, setSelectedTf] = useState<string>(storeTf || '1H');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
-  const [oneClickTrading, setOneClickTrading] = useState(false);
+  // Shared with the QuickTrade panel via the store — both switches act in unison.
+  const oneClickTrading = useTradingStore((s) => s.oneClickTrading);
+  const setOneClickTrading = useTradingStore((s) => s.setOneClickTrading);
   const [activeLayout, setActiveLayout] = useState<LayoutType>('single');
 
   // Change timeframe locally AND publish to the shared store, so the RAPTOR

@@ -45,6 +45,20 @@ export const orderService = {
     return data;
   },
 
+  /** Close a fraction (0–1) of an open position; >= 1 delegates to a full
+   *  close server-side. Closing is never gated by protection rules. */
+  async partialClosePosition(positionId: string, closePrice: number, fraction: number) {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('partial_close_position', {
+      p_position_id: positionId,
+      p_close_price: closePrice,
+      p_fraction: fraction,
+    });
+    if (error) throw error;
+    invalidateDayStats();
+    return data;
+  },
+
   async modifyPosition(positionId: string, sl?: number, tp?: number) {
     const supabase = createClient();
     const { data, error } = await supabase.rpc('modify_position', {
