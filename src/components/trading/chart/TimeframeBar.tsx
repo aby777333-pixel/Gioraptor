@@ -22,7 +22,7 @@ const TIMEFRAMES: { label: string; value: string }[] = [
   { label: 'MN', value: '1Mo' },
 ];
 
-export default function TimeframeBar({ trailing }: { trailing?: React.ReactNode }) {
+export default function TimeframeBar({ middle, trailing }: { middle?: React.ReactNode; trailing?: React.ReactNode }) {
   const activeTimeframe = useTradingStore((s) => s.activeTimeframe);
   const setActiveTimeframe = useTradingStore((s) => s.setActiveTimeframe);
 
@@ -52,6 +52,7 @@ export default function TimeframeBar({ trailing }: { trailing?: React.ReactNode 
           </button>
         );
       })}
+      {middle && <div className="ml-3 flex shrink-0 items-center gap-1">{middle}</div>}
       <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
         {trailing}
         <span className="shrink-0 text-[8px] uppercase tracking-wide text-white/20">both charts</span>

@@ -42,6 +42,7 @@ import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
 import TrendSignal from './TrendSignal';
 import TraderChips from './TraderChips';
+import EdgeChips from './EdgeChips';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
 import { effectiveEngineParams, builtinInputsFor } from '@/lib/trading/ea-params';
@@ -143,7 +144,18 @@ export default function ChartSourceSwitcher({
   const [quickType, setQuickType] = useState<string>('market');
   const [quickPrice, setQuickPrice] = useState('');
   const [quickStop, setQuickStop] = useState('');
+  // Confidence Calibration tag (🎲): optional per-trade conviction — consumed
+  // by EdgeChips, which compares stated confidence with actual outcomes.
+  const [conviction, setConviction] = useState<number>(0);
   const quickRef = useRef<HTMLDivElement>(null);
+
+  const announceConviction = useCallback((symbol: string, direction: 'BUY' | 'SELL') => {
+    if (!conviction) return;
+    try {
+      window.dispatchEvent(new CustomEvent('raptor-conviction', { detail: { symbol, direction, conviction, ts: Date.now() } }));
+    } catch { /* ignore */ }
+    setConviction(0);
+  }, [conviction]);
   // Per-EA enable/disable (independent of the global Algo switch). Keyed by
   // `${strategyId}-${symbol}` — the same key the runtime + eaStats use. Missing = on.
   const [eaEnabled, setEaEnabled] = useState<Record<string, boolean>>({});
@@ -345,6 +357,7 @@ export default function ChartSourceSwitcher({
         comment: 'QuickTrade',
       });
       showEAToast(`✓ ${direction} ${size} ${activeSymbol} filled @ ${fill}`);
+      announceConviction(activeSymbol, direction);
       triggerRefresh();
       setQuickOpen(false);
     } catch (err) {
@@ -352,7 +365,7 @@ export default function ChartSourceSwitcher({
     } finally {
       setPlacing(false);
     }
-  }, [activeSymbol, lot, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
+  }, [activeSymbol, lot, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh, announceConviction]);
 
   // Pending order from QuickTrade (limit / stop / stop-limit) — same service
   // mapping as the order ticket; direction comes from the chosen type.
@@ -380,6 +393,7 @@ export default function ChartSourceSwitcher({
         comment: 'QuickTrade',
       });
       showEAToast(`✓ ${label} ${size} ${activeSymbol} @ ${orderPrice} placed`);
+      announceConviction(activeSymbol, direction);
       triggerRefresh();
       setQuickPrice(''); setQuickStop('');
     } catch (err) {
@@ -387,7 +401,7 @@ export default function ChartSourceSwitcher({
     } finally {
       setPlacing(false);
     }
-  }, [activeSymbol, lot, quickType, quickPrice, quickStop, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
+  }, [activeSymbol, lot, quickType, quickPrice, quickStop, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh, announceConviction]);
 
   // Take Profit ladder: close a percentage of every open position on the
   // active symbol (100% = full close via the canonical close path).
@@ -807,6 +821,28 @@ export default function ChartSourceSwitcher({
                       className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
                   </div>
                 </div>
+                {/* 🎲 Conviction tag — feeds the Confidence Calibration chip */}
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="w-10 text-[10px] text-white/45" title="How sure are you? The platform compares stated confidence with real outcomes over time.">Sure?</label>
+                  <div className="grid flex-1 grid-cols-5 gap-1">
+                    {[0, 55, 65, 75, 85].map((pct) => (
+                      <button key={pct}
+                        onClick={() => setConviction(pct)}
+                        className="rounded py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                        style={{
+                          backgroundColor: conviction === pct ? 'rgba(255,179,0,0.25)' : 'rgba(255,179,0,0.06)',
+                          color: conviction === pct ? '#FFB300' : 'rgba(255,179,0,0.5)',
+                          border: `1px solid rgba(255,179,0,${conviction === pct ? 0.6 : 0.2})`,
+                          textShadow: conviction === pct ? '0 0 6px rgba(255,179,0,0.8)' : 'none',
+                        }}
+                        title={pct === 0 ? 'No tag' : `Tag the next order as ${pct}% confident`}
+                      >
+                        {pct === 0 ? '—' : `${pct}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Market properties — pip value + margin, same math as the ticket */}
                 {(() => {
                   const lots = parseFloat(lot) || 0;
@@ -1071,10 +1107,13 @@ export default function ChartSourceSwitcher({
 
       {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
           The free space hosts the trader chips + the live trend signal beacon. */}
-      <TimeframeBar trailing={<>
-        <TraderChips ohlcvBuilder={ohlcvBuilder} />
-        <TrendSignal ohlcvBuilder={ohlcvBuilder} />
-      </>} />
+      <TimeframeBar
+        middle={<EdgeChips ohlcvBuilder={ohlcvBuilder} />}
+        trailing={<>
+          <TraderChips ohlcvBuilder={ohlcvBuilder} />
+          <TrendSignal ohlcvBuilder={ohlcvBuilder} />
+        </>}
+      />
 
       {/* Chart row: the active chart and the optional Order/Account/Tools
           side panel share this row — both sit BELOW the header + TF bars. */}

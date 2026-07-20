@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/client';
 import { protectionCheck, invalidateDayStats } from '@/lib/trading/protection';
 
+// Notify cockpit features (Session Game Plan, calibration) that an order was
+// accepted. Fire-and-forget; never affects the order path.
+function announceOrder(symbol: string, direction: 'BUY' | 'SELL', size: number) {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('raptor-order-placed', { detail: { symbol, direction, size, ts: Date.now() } }));
+    }
+  } catch { /* ignore */ }
+}
+
 export const orderService = {
   async placeMarketOrder(params: {
     accountId: string;
@@ -31,6 +41,7 @@ export const orderService = {
     });
     if (error) throw error;
     invalidateDayStats();
+    announceOrder(params.symbol, params.direction, params.size);
     return data;
   },
 
@@ -98,6 +109,7 @@ export const orderService = {
       p_comment: params.comment ?? null,
     });
     if (error) throw error;
+    announceOrder(params.symbol, params.direction, params.size);
     return data;
   },
 

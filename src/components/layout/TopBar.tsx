@@ -33,6 +33,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import VoiceTrading from '@/components/trading/VoiceTrading';
+import TopBarCockpit from '@/components/layout/TopBarCockpit';
 import AlertsPanel from '@/components/trading/alerts/AlertsPanel';
 import Logo from '@/components/Logo';
 import { useTradingStore } from '@/stores/trading';
@@ -354,8 +355,10 @@ export default function TopBar() {
         <span className="font-mono font-semibold text-[13px]">{activeSymbol}</span>
       </div>
 
-      {/* ── Spacer ── */}
-      <div className="flex-1" />
+      {/* ── Spacer — hosts the trader cockpit on the terminal ── */}
+      <div className="flex min-w-0 flex-1 items-center justify-center">
+        {pathname?.startsWith('/terminal') && <TopBarCockpit />}
+      </div>
 
       {/* ── Right side controls ── */}
       <div className="flex items-center gap-2">
