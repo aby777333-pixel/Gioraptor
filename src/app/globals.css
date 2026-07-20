@@ -455,3 +455,35 @@ body {
   to { opacity: 1; }
 }
 .gentleman .g-fade-in { animation: g-fade-in 180ms ease-out both; }
+
+/* QuickTrade "Trade" button: alternating green/red blink (one blink green,
+   the next red). Animated properties override the button's resting styles
+   while the animation runs; the open state uses a steady style instead. */
+@keyframes raptor-trade-blink {
+  0%, 42% {
+    color: #00C27A;
+    border-color: rgba(0, 194, 122, 0.85);
+    background: linear-gradient(180deg, rgba(0, 194, 122, 0.32) 0%, rgba(0, 194, 122, 0.1) 100%);
+    box-shadow: 0 0 12px rgba(0, 194, 122, 0.55), 0 0 3px rgba(0, 194, 122, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    text-shadow: 0 0 8px rgba(0, 194, 122, 0.9);
+  }
+  50%, 92% {
+    color: #FF5252;
+    border-color: rgba(255, 82, 82, 0.85);
+    background: linear-gradient(180deg, rgba(255, 82, 82, 0.32) 0%, rgba(255, 82, 82, 0.1) 100%);
+    box-shadow: 0 0 12px rgba(255, 82, 82, 0.55), 0 0 3px rgba(255, 82, 82, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    text-shadow: 0 0 8px rgba(255, 82, 82, 0.9);
+  }
+  100% {
+    color: #00C27A;
+    border-color: rgba(0, 194, 122, 0.85);
+    background: linear-gradient(180deg, rgba(0, 194, 122, 0.32) 0%, rgba(0, 194, 122, 0.1) 100%);
+    box-shadow: 0 0 12px rgba(0, 194, 122, 0.55), 0 0 3px rgba(0, 194, 122, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    text-shadow: 0 0 8px rgba(0, 194, 122, 0.9);
+  }
+}
+.raptor-trade-blink {
+  border: 1px solid rgba(0, 194, 122, 0.85);
+  color: #00C27A;
+  animation: raptor-trade-blink 2.4s ease-in-out infinite;
+}

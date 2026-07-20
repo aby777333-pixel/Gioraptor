@@ -689,8 +689,8 @@ export default function ChartSourceSwitcher({
           <button
             onClick={() => setQuickOpen((o) => !o)}
             title="QuickTrade — one-click Buy/Sell for the active symbol"
-            className={`flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-all ${quickOpen ? '' : 'animate-pulse'}`}
-            style={headerBtnStyle('trade', true)}
+            className={`flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-all ${quickOpen ? '' : 'raptor-trade-blink'}`}
+            style={quickOpen ? headerBtnStyle('trade', true) : undefined}
           >
             <Zap size={12} /> <span className="hidden 2xl:inline">Trade</span> <ChevronDown size={10} />
           </button>
