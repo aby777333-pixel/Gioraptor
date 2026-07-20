@@ -31,6 +31,7 @@ import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeec
 import { getPipSize, calcPipValue } from '@/lib/trading/ticket-math';
 import EmilGovernance from '@/components/trading/emil/EmilGovernance';
 import EmilLanguagePanel from '@/components/trading/emil/EmilLanguagePanel';
+import EmilKnowledge from '@/components/trading/emil/EmilKnowledge';
 import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
@@ -1478,6 +1479,16 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
 
               {/* ── Language & Voice: Sarvam multilingual layer (additive) ── */}
               <EmilLanguagePanel onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }} />
+
+              {/* ── 🌍 Always Learning: autonomous global knowledge engine ── */}
+              <EmilKnowledge
+                builder={builderRef.current}
+                prices={prices}
+                calendar={calendar}
+                openSymbols={(positions as unknown as Array<{ symbol: string; status?: string }>).filter((p) => (p.status ?? 'open') === 'open').map((p) => p.symbol)}
+                sarvamOk={sarvamOk === true}
+                onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }}
+              />
 
               {/* EMIL activity feed */}
               {(mode !== 'observe' || loadEmilLog().length > 0) && (
