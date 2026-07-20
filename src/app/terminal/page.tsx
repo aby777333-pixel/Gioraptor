@@ -178,19 +178,24 @@ export default function TerminalPage() {
             because its quotes come from the RAPTOR feed). Collapsible — the
             handle on its left edge hides it; a pulsing light restores it. */}
         {chartSource !== 'tradingview' && !rightHidden && (
-          <div className="relative border-l border-[var(--border)] overflow-hidden hidden xl:block">
+          <div className="relative border-l border-[var(--border)] hidden xl:block">
+            {/* Collapse handle — hangs OVER the chart edge (left of the panel
+                border) so it never covers the Order ticket's own controls. */}
             <button
               onClick={() => toggleRightPanel(true)}
-              title="Hide panel — the blinking light at the right edge brings it back"
-              className="absolute left-0 top-1/2 z-40 flex -translate-y-1/2 items-center justify-center rounded-r-md transition-colors hover:text-white"
+              title="Hide panel — the pulsing red light at the right edge brings it back"
+              className="absolute top-1/2 z-40 flex -translate-y-1/2 items-center justify-center rounded-l-lg transition-all hover:brightness-125"
               style={{
-                width: 16, height: 64,
-                backgroundColor: 'rgba(0,145,213,0.18)',
-                border: '1px solid rgba(0,145,213,0.45)', borderLeft: 'none',
-                color: '#0091D5', fontSize: 14, fontWeight: 700,
+                left: -26, width: 26, height: 96,
+                background: 'linear-gradient(180deg, rgba(255,82,82,0.4) 0%, rgba(255,82,82,0.15) 100%)',
+                border: '1px solid rgba(255,82,82,0.7)', borderRight: 'none',
+                color: '#FF5252', fontSize: 18, fontWeight: 700,
+                boxShadow: '0 0 16px rgba(255,82,82,0.55), inset 0 1px 0 rgba(255,255,255,0.2)',
+                textShadow: '0 0 8px rgba(255,82,82,0.9)',
               }}
             >
-              ›
+              <span className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 animate-ping rounded-full" style={{ backgroundColor: '#FF5252' }} />
+              <span className="animate-pulse">›</span>
             </button>
             <RightPanel />
           </div>
@@ -248,16 +253,17 @@ export default function TerminalPage() {
         <button
           onClick={() => toggleRightPanel(false)}
           title="Show Order / Account / Tools panel"
-          className="fixed right-1.5 top-1/2 z-[60] hidden -translate-y-1/2 items-center justify-center xl:flex"
+          className="fixed right-2 top-1/2 z-[60] hidden -translate-y-1/2 items-center justify-center xl:flex"
           style={{
-            width: 24, height: 24, borderRadius: '50%',
+            width: 40, height: 40, borderRadius: '50%',
             backgroundColor: 'rgba(10,15,26,0.92)',
-            border: '1px solid rgba(0,145,213,0.5)',
-            boxShadow: '0 0 12px rgba(0,145,213,0.55)',
+            border: '2px solid rgba(255,82,82,0.8)',
+            boxShadow: '0 0 22px rgba(255,82,82,0.75), 0 0 6px rgba(255,82,82,0.9), inset 0 1px 0 rgba(255,255,255,0.15)',
           }}
         >
-          <span className="absolute h-2 w-2 animate-ping rounded-full" style={{ backgroundColor: '#0091D5' }} />
-          <span className="relative h-2 w-2 rounded-full" style={{ backgroundColor: '#0091D5' }} />
+          <span className="absolute h-5 w-5 animate-ping rounded-full" style={{ backgroundColor: 'rgba(255,82,82,0.8)' }} />
+          <span className="absolute h-8 w-8 animate-ping rounded-full" style={{ backgroundColor: 'rgba(255,82,82,0.25)', animationDelay: '0.4s' }} />
+          <span className="relative h-4 w-4 animate-pulse rounded-full" style={{ backgroundColor: '#FF5252', boxShadow: '0 0 10px rgba(255,82,82,1)' }} />
         </button>
       )}
 

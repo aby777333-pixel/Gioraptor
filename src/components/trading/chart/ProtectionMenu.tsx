@@ -63,6 +63,13 @@ export default function ProtectionMenu({ onToast }: { onToast: (msg: string) => 
     });
   }, [accountId]);
 
+  // Master switch: arm or disarm every rule at once (params are kept).
+  const setAll = useCallback((on: boolean) => {
+    update((s) => {
+      (Object.keys(s) as (keyof ProtectionSettings)[]).forEach((k) => { s[k].on = on; });
+    });
+  }, [update]);
+
   // ── Always-on monitor: margin ladder + equity floor ───────────
   useEffect(() => {
     const id = setInterval(async () => {
@@ -144,6 +151,32 @@ export default function ProtectionMenu({ onToast }: { onToast: (msg: string) => 
               They gate <b>new</b> orders only — closing positions is never blocked. All order surfaces
               obey them, including EAs.
             </p>
+            {/* Master switch — arm/disarm everything, or pick rules individually below */}
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => setAll(true)}
+                className="rounded py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(0,229,160,0.35) 0%, rgba(0,229,160,0.12) 100%)',
+                  color: MINT, border: '1px solid rgba(0,229,160,0.6)',
+                  boxShadow: '0 0 10px rgba(0,229,160,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+                }}
+                title="Arm every protection rule at once (your amounts and limits are kept)"
+              >
+                🛡 ALL ON — full shield
+              </button>
+              <button
+                onClick={() => setAll(false)}
+                className="rounded py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
+                style={{
+                  backgroundColor: 'rgba(255,82,82,0.08)', color: 'rgba(255,82,82,0.8)',
+                  border: '1px solid rgba(255,82,82,0.3)',
+                }}
+                title="Disarm every rule — you trade with no self-imposed protections"
+              >
+                ALL OFF — no shield
+              </button>
+            </div>
             {lock && (
               <div className="mt-2 rounded border px-2 py-1.5 text-[10px]" style={{ borderColor: 'rgba(255,82,82,0.4)', backgroundColor: 'rgba(255,82,82,0.1)', color: '#FF5252' }}>
                 ⛔ Trading locked ~{lockHoursLeft}h — {lock.reason}

@@ -36,6 +36,7 @@ import TemplatesMenu from './TemplatesMenu';
 import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
 import ProtectionMenu from './ProtectionMenu';
+import { calcPipValue, calcMarginRequired, lotsForRiskPct, getTicketDecimals } from '@/lib/trading/ticket-math';
 import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
@@ -70,7 +71,7 @@ export default function ChartSourceSwitcher({
   onSourceChange?: (source: 'tradingview' | 'raptor') => void;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
-  const { activeSymbol, prices, activeAccountId, triggerRefresh, setActiveSymbol } = useTradingStore();
+  const { activeSymbol, prices, activeAccountId, accountSummary, triggerRefresh, setActiveSymbol } = useTradingStore();
 
   // Merged EA library (built-in + uploaded custom) + upload flow for the TV menu.
   const { all: eaList, fileInputRef, handleFile, remove: removeCustom } = useEALibrary();
@@ -132,6 +133,11 @@ export default function ChartSourceSwitcher({
   const [tpPrice, setTpPrice] = useState('');
   const [confirmTrade, setConfirmTrade] = useState(true);
   const [placing, setPlacing] = useState(false);
+  // QuickTrade order type — mirrors the order ticket's full ladder (§ticket
+  // parity): market + limit / stop / stop-limit pendings.
+  const [quickType, setQuickType] = useState<string>('market');
+  const [quickPrice, setQuickPrice] = useState('');
+  const [quickStop, setQuickStop] = useState('');
   const quickRef = useRef<HTMLDivElement>(null);
   // Per-EA enable/disable (independent of the global Algo switch). Keyed by
   // `${strategyId}-${symbol}` — the same key the runtime + eaStats use. Missing = on.
@@ -342,6 +348,41 @@ export default function ChartSourceSwitcher({
       setPlacing(false);
     }
   }, [activeSymbol, lot, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
+
+  // Pending order from QuickTrade (limit / stop / stop-limit) — same service
+  // mapping as the order ticket; direction comes from the chosen type.
+  const placeQuickPending = useCallback(async () => {
+    const acct = accountRef.current;
+    const size = parseFloat(lot);
+    const orderPrice = parseFloat(quickPrice);
+    if (!acct) { showEAToast('Select a trading account first'); return; }
+    if (!(size > 0)) { showEAToast('Enter a valid lot size'); return; }
+    if (!(orderPrice > 0)) { showEAToast('Enter a valid order price'); return; }
+    if (quickType.endsWith('stop_limit') && !(parseFloat(quickStop) > 0)) {
+      showEAToast('Enter a stop trigger price for the stop-limit order'); return;
+    }
+    const direction: 'BUY' | 'SELL' = quickType.startsWith('buy') ? 'BUY' : 'SELL';
+    const serviceType: 'limit' | 'stop' = quickType.includes('limit') ? 'limit' : 'stop';
+    const label = quickType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (confirmTrade && !window.confirm(`${label} ${size} ${activeSymbol} @ ${orderPrice}?`)) return;
+    setPlacing(true);
+    try {
+      await orderService.placePendingOrder({
+        accountId: acct, symbol: activeSymbol, direction, orderType: serviceType,
+        size, price: orderPrice,
+        sl: slPrice ? parseFloat(slPrice) : undefined,
+        tp: tpPrice ? parseFloat(tpPrice) : undefined,
+        comment: 'QuickTrade',
+      });
+      showEAToast(`✓ ${label} ${size} ${activeSymbol} @ ${orderPrice} placed`);
+      triggerRefresh();
+      setQuickPrice(''); setQuickStop('');
+    } catch (err) {
+      showEAToast(`Order failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPlacing(false);
+    }
+  }, [activeSymbol, lot, quickType, quickPrice, quickStop, slPrice, tpPrice, confirmTrade, showEAToast, triggerRefresh]);
 
   // Batch-close open positions (all / profitable / losing) via the real order
   // service. Closing a BUY sells at bid; closing a SELL buys at ask.
@@ -610,37 +651,113 @@ export default function ChartSourceSwitcher({
             return (
               <HeaderPortal open={quickOpen} anchorRef={quickRef}>
               <div
-                className="w-[260px] rounded-lg border p-3 shadow-2xl"
+                className="w-[280px] rounded-lg border p-3 shadow-2xl"
                 style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.1)' }}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-white">{activeSymbol}</span>
                   <span className="text-[9px] text-white/35">one-click · both charts</span>
                 </div>
-                <div className="mb-2 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => placeQuick('SELL')}
-                    disabled={placing}
-                    className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
-                    style={{ backgroundColor: 'rgba(193,18,31,0.15)', border: '1px solid rgba(193,18,31,0.4)' }}
+                {quickType === 'market' ? (
+                  <div className="mb-2 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => placeQuick('SELL')}
+                      disabled={placing}
+                      className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(193,18,31,0.15)', border: '1px solid rgba(193,18,31,0.4)' }}
+                    >
+                      <span className="text-[10px] font-bold uppercase" style={{ color: '#FF5252' }}>Sell</span>
+                      <span className="font-mono text-[12px] text-white">{bid != null ? bid.toFixed(digits) : '—'}</span>
+                    </button>
+                    <button
+                      onClick={() => placeQuick('BUY')}
+                      disabled={placing}
+                      className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: 'rgba(0,194,122,0.15)', border: '1px solid rgba(0,194,122,0.4)' }}
+                    >
+                      <span className="text-[10px] font-bold uppercase" style={{ color: '#00C27A' }}>Buy</span>
+                      <span className="font-mono text-[12px] text-white">{ask != null ? ask.toFixed(digits) : '—'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mb-2 grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-md py-1.5" style={{ backgroundColor: 'rgba(193,18,31,0.1)', border: '1px solid rgba(193,18,31,0.25)' }}>
+                      <div className="text-[8px] uppercase text-white/35">Bid</div>
+                      <div className="font-mono text-[12px]" style={{ color: '#FF5252' }}>{bid != null ? bid.toFixed(digits) : '—'}</div>
+                    </div>
+                    <div className="rounded-md py-1.5" style={{ backgroundColor: 'rgba(0,194,122,0.1)', border: '1px solid rgba(0,194,122,0.25)' }}>
+                      <div className="text-[8px] uppercase text-white/35">Ask</div>
+                      <div className="font-mono text-[12px]" style={{ color: '#00C27A' }}>{ask != null ? ask.toFixed(digits) : '—'}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Order type — full ticket ladder */}
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="w-10 text-[10px] text-white/45">Type</label>
+                  <select
+                    value={quickType}
+                    onChange={(e) => setQuickType(e.target.value)}
+                    className="flex-1 rounded bg-white/[0.06] px-1.5 py-1 text-[10px] text-white outline-none"
+                    style={{ border: '1px solid rgba(255,255,255,0.1)' }}
                   >
-                    <span className="text-[10px] font-bold uppercase" style={{ color: '#FF5252' }}>Sell</span>
-                    <span className="font-mono text-[12px] text-white">{bid != null ? bid.toFixed(digits) : '—'}</span>
-                  </button>
-                  <button
-                    onClick={() => placeQuick('BUY')}
-                    disabled={placing}
-                    className="flex flex-col items-center rounded-md py-2 transition-all hover:brightness-110 disabled:opacity-50"
-                    style={{ backgroundColor: 'rgba(0,194,122,0.15)', border: '1px solid rgba(0,194,122,0.4)' }}
-                  >
-                    <span className="text-[10px] font-bold uppercase" style={{ color: '#00C27A' }}>Buy</span>
-                    <span className="font-mono text-[12px] text-white">{ask != null ? ask.toFixed(digits) : '—'}</span>
-                  </button>
+                    <option value="market" style={{ backgroundColor: '#0A0F1A' }}>Market Execution</option>
+                    <option value="buy_limit" style={{ backgroundColor: '#0A0F1A' }}>Buy Limit — buy below market</option>
+                    <option value="sell_limit" style={{ backgroundColor: '#0A0F1A' }}>Sell Limit — sell above market</option>
+                    <option value="buy_stop" style={{ backgroundColor: '#0A0F1A' }}>Buy Stop — buy on breakout up</option>
+                    <option value="sell_stop" style={{ backgroundColor: '#0A0F1A' }}>Sell Stop — sell on breakdown</option>
+                    <option value="buy_stop_limit" style={{ backgroundColor: '#0A0F1A' }}>Buy Stop Limit</option>
+                    <option value="sell_stop_limit" style={{ backgroundColor: '#0A0F1A' }}>Sell Stop Limit</option>
+                  </select>
                 </div>
+                {quickType !== 'market' && (
+                  <div className="mb-2 grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[10px] text-white/45">Price</label>
+                      <input value={quickPrice} onChange={(e) => setQuickPrice(e.target.value)} placeholder="order" inputMode="decimal"
+                        className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
+                    </div>
+                    {quickType.endsWith('stop_limit') && (
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] text-white/45">Trigger</label>
+                        <input value={quickStop} onChange={(e) => setQuickStop(e.target.value)} placeholder="stop" inputMode="decimal"
+                          className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="mb-2 flex items-center gap-2">
                   <label className="w-10 text-[10px] text-white/45">Lots</label>
                   <input value={lot} onChange={(e) => setLot(e.target.value)} inputMode="decimal"
                     className="flex-1 rounded bg-white/[0.06] px-2 py-1 font-mono text-[11px] text-white outline-none" />
+                </div>
+
+                {/* Risk presets — size the lot from balance % over the SL distance */}
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="w-10 text-[10px] text-white/45">Risk</label>
+                  <div className="grid flex-1 grid-cols-4 gap-1">
+                    {([['0.5%', 0.5, '#00C27A'], ['1%', 1, '#00C27A'], ['2%', 2, '#FFB300'], ['5%', 5, '#FF5252']] as const).map(([lbl, pct, color]) => (
+                      <button key={lbl}
+                        onClick={() => {
+                          const entry = quickType === 'market'
+                            ? (quickType.startsWith('sell') ? (bid ?? 0) : (ask ?? 0))
+                            : (parseFloat(quickPrice) || ask || 0);
+                          const sized = lotsForRiskPct({
+                            symbol: activeSymbol, balance: Number(accountSummary?.balance ?? 0),
+                            pct, entryPrice: entry, sl: slPrice ? parseFloat(slPrice) : null,
+                          });
+                          if (sized == null) { showEAToast('Risk presets need an account balance'); return; }
+                          setLot(sized.toFixed(2));
+                        }}
+                        className="rounded py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                        style={{ backgroundColor: `${color}1A`, color, border: `1px solid ${color}55` }}
+                        title={`Size the lot so ~${pct}% of balance is at risk to the SL (50-pip stop assumed when SL is empty)`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <div className="flex items-center gap-1.5">
@@ -654,10 +771,49 @@ export default function ChartSourceSwitcher({
                       className="w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white placeholder:text-white/20 outline-none" />
                   </div>
                 </div>
+                {/* Market properties — pip value + margin, same math as the ticket */}
+                {(() => {
+                  const lots = parseFloat(lot) || 0;
+                  const entry = quickType === 'market' ? (ask ?? 0) : (parseFloat(quickPrice) || ask || 0);
+                  const pv = calcPipValue(activeSymbol, lots);
+                  const mg = calcMarginRequired(activeSymbol, lots, entry);
+                  const dp = getTicketDecimals(activeSymbol) <= 2 ? 2 : 2;
+                  return (
+                    <div className="mb-2 rounded px-2 py-1.5 text-[10px]" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-white/40">Pip Value</span>
+                        <span className="font-mono" style={{ color: '#0091D5' }}>1 pip = ${pv.toFixed(dp)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-white/40">Margin Required</span>
+                        <span className="font-mono text-white/80">${mg.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <label className="flex items-center gap-1.5 text-[10px] text-white/45">
                   <input type="checkbox" checked={confirmTrade} onChange={(e) => setConfirmTrade(e.target.checked)} className="accent-[#0091D5]" />
                   Confirm before execution
                 </label>
+
+                {/* Place button for pending order types */}
+                {quickType !== 'market' && (
+                  <button
+                    onClick={placeQuickPending}
+                    disabled={placing}
+                    className="mt-2 w-full rounded-md py-2 text-[11px] font-bold transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{
+                      background: quickType.startsWith('buy')
+                        ? 'linear-gradient(180deg, rgba(0,194,122,0.4) 0%, rgba(0,194,122,0.15) 100%)'
+                        : 'linear-gradient(180deg, rgba(255,82,82,0.4) 0%, rgba(255,82,82,0.15) 100%)',
+                      color: quickType.startsWith('buy') ? '#00C27A' : '#FF5252',
+                      border: `1px solid ${quickType.startsWith('buy') ? 'rgba(0,194,122,0.6)' : 'rgba(255,82,82,0.6)'}`,
+                    }}
+                  >
+                    Place {quickType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </button>
+                )}
 
                 {/* Manage open positions / pending orders */}
                 <div className="mt-2 border-t border-white/[0.06] pt-2">
