@@ -358,8 +358,9 @@ export default function TopBar() {
         {pathname?.startsWith('/terminal') && <TopBarCockpit />}
       </div>
 
-      {/* ── Right side controls ── */}
-      <div className="flex items-center gap-2">
+      {/* ── Right side controls (shrink-0: the cockpit strip must never
+             overlap these — owner rule: no overlaps anywhere) ── */}
+      <div className="flex shrink-0 items-center gap-2">
         {/* Connection status (hidden on mobile) */}
         <div className="hidden md:flex items-center gap-2 px-3 text-[12px] font-mono opacity-70">
           <span

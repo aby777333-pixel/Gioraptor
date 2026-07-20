@@ -688,8 +688,11 @@ export default function ChartSourceSwitcher({
     >
       {/* Source tabs + TV-tab EA menu */}
       <div
-        className="flex shrink-0 items-center gap-1 overflow-x-auto border-b px-2 [&>*]:shrink-0"
-        style={{ height: 30, minHeight: 30, backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', scrollbarWidth: 'none' }}
+        className="flex shrink-0 flex-wrap items-center gap-x-1 gap-y-1 border-b px-2 py-0.5 [&>*]:shrink-0"
+        /* auto-height: the row GROWS when chips wrap (owner rule: nothing
+           off-frame or overlapping) — a fixed 30px here spilled wrapped
+           chips onto the TF bar below */
+        style={{ minHeight: 30, backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
       >
         {(
           [

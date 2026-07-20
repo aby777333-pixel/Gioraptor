@@ -234,7 +234,7 @@ export const ENTITLEMENTS: Entitlement[] = [
   { section: 'FX / metals / indices / energy / crypto pricing', status: 'Live', note: 'platform feed (simulated until the real LP; same wiring carries live prices)' },
   { section: 'Economic calendar (forecast/previous/actual)', status: 'Live', note: 'licensed-free weekly feed via throttled proxy' },
   { section: 'Regimes, volatility, correlations, scanner, hedge math', status: 'Live', note: 'computed on-platform from live bars' },
-  { section: 'EMIL intelligence + Sarvam languages', status: 'Live', note: 'platform-generated + consent-gated language services' },
+  { section: 'EMIL intelligence + Lara languages', status: 'Live', note: 'platform-generated + consent-gated language services' },
   { section: 'Portfolio / execution analytics', status: 'Partial', note: 'position analytics live; fill/slippage quality needs the real LP' },
   { section: 'Equities fundamentals, earnings, corporate actions', status: 'Awaiting license', note: 'vendor slot defined; never simulated' },
   { section: 'Fixed income (bonds, curves, auctions)', status: 'Awaiting license', note: 'vendor slot defined; never simulated' },

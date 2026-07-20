@@ -2,7 +2,7 @@
 // EMIL Autonomous Global Trading Knowledge Engine — honest edition.
 // ADDITIVE: continuous background learning over the sources this
 // platform GENUINELY has (live bars/ticks, the real economic calendar,
-// Sarvam language services, EMIL's own trade/veto/forecast history).
+// Lara language services, EMIL's own trade/veto/forecast history).
 // The connector framework lists every other source category honestly as
 // NOT CONNECTED — news, filings, research, social — never simulated.
 //
@@ -74,7 +74,7 @@ export function sourceRegistry(sarvamConfigured: boolean, calendarCount: number,
   return [
     { name: 'RAPTOR platform price feed', category: 'Market data', region: 'Global', reliability: 'Official primary (simulated pricing until the real LP)', status: liveSymbols > 0 ? 'Connected' : 'Degraded', updates: 'sub-second ticks → bars on every resolution', note: `${liveSymbols} instruments quoting` },
     { name: 'Economic calendar (ForexFactory feed)', category: 'Economic calendar', region: 'Global', reliability: 'Established secondary source', status: calendarCount > 0 ? 'Connected' : 'Degraded', updates: '30-min server cache', note: `${calendarCount} events this week` },
-    { name: 'Sarvam language services', category: 'Language / translation', region: 'India', reliability: 'Verified institutional service', status: sarvamConfigured ? 'Connected' : 'Not connected', updates: 'on demand', note: sarvamConfigured ? 'translate + speech armed' : 'SARVAM_API_KEY not configured' },
+    { name: 'Lara language services', category: 'Language / translation', region: 'India', reliability: 'Verified institutional service', status: sarvamConfigured ? 'Connected' : 'Not connected', updates: 'on demand', note: sarvamConfigured ? 'translate + speech armed' : 'SARVAM_API_KEY not configured' },
     { name: 'EMIL trade / veto / forecast history', category: 'Platform-generated data', region: 'Local', reliability: 'Official primary source', status: 'Connected', updates: 'every pilot cycle', note: 'closed trades, Guardian vetoes, shadow setups, forecasts' },
     { name: 'News services', category: 'News', region: 'Global', reliability: '—', status: 'Not connected', updates: '—', note: 'awaiting licensed source — never simulated' },
     { name: 'Exchange & regulatory announcements', category: 'Official publications', region: 'Global', reliability: '—', status: 'Not connected', updates: '—', note: 'awaiting licensed source — never simulated' },

@@ -125,7 +125,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [adaptPrefs, setAdaptPrefs] = useState<AdaptPrefs>(loadAdaptPrefs);
   const [adaptGate, setAdaptGate] = useState(false);
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
-  const [sarvamOk, setSarvamOk] = useState<boolean | null>(null);
+  const [sarvamOk, setLaraOk] = useState<boolean | null>(null);
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const voiceCapRef = useRef<VoiceCapture | null>(null);
@@ -155,7 +155,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const lastEmilClosedRef = useRef<number | null>(null);    // learning: newest EMIL close seen
 
   useEffect(() => { setOnboarded(isEmilOnboarded()); }, []);
-  useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
+  useEffect(() => { sarvamHealth().then(setLaraOk); }, []);
 
   // Armed proposal from Scanner / Hedge Engine — refresh + countdown.
   useEffect(() => {
@@ -309,7 +309,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
 
   // Mission parsing pipeline — shared by typed text AND voice transcripts.
   // §Language routing: English → rule parser directly; Indian/mixed text →
-  // Sarvam translate (consented + configured) → the SAME rule parser +
+  // Lara translate (consented + configured) → the SAME rule parser +
   // read-back + explicit Apply. Never guessed; never executes on its own.
   const runMissionParse = useCallback(async (text: string) => {
     const pricesNow = useTradingStore.getState().prices;
@@ -321,7 +321,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
       const tr = await sarvamTranslate(text, route.detect.lang);
       if (tr.ok && tr.translated) {
         textToParse = tr.translated;
-        preRules.push({ label: 'Sarvam translation', detail: `“${tr.translated}” — review the read-back below before applying` });
+        preRules.push({ label: 'Lara translation', detail: `“${tr.translated}” — review the read-back below before applying` });
         langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'mission parsed' });
       } else {
         preRules.push({ label: 'Language service', detail: `${tr.error} — parsed with the English rule engine instead` });
@@ -335,7 +335,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     setMissionParse(parsed);
   }, [sarvamOk]);
 
-  // Voice command: mic → 16kHz WAV → Sarvam speech-to-text-translate →
+  // Voice command: mic → 16kHz WAV → Lara speech-to-text-translate →
   // English transcript → the same mission pipeline. Nothing executes from
   // voice alone — the read-back + Apply click are always required (§7).
   const handleVoice = useCallback(async () => {
@@ -362,8 +362,8 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
       return;
     }
     const prefs = loadLangPrefs();
-    if (!prefs.sarvamEnabled || !prefs.consentAt) { emilLog('mode', 'voice needs Sarvam enabled + consent — see the Language & Voice panel below.'); setLogTick((t) => t + 1); return; }
-    if (sarvamOk !== true) { emilLog('mode', 'voice: Sarvam is not configured on the server — voice stays off, honestly.'); setLogTick((t) => t + 1); return; }
+    if (!prefs.sarvamEnabled || !prefs.consentAt) { emilLog('mode', 'voice needs Lara enabled + consent — see the Language & Voice panel below.'); setLogTick((t) => t + 1); return; }
+    if (sarvamOk !== true) { emilLog('mode', 'voice: Lara is not configured on the server — voice stays off, honestly.'); setLogTick((t) => t + 1); return; }
     try {
       voiceCapRef.current = await startVoiceCapture();
       setRecording(true);
@@ -1052,7 +1052,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     placeholder='e.g. "Only trade gold and EURUSD. Risk no more than 0.5 percent. Stop after two losses. Lock the day at a $300 target."'
                     className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2.5 text-[13px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
                   <button onClick={handleVoice} disabled={voiceBusy}
-                    title={recording ? 'Stop recording and transcribe' : 'Voice command via Sarvam — speak English or an Indian language; EMIL reads back before anything applies'}
+                    title={recording ? 'Stop recording and transcribe' : 'Voice command via Lara — speak English or an Indian language; EMIL reads back before anything applies'}
                     className="shrink-0 rounded px-3 py-2.5 text-[12px] font-bold transition-all hover:brightness-110 disabled:opacity-40"
                     style={recording
                       ? { backgroundColor: 'rgba(255,82,82,0.2)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.7)', boxShadow: '0 0 12px rgba(255,82,82,0.5)', animation: 'pulse 1.2s infinite' }
@@ -1585,7 +1585,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 sarvamOk={sarvamOk === true}
               />
 
-              {/* ── Language & Voice: Sarvam multilingual layer (additive) ── */}
+              {/* ── Language & Voice: Lara multilingual layer (additive) ── */}
               <EmilLanguagePanel onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }} />
 
               {/* ── 🌍 Always Learning: autonomous global knowledge engine ── */}

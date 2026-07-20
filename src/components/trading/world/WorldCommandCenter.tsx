@@ -40,7 +40,7 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
   const [memQ, setMemQ] = useState('');
   const [memA, setMemA] = useState<string[]>([]);
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
-  const [sarvamOk, setSarvamOk] = useState(false);
+  const [sarvamOk, setLaraOk] = useState(false);
   const [memRecording, setMemRecording] = useState(false);
   const [memBusy, setMemBusy] = useState(false);
   const memVoiceRef = useRef<VoiceCapture | null>(null);
@@ -51,11 +51,11 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
   const universe = useMemo(() => Object.keys(prices).filter((s) => prices[s]?.bid != null), [prices]);
 
   useEffect(() => { getCalendar().then(setCalendar); }, []);
-  useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
+  useEffect(() => { sarvamHealth().then(setLaraOk); }, []);
 
   // Memory search with the SAME language routing as Mission Control:
   // native-script aliases hit directly; otherwise Indic/mixed text goes
-  // through consented Sarvam translation into the deterministic matcher.
+  // through consented Lara translation into the deterministic matcher.
   // Language processing only ever SEARCHES — it can never trade.
   const runMemorySearch = useCallback(async (text: string) => {
     if (!text.trim()) return;
@@ -66,7 +66,7 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
       const tr = await sarvamTranslate(text, route.detect.lang);
       if (tr.ok && tr.translated) {
         toSearch = tr.translated;
-        pre.push(`Translated (Sarvam): “${tr.translated}”`);
+        pre.push(`Translated (Lara): “${tr.translated}”`);
         langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'memory search' });
       } else {
         pre.push(`Language service: ${tr.error} — searched as typed (native-script instrument names still match).`);
@@ -98,8 +98,8 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
       return;
     }
     const prefs = loadLangPrefs();
-    if (!prefs.sarvamEnabled || !prefs.consentAt) { setMemA(['Voice needs Sarvam enabled + consent — see Language & Voice in the EMIL console.']); return; }
-    if (!sarvamOk) { setMemA(['Voice: Sarvam is not configured on the server — voice stays off, honestly.']); return; }
+    if (!prefs.sarvamEnabled || !prefs.consentAt) { setMemA(['Voice needs Lara enabled + consent — see Language & Voice in the EMIL console.']); return; }
+    if (!sarvamOk) { setMemA(['Voice: Lara is not configured on the server — voice stays off, honestly.']); return; }
     try { memVoiceRef.current = await startVoiceCapture(); setMemRecording(true); }
     catch { setMemA(['Voice: microphone unavailable or permission denied.']); }
   }, [sarvamOk, runMemorySearch]);
@@ -347,7 +347,7 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
             placeholder='e.g. "When did I trade gold best?" · "my losses in London" · "सोना" · "தங்கம்" · "biggest hedge"'
             className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2 text-[11px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(77,208,225,0.35)' }} />
           <button onClick={handleMemVoice} disabled={memBusy}
-            title={memRecording ? 'Stop recording and transcribe' : 'Voice question via Sarvam — speak English or an Indian language; searching only, never trading'}
+            title={memRecording ? 'Stop recording and transcribe' : 'Voice question via Lara — speak English or an Indian language; searching only, never trading'}
             className="shrink-0 rounded px-3 py-2 text-[11px] font-bold transition-all hover:brightness-110 disabled:opacity-40"
             style={memRecording
               ? { backgroundColor: 'rgba(255,82,82,0.2)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.7)', boxShadow: '0 0 12px rgba(255,82,82,0.5)' }
@@ -361,7 +361,7 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
           </button>
         </div>
         {memA.length > 0 && <div className="mt-2">{memA.map((l, i) => <p key={i} className="font-mono text-[10px] leading-relaxed text-white/60">{l}</p>)}</div>}
-        <p className="mt-1 text-[8px] text-white/25">Deterministic answers from your loaded closed-trade history (last 100) — filters: instruments (gold/oil/bitcoin — English or native script: सोना · தங்கம் · സ്വർണം), months, London / New York hours, hedge, EMIL, best/worst/biggest. Indian-language questions route through Sarvam (consented) into the SAME matcher; voice transcribes then searches — language can never trade.</p>
+        <p className="mt-1 text-[8px] text-white/25">Deterministic answers from your loaded closed-trade history (last 100) — filters: instruments (gold/oil/bitcoin — English or native script: सोना · தங்கம் · സ്വർണം), months, London / New York hours, hedge, EMIL, best/worst/biggest. Indian-language questions route through Lara (consented) into the SAME matcher; voice transcribes then searches — language can never trade.</p>
       </div>
 
       <p className="mt-3 text-[9px] leading-relaxed text-white/30">

@@ -385,7 +385,7 @@ interface HistRow { symbol?: string; direction?: string; size?: number; realized
 
 // Instrument aliases — English plus common native-script names (Hindi,
 // Tamil, Malayalam) so multilingual queries hit directly even before the
-// Sarvam translation path runs.
+// Lara translation path runs.
 export const SYM_ALIASES: Record<string, string> = {
   gold: 'XAUUSD', silver: 'XAGUSD', bitcoin: 'BTCUSD', btc: 'BTCUSD', oil: 'USOIL',
   nasdaq: 'NAS100', dow: 'US30', euro: 'EURUSD', pound: 'GBPUSD', yen: 'USDJPY',

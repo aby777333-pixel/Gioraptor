@@ -28,7 +28,7 @@ export const MODULE_SCORES: ModuleScore[] = [
   { module: 'Hedge Engine + Hedge&Trade window', functionality: 88, integration: 92, security: 85, reliability: 88, readiness: 88, note: 'viable cards need real correlations; sim feed keeps some paths compiled-but-unexercised' },
   { module: 'EMIL (council → pilot → modes → adapt → governance)', functionality: 90, integration: 92, security: 88, reliability: 88, readiness: 88, note: 'typed-consent envelope, session-reset modes, acts only while a console is open — server-side 24/7 worker is a future phase' },
   { module: 'EMIL Always-Learning knowledge engine', functionality: 88, integration: 90, security: 90, reliability: 90, readiness: 88, note: 'measures only genuinely connected sources; firewall to live trading' },
-  { module: 'Sarvam language layer (translate + voice STT)', functionality: 85, integration: 90, security: 90, reliability: 82, readiness: 85, note: 'server-proxied key, consent-gated, honest 503 fallback; TTS not built' },
+  { module: 'Lara language layer (translate + voice STT)', functionality: 85, integration: 90, security: 90, reliability: 82, readiness: 85, note: 'server-proxied key, consent-gated, honest 503 fallback; TTS not built' },
   { module: 'World Command Center + Twin + Studio + Watchdog', functionality: 88, integration: 90, security: 88, reliability: 90, readiness: 88, note: 'all figures measured; IN/CN honestly instrument-less on this feed' },
   { module: 'NEXUS assistant', functionality: 85, integration: 88, security: 85, reliability: 85, readiness: 85, note: 'Anthropic-backed via server routes; conditional-hooks crash bug FIXED this audit' },
   { module: 'Economic calendar pipeline', functionality: 90, integration: 92, security: 90, reliability: 85, readiness: 88, note: 'throttled /api/calendar proxy (30-min cache, stale-serve) — upstream 429s handled' },
@@ -61,7 +61,7 @@ export const DEPENDENCY_MAP: Array<{ from: string; to: string; note: string }> =
   { from: 'Terminal', to: 'Netlify (site + functions)', note: 'hosting, /api/* serverless, env secrets (SARVAM_API_KEY, ANTHROPIC_API_KEY)' },
   { from: 'Terminal charts', to: 'TradingView widget', note: 'chart rendering; its iframe console noise is known + benign' },
   { from: 'Terminal calendar', to: 'ForexFactory weekly JSON', note: 'via throttled proxy ONLY — direct calls 429 fast' },
-  { from: 'EMIL language', to: 'Sarvam API', note: 'translate + STT via server proxy; rule parser is the permanent fallback' },
+  { from: 'EMIL language', to: 'Lara API', note: 'translate + STT via server proxy; rule parser is the permanent fallback' },
   { from: 'NEXUS', to: 'Anthropic API', note: 'server-routed; key never client-side' },
   { from: 'Closed positions', to: 'JUNE-2026 portal (SB tdifcayznqnaduchzfqz)', note: 'trade mirror bridge → portal trades (per infra memory)' },
   { from: 'Staff / broker / dealer production tooling', to: 'JUNE-2026 monorepo portals', note: 'the REAL home of admin/dealer/CRM/IB workflows — this repo’s copies are demo-grade' },
@@ -75,13 +75,13 @@ export const GAP_REPORT: Gap[] = [
   { severity: 'Critical', gap: 'Real liquidity provider / price feed not connected — all pricing is the simulated platform feed', plan: 'the keystone milestone; unlocks live prices everywhere, slippage/fill statistics, order simulator, broker comparison, liquidity intelligence, RPC-level Shield enforcement' },
   { severity: 'High', gap: 'Legacy dealer/CRM/IB API routes in this repo carry TODO mock persistence (dealer/execute, dealer/flatten, dealer/routing, crm/tasks, ib)', plan: 'production broker tooling lives in the JUNE-2026 portal; either wire these to real tables or gate/retire the demo pages before broker onboarding' },
   { severity: 'High', gap: 'Shield/Guardian enforcement is client-side', plan: 'planned upgrade: mirror the gates inside place_market_order RPC at the real-LP milestone (client gate stays as UX layer)' },
-  { severity: 'High', gap: 'API keys pasted in chat during builds (Sarvam, Anthropic, others per rotation register)', plan: 'rotate all before public launch — rotation recipes recorded in the operator memory' },
+  { severity: 'High', gap: 'API keys pasted in chat during builds (Lara, Anthropic, others per rotation register)', plan: 'rotate all before public launch — rotation recipes recorded in the operator memory' },
   { severity: 'Medium', gap: 'EMIL pilot + learning run only while a console/window is open', plan: 'server-side 24/7 worker is a designed future phase; never claimed as existing' },
   { severity: 'Medium', gap: 'Pre-existing render-loop console error ("Maximum update depth exceeded") on /terminal/scan-trade — clamped by React, page fully functional; reproduced on commit 90064c9 BEFORE Round 28, so not a regression', plan: 'focused hunt scheduled: bisect the page component tree (suspects among legacy set-state-in-effect findings); fix must not touch working scanner logic' },
   { severity: 'Medium', gap: '96 legacy lint errors remain (36 set-state-in-effect, 16 purity, 12 refs, 11 unescaped entities, 9 html-link, 7 any, others) in older pages', plan: 'non-breaking style debt; clean opportunistically — mass-fixing legacy pages in one sweep risks regressions' },
   { severity: 'Medium', gap: 'postcss moderate advisory inside Next.js’s own bundled copy', plan: 'accepted: the only downstream “fix” downgrades Next to 9.x; waiting on upstream Next release' },
   { severity: 'Medium', gap: 'No INR/CNY instruments; exchange holidays not integrated into sessions', plan: 'arrives with broader market-data licensing; regions display honestly meanwhile' },
-  { severity: 'Low', gap: 'Voice output (TTS), natural voice conversation, per-language alert delivery not built', plan: 'Sarvam TTS + NEXUS-routed dialogue are next candidates; never claimed early' },
+  { severity: 'Low', gap: 'Voice output (TTS), natural voice conversation, per-language alert delivery not built', plan: 'Lara TTS + NEXUS-routed dialogue are next candidates; never claimed early' },
   { severity: 'Low', gap: 'Workspace/layout save-restore and multi-device continuity absent', plan: 'needs backend state sync; scoped for a dedicated round' },
 ];
 
@@ -94,7 +94,7 @@ export const THIRD_PARTY_REGISTER: ThirdParty[] = [
   { vendor: 'Netlify (dashing-hamster-0028ed)', purpose: 'hosting, serverless /api/*, env secrets', status: 'Production (manual CLI deploys, cache-cleared)', failureImpact: 'site down — critical', backup: 'redeploy from git; site is rebuildable from repo' },
   { vendor: 'TradingView', purpose: 'chart widget', status: 'Production', failureImpact: 'charts degrade; trading path unaffected', backup: 'native lightweight-charts fallback exists in repo' },
   { vendor: 'ForexFactory feed', purpose: 'economic calendar', status: 'Production via throttled proxy', failureImpact: 'news guard degrades to stale-serve then honest empty', backup: 'stale cache; alternative licensed calendar is a future line-item' },
-  { vendor: 'Sarvam AI', purpose: 'Indian-language translate + speech', status: 'Production (key set 2026-07-20; rotate before launch)', failureImpact: 'NONE on trading — rule parser continues; UI says so', backup: 'default English engine is the permanent fallback' },
+  { vendor: 'Sarvam AI (powers Lara)', purpose: 'Indian-language translate + speech', status: 'Production (key set 2026-07-20; rotate before launch)', failureImpact: 'NONE on trading — rule parser continues; UI says so', backup: 'default English engine is the permanent fallback' },
   { vendor: 'Anthropic', purpose: 'NEXUS assistant', status: 'Production (key set; rotate before launch)', failureImpact: 'NEXUS chat degrades; trading unaffected', backup: 'graceful error in chat' },
 ];
 
@@ -113,9 +113,9 @@ export interface SignOff { check: string; state: 'Done' | 'Partial' | 'Pending';
 
 export const SIGN_OFF: SignOff[] = [
   { check: 'Functional testing', state: 'Done', note: 'every round verified live in the browser before deploy (DOM probes + interaction tests)' },
-  { check: 'Integration testing', state: 'Done', note: 'order path, calendar proxy, Sarvam translate/STT, consent flows exercised end-to-end' },
+  { check: 'Integration testing', state: 'Done', note: 'order path, calendar proxy, Lara translate/STT, consent flows exercised end-to-end' },
   { check: 'Permission / consent testing', state: 'Done', note: 'terms gate, EMIL onboarding, typed pilot consent, adaptation + learning consents verified' },
-  { check: 'Error-path testing', state: 'Done', note: 'Sarvam 503/failed-translate, stale quotes, Guardian vetoes, budget rejections produce honest messages' },
+  { check: 'Error-path testing', state: 'Done', note: 'Lara 503/failed-translate, stale quotes, Guardian vetoes, budget rejections produce honest messages' },
   { check: 'Security pass', state: 'Partial', note: 'Next.js patched (middleware advisories), ws patched, no secrets client-side, keys server-env only — key ROTATION before launch still owed' },
   { check: 'Regression testing', state: 'Done', note: 'main terminal smoke after every round; single execution path untouched in display-only rounds' },
   { check: 'Mobile validation', state: 'Partial', note: 'terminal is desktop-first by design; standalone windows usable but not mobile-optimised' },

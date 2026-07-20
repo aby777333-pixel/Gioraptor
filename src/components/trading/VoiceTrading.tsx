@@ -204,10 +204,10 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const confirmTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [sarvamReady, setSarvamReady] = useState(false);
+  const [sarvamReady, setLaraReady] = useState(false);
   const sarvamCapRef = useRef<VoiceCapture | null>(null);
 
-  // Check support on mount. Sarvam (consented + configured) upgrades voice
+  // Check support on mount. Lara (consented + configured) upgrades voice
   // to MULTILINGUAL speech-to-text-translate; browser speech (English)
   // remains the fallback. The confirmation step is mandatory either way.
   useEffect(() => {
@@ -217,7 +217,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     }
     const prefs = loadLangPrefs();
     if (prefs.sarvamEnabled && prefs.consentAt) {
-      sarvamHealth().then((ok) => setSarvamReady(ok));
+      sarvamHealth().then((ok) => setLaraReady(ok));
     }
   }, []);
 
@@ -406,9 +406,9 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     stopListening();
   }, [stopListening]);
 
-  // Sarvam multilingual capture: mic → 16kHz WAV → speech-to-text-translate
+  // Lara multilingual capture: mic → 16kHz WAV → speech-to-text-translate
   // → ENGLISH transcript → the SAME parser + mandatory confirmation.
-  const handleSarvamMic = useCallback(async () => {
+  const handleLaraMic = useCallback(async () => {
     if (sarvamCapRef.current) {
       setState('processing');
       try {
@@ -442,7 +442,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
   }, []);
 
   const handleMicClick = () => {
-    if (sarvamReady) { void handleSarvamMic(); return; }
+    if (sarvamReady) { void handleLaraMic(); return; }
     if (state === 'listening') {
       stopListening();
       setState('idle');
@@ -451,7 +451,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     }
   };
 
-  // Not supported fallback (Sarvam capture works in any browser with a mic)
+  // Not supported fallback (Lara capture works in any browser with a mic)
   if (!supported && !sarvamReady) {
     return (
       <div
@@ -494,7 +494,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
           <Volume2 size={13} style={{ color: '#0091D5' }} />
           <span className="text-[11px] font-bold">Voice Trading</span>
           <span className="rounded px-1.5 py-0.5 font-mono text-[8px] font-bold"
-            title={sarvamReady ? 'Sarvam speech-to-text-translate: speak English or a supported Indian language — every command still needs your Confirm click' : 'Browser speech recognition (English). Enable Sarvam in EMIL’s Language & Voice panel for multilingual voice.'}
+            title={sarvamReady ? 'Lara speech-to-text-translate: speak English or a supported Indian language — every command still needs your Confirm click' : 'Browser speech recognition (English). Enable Lara in EMIL’s Language & Voice panel for multilingual voice.'}
             style={{ color: sarvamReady ? '#FF8A65' : 'rgba(255,255,255,0.35)', border: `1px solid ${sarvamReady ? 'rgba(255,138,101,0.5)' : 'rgba(255,255,255,0.15)'}` }}>
             {sarvamReady ? 'SARVAM · multilingual' : 'browser · English'}
           </span>

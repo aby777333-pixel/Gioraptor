@@ -50,7 +50,7 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
   const [cb, setCb] = useState<CbIntel | null>(null);
   const [calCcy, setCalCcy] = useState('all');
   const [calHighOnly, setCalHighOnly] = useState(true);
-  const [sarvamOk, setSarvamOk] = useState(false);
+  const [sarvamOk, setLaraOk] = useState(false);
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const voiceRef = useRef<VoiceCapture | null>(null);
@@ -62,7 +62,7 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
 
   useEffect(() => { getCalendar().then(setCalendar); }, []);
   useEffect(() => { getInstrumentSpecs().then(setSpecs).catch(() => {}); }, []);
-  useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
+  useEffect(() => { sarvamHealth().then(setLaraOk); }, []);
 
   // Live refresh: overview, sessions, opportunities, DNA every 30s.
   useEffect(() => {
@@ -103,13 +103,13 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
   }, [openInstrument, calendar]);
 
   // Search + command share the language routing (English direct; Indic →
-  // consented Sarvam translate → the SAME deterministic logic).
+  // consented Lara translate → the SAME deterministic logic).
   const routedText = useCallback(async (text: string): Promise<string> => {
     const route = routeCommand(text, loadLangPrefs(), sarvamOk);
     if (route.engine === 'sarvam+rules') {
       const tr = await sarvamTranslate(text, route.detect.lang);
       if (tr.ok && tr.translated) {
-        setNote(`Translated (Sarvam): “${tr.translated}”`);
+        setNote(`Translated (Lara): “${tr.translated}”`);
         langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'abin query' });
         return tr.translated;
       }
@@ -122,7 +122,7 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
     if (!query.trim()) return;
     setNote(null);
     // Native-script aliases match the RAW query directly — translate only
-    // when the raw text finds nothing (Sarvam transliterates single words).
+    // when the raw text finds nothing (Lara transliterates single words).
     const raw = universalSearch(query, { universe, calendar });
     if (raw.length && raw[0].label !== 'No matches') { setResults(raw); return; }
     const text = await routedText(query);
@@ -168,8 +168,8 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
       return;
     }
     const p = loadLangPrefs();
-    if (!p.sarvamEnabled || !p.consentAt) { setNote('Voice needs Sarvam enabled + consent (EMIL → Language & Voice).'); return; }
-    if (!sarvamOk) { setNote('Voice: Sarvam not configured on the server — honestly off.'); return; }
+    if (!p.sarvamEnabled || !p.consentAt) { setNote('Voice needs Lara enabled + consent (EMIL → Language & Voice).'); return; }
+    if (!sarvamOk) { setNote('Voice: Lara not configured on the server — honestly off.'); return; }
     try { voiceRef.current = await startVoiceCapture(); setRecording(true); } catch { setNote('Voice: microphone unavailable or denied.'); }
   }, [sarvamOk, runCommand]);
 
@@ -239,7 +239,7 @@ export default function AbinTerminal({ ohlcvBuilder, isLiveData }: { ohlcvBuilde
             placeholder='Search or command — "gold" · "सोना" · "compare EURUSD and GBPUSD" · "find hedge for gold" · "show my exposure" · "ask EMIL why oil is falling"'
             className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2.5 text-[12px] text-white placeholder:text-white/25 outline-none" style={{ border: `1px solid ${CYAN}59` }} />
           <button onClick={handleVoice} disabled={voiceBusy}
-            title={recording ? 'Stop and transcribe' : 'Voice via Sarvam — any supported language; commands never execute trades directly'}
+            title={recording ? 'Stop and transcribe' : 'Voice via Lara — any supported language; commands never execute trades directly'}
             className="shrink-0 rounded px-3 py-2.5 text-[12px] font-bold transition-all hover:brightness-110 disabled:opacity-40"
             style={recording ? { color: '#FF5252', border: '1px solid rgba(255,82,82,0.7)', boxShadow: '0 0 12px rgba(255,82,82,0.5)' } : { color: '#FF8A65', border: '1px solid rgba(255,138,101,0.4)' }}>
             {voiceBusy ? '…' : recording ? '⏹' : '🎤'}

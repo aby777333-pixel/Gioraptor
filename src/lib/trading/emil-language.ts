@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // EMIL multilingual layer — dual-engine architecture.
 // The existing deterministic English rule parser (emil-mission) remains
-// the PRIMARY and fallback engine at all times. Sarvam is an ADDITIVE,
+// the PRIMARY and fallback engine at all times. Lara is an ADDITIVE,
 // optional, consent-gated assist for Indian-language and mixed-language
 // input, reached only through the server proxy (/api/sarvam) so no key
 // ever touches the client. Language processing NEVER executes a trade:
@@ -16,7 +16,7 @@ export interface LangPrefs {
   consentAt: number | null;    // when the trader accepted the data-sharing note
   displayLang: string;         // 'en' or a code below — response/display preference
   detectAuto: boolean;         // auto-detect input language
-  translationOnly: boolean;    // use Sarvam only to translate, never for chat
+  translationOnly: boolean;    // use Lara only to translate, never for chat
 }
 
 const LANG_KEY = 'raptor_emil_lang_v1';
@@ -92,14 +92,14 @@ export interface RouteDecision {
 export function routeCommand(text: string, prefs: LangPrefs, sarvamConfigured: boolean): RouteDecision {
   const detect = detectLanguageLocal(text);
   if (detect.lang === 'en' && !detect.mixed) return { engine: 'rules', reason: 'English input — deterministic rule parser handles it directly', detect };
-  if (!prefs.sarvamEnabled) return { engine: 'rules', reason: `${detect.label} detected but Sarvam is disabled — rule parser will flag what it cannot read`, detect };
-  if (!prefs.consentAt) return { engine: 'rules', reason: 'Sarvam consent not recorded — nothing leaves the device', detect };
-  if (!sarvamConfigured) return { engine: 'rules', reason: 'Sarvam not configured on the server — rule parser remains active', detect };
-  return { engine: 'sarvam+rules', reason: `${detect.label} detected — Sarvam translates, then the SAME rule parser + read-back + confirm pipeline applies`, detect };
+  if (!prefs.sarvamEnabled) return { engine: 'rules', reason: `${detect.label} detected but Lara is disabled — rule parser will flag what it cannot read`, detect };
+  if (!prefs.consentAt) return { engine: 'rules', reason: 'Lara consent not recorded — nothing leaves the device', detect };
+  if (!sarvamConfigured) return { engine: 'rules', reason: 'Lara not configured on the server — rule parser remains active', detect };
+  return { engine: 'sarvam+rules', reason: `${detect.label} detected — Lara translates, then the SAME rule parser + read-back + confirm pipeline applies`, detect };
 }
 
 /** Translate via the server proxy. Never throws — falls back honestly.
- *  Pass the locally-detected script code as sourceLang: Sarvam requires an
+ *  Pass the locally-detected script code as sourceLang: Lara requires an
  *  explicit (or detectable) source language. */
 export async function sarvamTranslate(text: string, sourceLang?: string | null): Promise<{ ok: boolean; translated: string | null; error: string | null }> {
   try {
@@ -115,7 +115,7 @@ export async function sarvamTranslate(text: string, sourceLang?: string | null):
   }
 }
 
-/** Voice command via Sarvam speech-to-text-translate: returns an ENGLISH
+/** Voice command via Lara speech-to-text-translate: returns an ENGLISH
  *  transcript (translation happens server-side in one hop) plus the detected
  *  spoken language. Never throws. */
 export async function sarvamSpeech(audioBase64: string): Promise<{ ok: boolean; transcript: string | null; language: string | null; error: string | null }> {
@@ -132,7 +132,7 @@ export async function sarvamSpeech(audioBase64: string): Promise<{ ok: boolean; 
   }
 }
 
-// ── Microphone → 16 kHz mono WAV (what Sarvam's speech API expects) ──
+// ── Microphone → 16 kHz mono WAV (what Lara's speech API expects) ──
 
 export interface VoiceCapture { stop: () => Promise<{ base64: string; seconds: number }> }
 

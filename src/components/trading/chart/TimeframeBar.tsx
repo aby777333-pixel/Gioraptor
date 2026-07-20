@@ -34,8 +34,10 @@ export default function TimeframeBar({ middle, trailing }: { middle?: React.Reac
 
   return (
     <div
-      className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b px-2 py-1"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)', scrollbarWidth: 'none' }}
+      className="flex shrink-0 flex-wrap items-center gap-x-0.5 gap-y-1 border-b px-2 py-1"
+      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+      /* flex-wrap (owner rule): nothing may go off-frame or overlap — chips
+         that don't fit wrap to a second row instead of scrolling out of view */
     >
       <span className="mr-1 shrink-0 text-[8px] font-semibold uppercase tracking-wider text-white/25">TF</span>
       {TIMEFRAMES.map((tf) => {

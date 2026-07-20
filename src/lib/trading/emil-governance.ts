@@ -359,7 +359,7 @@ export function healthChecks(params: {
     { name: 'Learning engine', status: storageOk ? 'Healthy' : 'Critical', note: storageOk ? 'buckets persisting' : 'localStorage unavailable — learning cannot persist' },
     { name: 'Audit & logs', status: storageOk ? 'Healthy' : 'Critical', note: storageOk ? 'activity, identity, replay and shadow logs writable' : 'storage failed' },
     { name: 'Notifications', status: notificationPermission === 'granted' ? 'Healthy' : 'Degraded', note: notificationPermission === 'granted' ? 'wake alerts deliverable' : `permission ${notificationPermission} — grant it for wake alerts` },
-    { name: 'Voice engine', status: sarvamConfigured ? 'Healthy' : 'Offline', note: sarvamConfigured ? 'Sarvam speech-to-text-translate via server proxy — read-back + confirm always required' : 'needs Sarvam configured server-side — never claimed early' },
+    { name: 'Voice engine', status: sarvamConfigured ? 'Healthy' : 'Offline', note: sarvamConfigured ? 'Lara speech-to-text-translate via server proxy — read-back + confirm always required' : 'needs Lara configured server-side — never claimed early' },
     { name: 'Liquidity / broker link', status: 'Degraded', note: 'simulated platform feed — real LP connection is the known open milestone' },
   ];
 }
