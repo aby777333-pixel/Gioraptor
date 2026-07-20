@@ -299,8 +299,14 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
             style={{ backgroundColor: showAuto ? 'rgba(255,179,0,0.18)' : 'rgba(255,179,0,0.06)', color: '#FFB300', border: '1px solid rgba(255,179,0,0.35)' }}>
             ⚙ Automation
           </button>
-          <button onClick={() => setShowLog((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-semibold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
-            Signal log
+          <button onClick={() => setShowLog((s) => !s)}
+            className="rounded px-2 py-0.5 text-[9px] font-semibold transition-all hover:brightness-125"
+            style={{
+              color: showLog ? '#29ABE2' : 'rgba(255,255,255,0.45)',
+              border: `1px solid ${showLog ? 'rgba(41,171,226,0.55)' : 'rgba(255,255,255,0.12)'}`,
+              backgroundColor: showLog ? 'rgba(41,171,226,0.12)' : 'transparent',
+            }}>
+            Signal log {showLog ? '▴' : '▾'}
           </button>
           <button onClick={exportLog} className="flex items-center gap-1 rounded px-2 py-0.5 text-[9px] font-semibold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
             <Download size={10} /> Export
@@ -340,6 +346,21 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
         <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[66vh]'}`} style={{ scrollbarWidth: 'thin' }}>
           {mode === 'off' && (
             <p className="py-8 text-center text-[12px] text-white/40">Scanner is OFF. Switch to SIGNAL ONLY to analyse the market.</p>
+          )}
+
+          {/* Signal log — rendered at the TOP of the body so toggling it gives
+              immediate visible feedback (it used to sit below dozens of cards,
+              which read as a dead button). */}
+          {showLog && (
+            <div className="mb-3 rounded-lg border p-3" style={{ borderColor: 'rgba(41,171,226,0.35)', backgroundColor: 'rgba(41,171,226,0.04)' }}>
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: '#29ABE2' }}>Signal log (latest 40 · full log via Export)</div>
+              {loadSignalLog().slice(-40).reverse().map((e, i) => (
+                <p key={i} className="font-mono text-[9px] text-white/45">
+                  {new Date(e.ts).toLocaleTimeString()} · {e.action.toUpperCase()} · {e.symbol} {e.tf} {e.direction} · score {e.score}{e.detail ? ` · ${e.detail}` : ''}
+                </p>
+              ))}
+              {loadSignalLog().length === 0 && <p className="text-[10px] text-white/30">No signals logged yet — entries appear when cards are shown, prepared, executed or rejected.</p>}
+            </div>
           )}
 
           {mode !== 'off' && opps.length === 0 && (
@@ -428,19 +449,6 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
               )}
             </div>
           ))}
-
-          {/* Signal log */}
-          {showLog && (
-            <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-white/40">Signal log (latest 40 · full log via Export)</div>
-              {loadSignalLog().slice(-40).reverse().map((e, i) => (
-                <p key={i} className="font-mono text-[9px] text-white/45">
-                  {new Date(e.ts).toLocaleTimeString()} · {e.action.toUpperCase()} · {e.symbol} {e.tf} {e.direction} · score {e.score}{e.detail ? ` · ${e.detail}` : ''}
-                </p>
-              ))}
-              {loadSignalLog().length === 0 && <p className="text-[10px] text-white/30">No signals logged yet.</p>}
-            </div>
-          )}
 
           <p className="mt-3 text-[9px] font-semibold leading-relaxed" style={{ color: 'rgba(255,179,0,0.75)' }}>
             {SCANNER_EXONERATION}
