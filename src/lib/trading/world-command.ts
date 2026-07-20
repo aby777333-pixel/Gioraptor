@@ -383,7 +383,16 @@ export function watchdogReview(params: {
 
 interface HistRow { symbol?: string; direction?: string; size?: number; realized_pnl?: number | null; closed_at?: string | null; comment?: string | null }
 
-const SYM_ALIASES: Record<string, string> = { gold: 'XAUUSD', silver: 'XAGUSD', bitcoin: 'BTCUSD', btc: 'BTCUSD', oil: 'USOIL', nasdaq: 'NAS100', dow: 'US30', euro: 'EURUSD', pound: 'GBPUSD', yen: 'USDJPY' };
+// Instrument aliases — English plus common native-script names (Hindi,
+// Tamil, Malayalam) so multilingual queries hit directly even before the
+// Sarvam translation path runs.
+const SYM_ALIASES: Record<string, string> = {
+  gold: 'XAUUSD', silver: 'XAGUSD', bitcoin: 'BTCUSD', btc: 'BTCUSD', oil: 'USOIL',
+  nasdaq: 'NAS100', dow: 'US30', euro: 'EURUSD', pound: 'GBPUSD', yen: 'USDJPY',
+  'सोना': 'XAUUSD', 'गोल्ड': 'XAUUSD', 'தங்கம்': 'XAUUSD', 'സ്വർണം': 'XAUUSD',
+  'चांदी': 'XAGUSD', 'வெள்ளி': 'XAGUSD', 'വെള്ളി': 'XAGUSD',
+  'तेल': 'USOIL', 'எண்ணெய்': 'USOIL', 'बिटकॉइन': 'BTCUSD',
+};
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 
 export function searchMemory(query: string, history: HistRow[]): string[] {

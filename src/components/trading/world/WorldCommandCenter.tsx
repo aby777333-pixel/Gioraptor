@@ -18,6 +18,7 @@ import { loadEmilAutoParams } from '@/lib/trading/emil-council';
 import { loadReplays } from '@/lib/trading/emil-governance';
 import { assessOpportunity, SCAN_TFS } from '@/lib/trading/scanner-engine';
 import { atr } from '@/lib/trading/indicators';
+import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
 import {
   REGIONS, regionSnapshot, portfolioDNA, simulateTwin, buildBriefing, watchdogReview, searchMemory,
   type Region, type RegionSnapshot, type PortfolioDNA, type TwinResult, type BriefingKind, type WatchdogItem, type OpenPosLite,
@@ -39,6 +40,10 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
   const [memQ, setMemQ] = useState('');
   const [memA, setMemA] = useState<string[]>([]);
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
+  const [sarvamOk, setSarvamOk] = useState(false);
+  const [memRecording, setMemRecording] = useState(false);
+  const [memBusy, setMemBusy] = useState(false);
+  const memVoiceRef = useRef<VoiceCapture | null>(null);
   const builderRef = useRef(ohlcvBuilder);
   builderRef.current = ohlcvBuilder;
 
@@ -46,6 +51,58 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
   const universe = useMemo(() => Object.keys(prices).filter((s) => prices[s]?.bid != null), [prices]);
 
   useEffect(() => { getCalendar().then(setCalendar); }, []);
+  useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
+
+  // Memory search with the SAME language routing as Mission Control:
+  // native-script aliases hit directly; otherwise Indic/mixed text goes
+  // through consented Sarvam translation into the deterministic matcher.
+  // Language processing only ever SEARCHES — it can never trade.
+  const runMemorySearch = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    const route = routeCommand(text, loadLangPrefs(), sarvamOk);
+    let toSearch = text;
+    const pre: string[] = [];
+    if (route.engine === 'sarvam+rules') {
+      const tr = await sarvamTranslate(text, route.detect.lang);
+      if (tr.ok && tr.translated) {
+        toSearch = tr.translated;
+        pre.push(`Translated (Sarvam): “${tr.translated}”`);
+        langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'memory search' });
+      } else {
+        pre.push(`Language service: ${tr.error} — searched as typed (native-script instrument names still match).`);
+      }
+    } else if (route.detect.lang !== 'en' || route.detect.mixed) {
+      pre.push(`Language routing: ${route.reason} (native-script instrument names still match directly).`);
+    }
+    setMemA([...pre, ...searchMemory(toSearch, history as never)]);
+  }, [sarvamOk, history]);
+
+  const handleMemVoice = useCallback(async () => {
+    if (memVoiceRef.current) {
+      setMemBusy(true);
+      try {
+        const cap = memVoiceRef.current;
+        memVoiceRef.current = null;
+        setMemRecording(false);
+        const { base64, seconds } = await cap.stop();
+        if (seconds < 1) { setMemA(['Voice: recording too short — try again.']); return; }
+        const res = await sarvamSpeech(base64);
+        if (res.ok && res.transcript) {
+          setMemQ(res.transcript);
+          langAudit({ original: `[voice ${seconds}s]`, detected: res.language ?? 'unknown', engine: 'sarvam-stt-translate', translated: res.transcript.slice(0, 200), action: 'memory search voice' });
+          await runMemorySearch(res.transcript);
+        } else {
+          setMemA([`Voice: ${res.error} — type the question instead; nothing else happened.`]);
+        }
+      } finally { setMemBusy(false); }
+      return;
+    }
+    const prefs = loadLangPrefs();
+    if (!prefs.sarvamEnabled || !prefs.consentAt) { setMemA(['Voice needs Sarvam enabled + consent — see Language & Voice in the EMIL console.']); return; }
+    if (!sarvamOk) { setMemA(['Voice: Sarvam is not configured on the server — voice stays off, honestly.']); return; }
+    try { memVoiceRef.current = await startVoiceCapture(); setMemRecording(true); }
+    catch { setMemA(['Voice: microphone unavailable or permission denied.']); }
+  }, [sarvamOk, runMemorySearch]);
   useEffect(() => {
     if (!activeAccountId) return;
     orderService.getTradeHistory(activeAccountId, 100).then((rows) => setHistory(rows as unknown as Array<Record<string, unknown>>)).catch(() => {});
@@ -286,17 +343,25 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
         <div className="mb-2 text-[12px] font-bold text-white">🧠 AI Memory Search — ask about your own history</div>
         <div className="flex gap-2">
           <input value={memQ} onChange={(e) => setMemQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && memQ.trim()) setMemA(searchMemory(memQ, history as never)); }}
-            placeholder='e.g. "When did I trade gold best?" · "my losses in London" · "biggest hedge" · "EMIL trades in July"'
+            onKeyDown={(e) => { if (e.key === 'Enter' && memQ.trim()) void runMemorySearch(memQ); }}
+            placeholder='e.g. "When did I trade gold best?" · "my losses in London" · "सोना" · "தங்கம்" · "biggest hedge"'
             className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2 text-[11px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(77,208,225,0.35)' }} />
-          <button onClick={() => memQ.trim() && setMemA(searchMemory(memQ, history as never))}
+          <button onClick={handleMemVoice} disabled={memBusy}
+            title={memRecording ? 'Stop recording and transcribe' : 'Voice question via Sarvam — speak English or an Indian language; searching only, never trading'}
+            className="shrink-0 rounded px-3 py-2 text-[11px] font-bold transition-all hover:brightness-110 disabled:opacity-40"
+            style={memRecording
+              ? { backgroundColor: 'rgba(255,82,82,0.2)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.7)', boxShadow: '0 0 12px rgba(255,82,82,0.5)' }
+              : { backgroundColor: 'rgba(255,138,101,0.12)', color: '#FF8A65', border: '1px solid rgba(255,138,101,0.4)' }}>
+            {memBusy ? '…' : memRecording ? '⏹ Stop' : '🎤'}
+          </button>
+          <button onClick={() => memQ.trim() && void runMemorySearch(memQ)}
             className="shrink-0 rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110"
             style={{ background: 'linear-gradient(180deg,#4DD0E1,#00ACC1)' }}>
             Ask
           </button>
         </div>
         {memA.length > 0 && <div className="mt-2">{memA.map((l, i) => <p key={i} className="font-mono text-[10px] leading-relaxed text-white/60">{l}</p>)}</div>}
-        <p className="mt-1 text-[8px] text-white/25">Deterministic answers from your loaded closed-trade history (last 100) — filters: instruments (gold/oil/bitcoin…), months, London / New York hours, hedge, EMIL, best/worst/biggest.</p>
+        <p className="mt-1 text-[8px] text-white/25">Deterministic answers from your loaded closed-trade history (last 100) — filters: instruments (gold/oil/bitcoin — English or native script: सोना · தங்கம் · സ്വർണം), months, London / New York hours, hedge, EMIL, best/worst/biggest. Indian-language questions route through Sarvam (consented) into the SAME matcher; voice transcribes then searches — language can never trade.</p>
       </div>
 
       <p className="mt-3 text-[9px] leading-relaxed text-white/30">
