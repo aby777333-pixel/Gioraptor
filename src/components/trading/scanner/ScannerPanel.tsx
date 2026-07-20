@@ -24,6 +24,7 @@ import {
   appendSignalLog, loadSignalLog,
   type Opportunity, type ScanFilters, type AssetClass,
 } from '@/lib/trading/scanner-engine';
+import EmilStrip from '@/components/trading/emil/EmilStrip';
 
 type AutoMode = 'off' | 'signal' | 'manual';
 
@@ -249,6 +250,11 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
             SEMI / FULL AUTO 🔒
           </span>
           <span className="ml-auto text-[9px] text-white/35">{meta.desc}</span>
+        </div>
+
+        {/* ── EMIL council read ── */}
+        <div className="border-b px-4 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
         </div>
 
         {/* ── Filters ── */}

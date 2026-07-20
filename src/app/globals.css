@@ -547,3 +547,33 @@ body {
   color: #29ABE2;
   animation: raptor-scan-blink 3.2s ease-in-out infinite;
 }
+
+/* EMIL chip: gold ⇄ ice-blue color blink. */
+@keyframes raptor-emil-blink {
+  0%, 42% {
+    color: #FFD54F;
+    border-color: rgba(255, 213, 79, 0.85);
+    background: linear-gradient(180deg, rgba(255, 213, 79, 0.28) 0%, rgba(255, 213, 79, 0.07) 100%);
+    box-shadow: 0 0 12px rgba(255, 213, 79, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(255, 213, 79, 0.9);
+  }
+  50%, 92% {
+    color: #80D8FF;
+    border-color: rgba(128, 216, 255, 0.85);
+    background: linear-gradient(180deg, rgba(128, 216, 255, 0.28) 0%, rgba(128, 216, 255, 0.07) 100%);
+    box-shadow: 0 0 12px rgba(128, 216, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(128, 216, 255, 0.9);
+  }
+  100% {
+    color: #FFD54F;
+    border-color: rgba(255, 213, 79, 0.85);
+    background: linear-gradient(180deg, rgba(255, 213, 79, 0.28) 0%, rgba(255, 213, 79, 0.07) 100%);
+    box-shadow: 0 0 12px rgba(255, 213, 79, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(255, 213, 79, 0.9);
+  }
+}
+.raptor-emil-blink {
+  border: 1px solid rgba(255, 213, 79, 0.85);
+  color: #FFD54F;
+  animation: raptor-emil-blink 3.6s ease-in-out infinite;
+}

@@ -28,6 +28,7 @@ import {
   stressTest, leadLag, spreadZ, weekendGap, correlationMatrix,
   type HedgeCandidate, type HedgeInputs, type HedgeGroup, type StressResult,
 } from '@/lib/trading/hedge-engine';
+import EmilStrip from '@/components/trading/emil/EmilStrip';
 
 const MINT = '#00E5A0';
 const VIOLET = '#AB47BC';
@@ -252,6 +253,11 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
         </div>
 
         <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[78vh]'}`} style={{ scrollbarWidth: 'thin' }}>
+          {/* ── EMIL council read ── */}
+          <div className="mb-3">
+            <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
+          </div>
+
           {/* ── Inputs ── */}
           <div className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
             <label className="text-[9px] uppercase tracking-wide text-white/40">Primary

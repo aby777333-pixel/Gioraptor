@@ -19,6 +19,7 @@ import dynamic from 'next/dynamic';
 const InsightsPanel = dynamic(() => import('../insights/InsightsPanel'), { ssr: false });
 const HedgePanel = dynamic(() => import('../hedge/HedgePanel'), { ssr: false });
 const ScannerPanel = dynamic(() => import('../scanner/ScannerPanel'), { ssr: false });
+const EmilPanel = dynamic(() => import('../emil/EmilPanel'), { ssr: false });
 const RiskPanel = dynamic(() => import('../insights/RiskPanel'), { ssr: false });
 const JournalPanel = dynamic(() => import('../insights/JournalPanel'), { ssr: false });
 import ChartPanel from './ChartPanel';
@@ -197,6 +198,9 @@ export default function ChartSourceSwitcher({
   // Global Trade Opportunity Scanner (entitlement trade_scanner; fail-open).
   const [scannerEnabled, setScannerEnabled] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
+  // EMIL — Evolving Market Intelligence Lab (entitlement emil; fail-open).
+  const [emilEnabled, setEmilEnabled] = useState(true);
+  const [emilOpen, setEmilOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -274,6 +278,7 @@ export default function ChartSourceSwitcher({
       if (ents['trade_journal'] === false) setJournalEnabled(false);
       if (ents['hedging_tools'] === false) setHedgeEnabled(false);
       if (ents['trade_scanner'] === false) setScannerEnabled(false);
+      if (ents['emil'] === false) setEmilEnabled(false);
     })();
     return () => { active = false; };
   }, []);
@@ -1080,6 +1085,15 @@ export default function ChartSourceSwitcher({
               📡 SCAN
             </button>
           )}
+          {emilEnabled && (
+            <button
+              onClick={() => setEmilOpen(true)}
+              title="EMIL — Evolving Market Intelligence Lab: the Agent Council over every live engine (observe-only; never trades for you)"
+              className="raptor-emil-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            >
+              🧠 EMIL
+            </button>
+          )}
         </>}
         trailing={<>
           <TraderChips ohlcvBuilder={ohlcvBuilder} />
@@ -1371,6 +1385,9 @@ export default function ChartSourceSwitcher({
 
       {/* Global Trade Opportunity Scanner — signal-first, manual-confirm execution */}
       {scannerOpen && <ScannerPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} onClose={() => setScannerOpen(false)} />}
+
+      {/* EMIL — Agent Council console (observe-only) */}
+      {emilOpen && <EmilPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} onClose={() => setEmilOpen(false)} />}
 
       {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
       {disclaimerFor && (
