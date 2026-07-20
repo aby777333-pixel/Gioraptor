@@ -13,6 +13,7 @@
 import { useTradingStore } from '@/stores/trading';
 import { getInstrumentSpecs, valuePerUnitPerLot } from '@/lib/insights/risk';
 import { createClient } from '@/lib/supabase/client';
+import { getCalendar, highImpactWithin } from '@/lib/trading/news-guard';
 
 // ── Settings ────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export interface ProtectionSettings {
   marginLadder:     { on: boolean };                            // early warnings at 300 / 200 / 150% margin level
   spreadGuard:      { on: boolean; maxPips: number };           // refuse fills into an abnormally wide spread
   equityFloor:      { on: boolean; equity: number };            // kill switch: close all + lock trading 24h
+  newsGuard:        { on: boolean; minutes: number };           // block new orders around high-impact news
 }
 
 export const PROTECTION_DEFAULTS: ProtectionSettings = {
@@ -42,6 +44,7 @@ export const PROTECTION_DEFAULTS: ProtectionSettings = {
   marginLadder:      { on: true },                 // warnings only — never blocks
   spreadGuard:       { on: false, maxPips: 5 },
   equityFloor:       { on: false, equity: 0 },
+  newsGuard:         { on: false, minutes: 30 },
 };
 
 const SETTINGS_PREFIX = 'raptor_protection_v1_';
@@ -231,6 +234,25 @@ export async function protectionCheck(ctx: OrderContext): Promise<void> {
             `🛡 Spread guard: ${ctx.symbol} spread is ${spreadPips.toFixed(1)} pips (your limit: ${s.spreadGuard.maxPips}). Filling into a wide spread hands the edge away — wait for it to normalise.`);
         }
       }
+    }
+  }
+
+  // 3b · News guard (opt-in): refuse new orders around high-impact releases
+  // touching either of the symbol's currencies. Real ForexFactory calendar
+  // data via /api/calendar; fails open if the feed is unreachable.
+  if (s.newsGuard.on) {
+    try {
+      const events = await getCalendar();
+      const hits = highImpactWithin(symbolCurrencies(ctx.symbol), events, s.newsGuard.minutes);
+      if (hits.length) {
+        const ev = hits[0];
+        const mins = Math.round((ev.timeMs - Date.now()) / 60_000);
+        throw new ProtectionBlockError(
+          `📅 News guard: ${ev.currency} "${ev.title}" ${mins >= 0 ? `in ${mins} min` : `${-mins} min ago`} — high-impact news makes spreads jump and stops slip. Your rule blocks entries within ${s.newsGuard.minutes} min of red-flag events.`);
+      }
+    } catch (e) {
+      if (e instanceof ProtectionBlockError) throw e;
+      // calendar unreachable — fail open
     }
   }
 

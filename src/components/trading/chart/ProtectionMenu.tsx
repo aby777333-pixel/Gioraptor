@@ -118,7 +118,7 @@ export default function ProtectionMenu({ onToast }: { onToast: (msg: string) => 
     settings.dailyLossLimit.on, settings.profitLockIn.on, settings.mandatorySL.on,
     settings.riskCap.on, settings.lossCooldown.on, settings.revengeGuard.on,
     settings.overtradeGovernor.on, settings.correlationGuard.on, settings.marginLadder.on,
-    settings.spreadGuard.on, settings.equityFloor.on,
+    settings.spreadGuard.on, settings.equityFloor.on, settings.newsGuard.on,
   ].filter(Boolean).length;
 
   const lockHoursLeft = lock ? Math.max(0, Math.ceil((lock.until - Date.now()) / 3_600_000)) : 0;
@@ -278,6 +278,13 @@ export default function ProtectionMenu({ onToast }: { onToast: (msg: string) => 
               name="Spread guard"
               desc="Refuses to fill into an abnormally wide spread (news spikes, rollover) — wide spreads silently hand your edge away."
               params={<AmountInput label="Max spread pips" value={settings.spreadGuard.maxPips} onChange={(v) => update((s) => { s.spreadGuard.maxPips = v; })} step={0.5} />}
+            />
+            <Rule
+              on={settings.newsGuard.on}
+              toggle={() => update((s) => { s.newsGuard.on = !s.newsGuard.on; })}
+              name="News guard"
+              desc="Blocks new orders within a window around HIGH-impact economic releases touching the symbol's currencies (real ForexFactory calendar). Spreads explode and stops slip through news — let it pass."
+              params={<AmountInput label="Window min" value={settings.newsGuard.minutes} onChange={(v) => update((s) => { s.newsGuard.minutes = Math.max(5, Math.round(v)); })} step={5} />}
             />
           </Section>
 

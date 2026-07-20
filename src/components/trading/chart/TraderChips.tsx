@@ -18,6 +18,8 @@ import { TF_TO_RESOLUTION, RESOLUTION_MS, type OHLCVBuilder, type Resolution } f
 import { getInstrumentSpecs, valuePerUnitPerLot, type InstrumentSpec } from '@/lib/insights/risk';
 import { getPipSize } from '@/lib/trading/ticket-math';
 import { orderService } from '@/lib/trading/order-service';
+import { symbolCurrencies } from '@/lib/trading/protection';
+import { getCalendar, nextHighImpact, upcomingHighImpact, fmtEta, type NewsEvent } from '@/lib/trading/news-guard';
 
 const REGIME_TFS: { label: string; res: Resolution }[] = [
   { label: 'M15', res: '15' }, { label: 'H1', res: '60' }, { label: 'H4', res: '240' }, { label: 'D1', res: '1D' },
@@ -54,6 +56,7 @@ export default function TraderChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuild
   const [heat, setHeat] = useState<{ pct: number | null; unbounded: number } | null>(null);
   const [rangeUsed, setRangeUsed] = useState<number | null>(null);
   const [discipline, setDiscipline] = useState<number | null>(null);
+  const [calendar, setCalendar] = useState<NewsEvent[]>([]);
   const [patience, setPatience] = useState<{ sinceMin: number | null; avgMin: number | null }>({ sinceMin: null, avgMin: null });
   const [info, setInfo] = useState<ChipInfo | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -66,6 +69,15 @@ export default function TraderChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuild
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // Economic calendar (10-min client cache inside getCalendar).
+  useEffect(() => {
+    let active = true;
+    const load = () => getCalendar().then((ev) => { if (active) setCalendar(ev); });
+    load();
+    const id = setInterval(load, 10 * 60_000);
+    return () => { active = false; clearInterval(id); };
   }, []);
 
   useEffect(() => {
@@ -282,6 +294,28 @@ export default function TraderChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuild
           <span style={{ color: '#CE93D8' }}>⏱ {patience.sinceMin}m{patience.avgMin != null ? `/${patience.avgMin}m` : ''}</span>
         </button>
       )}
+
+      {/* 📅 News radar — next high-impact event for this symbol's currencies */}
+      {(() => {
+        const ccys = symbolCurrencies(activeSymbol);
+        const next = nextHighImpact(ccys, calendar);
+        if (!next) return null;
+        const minsAway = (next.timeMs - (now || Date.now())) / 60_000;
+        const color = minsAway <= 15 ? '#FF5252' : minsAway <= 60 ? '#FFB300' : 'rgba(255,255,255,0.55)';
+        return (
+          <button className={`${chip} ${minsAway <= 15 ? 'animate-pulse' : ''}`} style={chipStyle('255,112,67')}
+            onClick={() => show('📅 News radar — high-impact events', [
+              ...upcomingHighImpact(ccys, calendar).slice(0, 6).map((e) =>
+                `${e.currency} · ${e.title} — ${fmtEta(e.timeMs)}${e.forecast ? ` (fcst ${e.forecast}, prev ${e.previous})` : ''}`),
+              'Red-flag releases blow out spreads and slip stops. Entering minutes before one is a coin flip with worse odds — the Shield "News guard" rule can block it automatically.',
+            ])}
+            title={`Next high-impact: ${next.currency} ${next.title} in ${fmtEta(next.timeMs)} — click for the list`}>
+            <span style={{ color, textShadow: minsAway <= 60 ? `0 0 6px ${color}` : 'none' }}>
+              📅 {next.currency} {fmtEta(next.timeMs)}
+            </span>
+          </button>
+        );
+      })()}
 
       {/* 🧲 Round-number radar */}
       <button className={chip} style={chipStyle('255,179,0')}
