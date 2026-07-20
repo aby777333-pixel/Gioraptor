@@ -419,7 +419,7 @@ export class MQL5Lexer {
     const startCol = this.column;
     const startOffset = this.pos;
 
-    let op = this.source[this.pos];
+    const op = this.source[this.pos];
     this.advance();
 
     // Try 3-character operators

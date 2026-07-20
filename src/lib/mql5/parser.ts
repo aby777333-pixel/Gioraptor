@@ -517,7 +517,7 @@ export class MQL5Parser {
   }
 
   private parseTernary(): ASTNode {
-    let expr = this.parseLogicalOr();
+    const expr = this.parseLogicalOr();
     if (this.match('operator', '?')) {
       const consequent = this.parseExpression();
       this.expect('operator', ':');

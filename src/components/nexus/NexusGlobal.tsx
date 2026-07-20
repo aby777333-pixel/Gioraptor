@@ -266,8 +266,9 @@ export function NexusGlobal() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [chatMessages.length, isTyping]);
 
-  if (isExcluded) return null;
-
+  // NOTE: the isExcluded early-return lives BELOW every hook (see before the
+  // JSX return) — returning here would change React's hook order when the
+  // route flips between excluded/included pages and crash the tree.
   const handleSnooze = (minutes: number) => { setSnoozeUntil(Date.now() + minutes * 60 * 1000); setIsSnoozed(true); };
   const handleDismiss = (id: string) => { setMessages(prev => prev.map(m => m.id === id ? { ...m, isDismissed: true } : m)); };
 
@@ -360,6 +361,8 @@ export function NexusGlobal() {
     window.addEventListener('nexus-ask', onAsk);
     return () => window.removeEventListener('nexus-ask', onAsk);
   }, []);
+
+  if (isExcluded) return null;
 
   return (
     <>

@@ -100,7 +100,7 @@ export function generateCalendarEvents(): CalendarEvent[] {
       const forecastNum = parseFloat(event.forecast.replace(/[%KMBkTt,]/g, ''));
       if (!isNaN(forecastNum)) {
         const variance = forecastNum * (Math.random() * 0.1 - 0.05);
-        let actualNum = forecastNum + variance;
+        const actualNum = forecastNum + variance;
 
         // Format to match forecast style
         if (event.forecast.includes('%')) {

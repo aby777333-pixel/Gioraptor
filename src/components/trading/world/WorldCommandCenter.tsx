@@ -113,6 +113,12 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
           <span className="ml-auto rounded px-2 py-0.5 font-mono text-[8px]" style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)' }}>
             {isLiveData ? 'live feed' : 'platform feed (simulated pricing until the real LP)'}
           </span>
+          <button onClick={() => window.open('/terminal/audit', '_blank')}
+            title="Platform systems audit — module readiness, wiring matrix, gap report, third-party register, LP checklist"
+            className="rounded px-2 py-0.5 font-mono text-[8px] font-bold transition-all hover:brightness-125"
+            style={{ color: '#FFB300', border: '1px solid rgba(255,179,0,0.4)' }}>
+            🧾 AUDIT
+          </button>
         </div>
         <div className="relative h-[300px] w-full overflow-hidden rounded-lg" style={{
           background: 'radial-gradient(ellipse at 50% 40%, rgba(0,145,213,0.08) 0%, rgba(8,13,22,0.9) 70%), repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(255,255,255,0.03) 30px), repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(255,255,255,0.03) 30px)',

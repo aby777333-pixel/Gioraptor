@@ -48,7 +48,7 @@ export default function SessionsPage() {
       const supabase = createClient();
       // `scope: 'others'` exists in supabase-js v2 but isn't always
       // surfaced; fallback to a full signOut so the UX still works.
-      const result = await supabase.auth.signOut({ scope: 'others' as 'others' });
+      const result = await supabase.auth.signOut({ scope: 'others' as const });
       if (result.error) {
         const fallback = await supabase.auth.signOut();
         if (fallback.error) return { ok: false, error: fallback.error.message };

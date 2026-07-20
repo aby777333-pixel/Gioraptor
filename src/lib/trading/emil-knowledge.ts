@@ -14,7 +14,6 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
-import { classifyMarketState } from '@/lib/nexus/market-state';
 import { atr } from '@/lib/trading/indicators';
 import { getPipSize } from '@/lib/trading/ticket-math';
 import { symbolCurrencies } from '@/lib/trading/protection';
