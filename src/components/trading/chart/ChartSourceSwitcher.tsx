@@ -18,6 +18,7 @@ import dynamic from 'next/dynamic';
 // unless the trader actually opens it.
 const InsightsPanel = dynamic(() => import('../insights/InsightsPanel'), { ssr: false });
 const HedgePanel = dynamic(() => import('../hedge/HedgePanel'), { ssr: false });
+const ScannerPanel = dynamic(() => import('../scanner/ScannerPanel'), { ssr: false });
 const RiskPanel = dynamic(() => import('../insights/RiskPanel'), { ssr: false });
 const JournalPanel = dynamic(() => import('../insights/JournalPanel'), { ssr: false });
 import ChartPanel from './ChartPanel';
@@ -193,6 +194,9 @@ export default function ChartSourceSwitcher({
   // AI Correlation Hedging Engine (entitlement hedging_tools; fail-open).
   const [hedgeEnabled, setHedgeEnabled] = useState(true);
   const [hedgeOpen, setHedgeOpen] = useState(false);
+  // Global Trade Opportunity Scanner (entitlement trade_scanner; fail-open).
+  const [scannerEnabled, setScannerEnabled] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -269,6 +273,7 @@ export default function ChartSourceSwitcher({
       if (ents['risk_tools'] === false) setRiskEnabled(false);
       if (ents['trade_journal'] === false) setJournalEnabled(false);
       if (ents['hedging_tools'] === false) setHedgeEnabled(false);
+      if (ents['trade_scanner'] === false) setScannerEnabled(false);
     })();
     return () => { active = false; };
   }, []);
@@ -1066,6 +1071,15 @@ export default function ChartSourceSwitcher({
               ⇄ HEDGE
             </button>
           )}
+          {scannerEnabled && (
+            <button
+              onClick={() => setScannerOpen(true)}
+              title="Trade Scanner — ranked multi-market opportunities with full trade plans (analytical tools, never guarantees)"
+              className="raptor-scan-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            >
+              📡 SCAN
+            </button>
+          )}
         </>}
         trailing={<>
           <TraderChips ohlcvBuilder={ohlcvBuilder} />
@@ -1354,6 +1368,9 @@ export default function ChartSourceSwitcher({
 
       {/* AI Correlation Hedging Engine — trader-confirmed execution only */}
       {hedgeOpen && <HedgePanel ohlcvBuilder={ohlcvBuilder} onClose={() => setHedgeOpen(false)} />}
+
+      {/* Global Trade Opportunity Scanner — signal-first, manual-confirm execution */}
+      {scannerOpen && <ScannerPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} onClose={() => setScannerOpen(false)} />}
 
       {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
       {disclaimerFor && (

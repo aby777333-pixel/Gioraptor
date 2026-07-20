@@ -517,3 +517,33 @@ body {
   color: #CE93D8;
   animation: raptor-hedge-blink 2.8s ease-in-out infinite;
 }
+
+/* Trade Scanner chip: color blink (scanner blue ⇄ signal green). */
+@keyframes raptor-scan-blink {
+  0%, 42% {
+    color: #29ABE2;
+    border-color: rgba(41, 171, 226, 0.85);
+    background: linear-gradient(180deg, rgba(41, 171, 226, 0.3) 0%, rgba(41, 171, 226, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(41, 171, 226, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(41, 171, 226, 0.9);
+  }
+  50%, 92% {
+    color: #00C27A;
+    border-color: rgba(0, 194, 122, 0.85);
+    background: linear-gradient(180deg, rgba(0, 194, 122, 0.3) 0%, rgba(0, 194, 122, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(0, 194, 122, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(0, 194, 122, 0.9);
+  }
+  100% {
+    color: #29ABE2;
+    border-color: rgba(41, 171, 226, 0.85);
+    background: linear-gradient(180deg, rgba(41, 171, 226, 0.3) 0%, rgba(41, 171, 226, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(41, 171, 226, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(41, 171, 226, 0.9);
+  }
+}
+.raptor-scan-blink {
+  border: 1px solid rgba(41, 171, 226, 0.85);
+  color: #29ABE2;
+  animation: raptor-scan-blink 3.2s ease-in-out infinite;
+}
