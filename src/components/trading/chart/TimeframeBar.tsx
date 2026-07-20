@@ -55,7 +55,6 @@ export default function TimeframeBar({ middle, trailing }: { middle?: React.Reac
       {middle && <div className="ml-3 flex shrink-0 items-center gap-1">{middle}</div>}
       <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
         {trailing}
-        <span className="shrink-0 text-[8px] uppercase tracking-wide text-white/20">both charts</span>
       </div>
     </div>
   );

@@ -1050,6 +1050,28 @@ export default function ChartSourceSwitcher({
         {/* Raptor Script — custom indicator editor; plots on the RAPTOR chart */}
         <RaptorScriptMenu onEnsureRaptor={() => setSource('raptor')} />
 
+      </div>
+
+      {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
+          The free space hosts the trader chips + the live trend signal beacon. */}
+      <TimeframeBar
+        middle={<>
+          <EdgeChips ohlcvBuilder={ohlcvBuilder} />
+          {hedgeEnabled && (
+            <button
+              onClick={() => setHedgeOpen(true)}
+              title="AI Correlation Hedging Engine — find, size and monitor portfolio hedges (estimates, never guarantees)"
+              className="raptor-hedge-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            >
+              ⇄ HEDGE
+            </button>
+          )}
+        </>}
+        trailing={<>
+          <TraderChips ohlcvBuilder={ohlcvBuilder} />
+          <TrendSignal ohlcvBuilder={ohlcvBuilder} />
+          {/* EAs / Robots — lives at the right end of the TF bar (replaces the
+              old header placement that overflowed off-screen) */}
         {source === 'tradingview' && (
           <div className="relative ml-1" ref={eaMenuRef}>
             <button
@@ -1140,26 +1162,6 @@ export default function ChartSourceSwitcher({
             </HeaderPortal>
           </div>
         )}
-      </div>
-
-      {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
-          The free space hosts the trader chips + the live trend signal beacon. */}
-      <TimeframeBar
-        middle={<>
-          <EdgeChips ohlcvBuilder={ohlcvBuilder} />
-          {hedgeEnabled && (
-            <button
-              onClick={() => setHedgeOpen(true)}
-              title="AI Correlation Hedging Engine — find, size and monitor portfolio hedges (estimates, never guarantees)"
-              className="raptor-hedge-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
-            >
-              ⇄ HEDGE
-            </button>
-          )}
-        </>}
-        trailing={<>
-          <TraderChips ohlcvBuilder={ohlcvBuilder} />
-          <TrendSignal ohlcvBuilder={ohlcvBuilder} />
         </>}
       />
 
