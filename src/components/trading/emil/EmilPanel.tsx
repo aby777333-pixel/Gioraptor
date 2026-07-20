@@ -19,9 +19,10 @@ import type { ClosedTrade } from '@/lib/trading/trader-metrics';
 import {
   buildCouncil, isEmilOnboarded, recordEmilOnboarding, EMIL_DISCLAIMER,
   loadEmilAutoParams, saveEmilAutoParams, isEmilAutoConsented, recordEmilAutoConsent,
-  emilLog, loadEmilLog,
+  emilLog, loadEmilLog, recordEmilOutcome, emilShouldAvoid, loadEmilLearning,
   type EmilConsensus, type CouncilStance, type EmilAutoParams,
 } from '@/lib/trading/emil-council';
+import { findHedges } from '@/lib/trading/hedge-engine';
 
 type EmilMode = 'observe' | 'confirm' | 'auto';
 
@@ -58,7 +59,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   builderRef.current = ohlcvBuilder;
   const modeRef = useRef<EmilMode>('observe');
   modeRef.current = mode;
-  const beDoneRef = useRef<Set<string>>(new Set());
+  const riskRef = useRef<Map<string, number>>(new Map());   // original SL risk per position (for the R-ladder)
+  const hedgedRef = useRef<Set<string>>(new Set());         // positions EMIL already hedged
+  const lastEmilClosedRef = useRef<number | null>(null);    // learning: newest EMIL close seen
 
   useEffect(() => { setOnboarded(isEmilOnboarded()); }, []);
   useEffect(() => { getInstrumentSpecs().then(setSpecs).catch(() => {}); }, []);
@@ -111,8 +114,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     if (!activeAccountId) { emilLog('blocked', 'no trading account selected'); setLogTick((t) => t + 1); return false; }
     const t = useTradingStore.getState().prices[opp.symbol];
     if (!t?.bid || !t?.ask) { emilLog('blocked', `${opp.symbol}: no live quote — refusing stale data`); setLogTick((x) => x + 1); return false; }
-    const base = opp.suggestedLots ?? 0.01; // scanner sizes at 1% risk
-    const lots = Math.max(0.01, Math.round(base * loadEmilAutoParams().riskPct * 100) / 100);
+    const p = loadEmilAutoParams();
+    const base = opp.suggestedLots ?? p.baseLot; // scanner sizes at 1% risk; base lot is the floor
+    const lots = Math.max(p.baseLot, Math.round(base * p.riskPct * 100) / 100);
     const fill = opp.direction === 'BUY' ? t.ask : t.bid;
     try {
       await orderService.placeMarketOrder({
@@ -149,9 +153,29 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         let consec = 0;
         for (const r of emilRows) { if (Number(r.realized_pnl ?? 0) < 0) consec++; else break; }
 
+        // ── Learning never stops: absorb every newly-closed EMIL trade ──
+        const emilClosed = emilRows.filter((r) => r.closed_at).sort((a, b) => new Date(b.closed_at!).getTime() - new Date(a.closed_at!).getTime());
+        const newestClosed = emilClosed.length ? new Date(emilClosed[0].closed_at!).getTime() : null;
+        if (lastEmilClosedRef.current != null && newestClosed != null && newestClosed > lastEmilClosedRef.current) {
+          for (const r of emilClosed.filter((x) => new Date(x.closed_at!).getTime() > lastEmilClosedRef.current!)) {
+            const parts = String(r.comment ?? '').split(':'); // EMIL:AUTO:H1 · EMIL:CONF:M15 · EMIL:HEDGE:EURUSD
+            if (parts[1] === 'HEDGE') continue;
+            const tf = parts[2] ?? '?';
+            const sym = (r as unknown as { symbol?: string }).symbol ?? '?';
+            const win = Number(r.realized_pnl ?? 0) > 0;
+            const learned = recordEmilOutcome(sym, tf, win);
+            if (learned.avoided) {
+              emilLog('lock', `learned: avoiding ${sym} ${tf} for now (${learned.bucket.wins}/${learned.bucket.n} wins) — losing buckets get benched, not repeated.`);
+              setLogTick((x) => x + 1);
+            }
+          }
+        }
+        if (newestClosed != null) lastEmilClosedRef.current = newestClosed;
+
         const open = (await orderService.getOpenPositions(activeAccountId)) as Array<{ id: string; symbol: string; direction: string; size: number; open_price: number; current_price: number | null; sl: number | null; tp: number | null; comment?: string | null }>;
         const emilOpenPos = open.filter((x) => String(x.comment ?? '').startsWith('EMIL'));
         const ticks = useTradingStore.getState().prices;
+        const universeAll = Object.keys(ticks).filter((s) => ticks[s]?.bid != null);
 
         // ── Exit management (runs in confirm AND auto modes) ──
         for (const pos of emilOpenPos) {
@@ -159,19 +183,34 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           const tk = ticks[pos.symbol];
           const cur = dir > 0 ? (tk?.bid ?? Number(pos.current_price)) : (tk?.ask ?? Number(pos.current_price));
           if (cur == null) continue;
-          // Break-even at +1R (once per position).
-          if (pos.sl != null && pos.sl !== 0 && !beDoneRef.current.has(pos.id)) {
-            const risk = (Number(pos.open_price) - Number(pos.sl)) * dir;
-            if (risk > 0 && (Number(cur) - Number(pos.open_price)) * dir >= risk) {
-              try {
-                await orderService.modifyPosition(pos.id, Number(pos.open_price), pos.tp ?? undefined);
-                beDoneRef.current.add(pos.id);
-                emilLog('breakeven', `${pos.symbol}: +1R reached — stop moved to break-even (${pos.open_price}). The trade can no longer lose.`);
-                setLogTick((x) => x + 1);
-              } catch { /* may have closed */ }
+          const openPx = Number(pos.open_price);
+
+          // R-ladder stop management: capture the ORIGINAL risk on first
+          // sighting, then +1R → break-even, +2R → lock +1R, +3R → +2R…
+          if (pos.sl != null && pos.sl !== 0) {
+            if (!riskRef.current.has(pos.id)) {
+              const r0 = (openPx - Number(pos.sl)) * dir;
+              if (r0 > 0) riskRef.current.set(pos.id, r0); // only pre-BE sightings define R
+            }
+            const risk0 = riskRef.current.get(pos.id);
+            if (risk0 && risk0 > 0) {
+              const profitR = (Number(cur) - openPx) * dir / risk0;
+              const currentLockR = (Number(pos.sl) - openPx) * dir / risk0; // negative before BE
+              const targetLockR = Math.floor(profitR) - 1;                  // +1R→0, +2R→1, +3R→2…
+              if (targetLockR >= 0 && targetLockR > currentLockR + 1e-9) {
+                const newSl = Number((openPx + dir * targetLockR * risk0).toFixed(openPx < 20 ? 5 : 2));
+                try {
+                  await orderService.modifyPosition(pos.id, newSl, pos.tp ?? undefined);
+                  emilLog('breakeven', targetLockR === 0
+                    ? `${pos.symbol}: +1R reached — stop to break-even (${newSl}). The trade can no longer lose.`
+                    : `${pos.symbol}: +${Math.floor(profitR)}R reached — stop trailed to lock +${targetLockR}R (${newSl}).`);
+                  setLogTick((x) => x + 1);
+                } catch { /* may have closed */ }
+              }
             }
           }
-          // Council-flip exit: the read turned against the position.
+
+          // Council read for this symbol (cheap: no hedge/exposure agents).
           const c = buildCouncil({ builder, symbol: pos.symbol, ticks, calendar, positions: [], history: [], specs: null, accountId: activeAccountId, balance: 0, isLiveData });
           const against = (pos.direction === 'BUY' && c.stance === 'BEARISH LEAN') || (pos.direction === 'SELL' && c.stance === 'BULLISH LEAN');
           if (against && c.confidence >= p.minCouncilConf) {
@@ -180,6 +219,38 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
               emilLog('exit', `${pos.symbol}: council flipped ${c.stance} (${c.confidence}%) against the ${pos.direction} — position closed at ${cur}.`);
               setLogTick((x) => x + 1);
             } catch { /* may have closed */ }
+            continue;
+          }
+
+          // Auto-hedge: position adverse ≥0.5R while the council is UNCERTAIN
+          // (NO EDGE) — not confident enough to close, so reduce the bleed with
+          // a viable hedge leg instead. Once per position; efficiency-gated by
+          // the hedge engine's own viability rules.
+          if (p.autoHedge && specs && modeRef.current === 'auto' && !hedgedRef.current.has(pos.id) && !String(pos.comment ?? '').startsWith('EMIL:HEDGE')) {
+            const risk0 = riskRef.current.get(pos.id);
+            const adverseR = risk0 && risk0 > 0 ? (openPx - Number(cur)) * dir / risk0 : 0;
+            if (adverseR >= 0.5 && c.stance === 'NO EDGE') {
+              const { viable } = findHedges(builder, { primary: pos.symbol, direction: pos.direction as 'BUY' | 'SELL', lots: Number(pos.size), hedgePct: 0.5 }, universeAll, specs, ticks);
+              const h = viable[0];
+              if (h) {
+                const ht = ticks[h.symbol];
+                const hFill = h.hedgeDirection === 'BUY' ? ht?.ask : ht?.bid;
+                if (hFill != null) {
+                  try {
+                    await orderService.placeMarketOrder({
+                      accountId: activeAccountId, symbol: h.symbol, direction: h.hedgeDirection,
+                      size: Math.max(p.baseLot, h.suggestedLots), fillPrice: Number(hFill), comment: `EMIL:HEDGE:${pos.symbol}`,
+                    });
+                    hedgedRef.current.add(pos.id);
+                    emilLog('entry', `hedge: ${pos.symbol} is ${adverseR.toFixed(1)}R adverse with an uncertain council — ${h.hedgeDirection} ${Math.max(p.baseLot, h.suggestedLots)} ${h.symbol} placed (~${h.reductionPct.toFixed(0)}% est. risk reduction, corr ${h.corr.avg?.toFixed(2)}).`);
+                    setLogTick((x) => x + 1);
+                  } catch (err) {
+                    emilLog('blocked', `hedge for ${pos.symbol} rejected: ${err instanceof Error ? err.message.slice(0, 120) : 'error'}`);
+                    setLogTick((x) => x + 1);
+                  }
+                }
+              }
+            }
           }
         }
 
@@ -203,14 +274,16 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         const entriesToday = loadEmilLog().filter((e) => e.kind === 'entry' && e.ts >= midnight.getTime()).length;
         if (entriesToday >= p.maxPerDay) return; // manage-only for the rest of the day
 
-        // ── Seek ONE quality entry this cycle ──
-        for (const symbol of p.symbols) {
+        // ── Seek ONE quality entry this cycle — EMIL selects the market ──
+        const scanUniverse = p.selectAll ? universeAll : p.symbols;
+        for (const symbol of scanUniverse) {
           if (emilOpenPos.some((x) => x.symbol === symbol)) continue; // one EMIL trade per symbol
           const c = buildCouncil({ builder, symbol, ticks, calendar, positions: [], history: [], specs: null, accountId: activeAccountId, balance: Number(accountSummary?.balance ?? 0), isLiveData });
           if (c.stance !== 'BULLISH LEAN' && c.stance !== 'BEARISH LEAN') continue;
           if (c.confidence < p.minCouncilConf) continue;
           const opp = c.bestOpp;
           if (!opp || opp.score < p.minScore) continue;
+          if (emilShouldAvoid(symbol, opp.tfLabel)) continue; // learned avoidance — losing buckets are benched
           const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
           if (!aligned) continue;
           const ok = await placeEmilOrder(opp, `EMIL:AUTO:${opp.tfLabel}`);
@@ -220,7 +293,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     }, 45_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboarded, activeAccountId, calendar.length]);
+  }, [onboarded, activeAccountId, calendar.length, specs]);
 
   const orbState = !onboarded ? 'inactive'
     : council?.protectionState === 'LOCKED' ? 'locked'
@@ -419,6 +492,13 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     </p>
                   ))}
                   {loadEmilLog().length === 0 && <p className="text-[9px] text-white/30">No EMIL actions yet.</p>}
+                  {loadEmilLearning().length > 0 && (
+                    <p className="mt-1.5 border-t pt-1.5 text-[9px] text-white/35" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      📚 Learning (never stops):{' '}
+                      {loadEmilLearning().slice(0, 6).map((l) => `${l.key.replace('|', ' ')} ${l.wins}/${l.n}${l.avoided ? ' ⛔benched' : ''}`).join(' · ')}
+                      {' '}— losing buckets are benched automatically (risk-reducing only).
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -452,24 +532,39 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 Outside it, EMIL refuses and tells you why. Every order passes your Shield rules.
               </p>
               <div className="mb-2">
-                <div className="mb-1 text-[9px] uppercase tracking-wide text-white/40">Instrument whitelist</div>
-                <div className="flex flex-wrap gap-1">
-                  {Object.keys(prices).filter((s) => prices[s]?.bid != null).map((s) => (
-                    <button key={s}
-                      onClick={() => setAutoParams((p) => ({ ...p, symbols: p.symbols.includes(s) ? p.symbols.filter((x) => x !== s) : [...p.symbols, s] }))}
-                      className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold transition-all"
-                      style={{
-                        backgroundColor: autoParams.symbols.includes(s) ? 'rgba(206,147,216,0.25)' : 'rgba(255,255,255,0.04)',
-                        color: autoParams.symbols.includes(s) ? '#CE93D8' : 'rgba(255,255,255,0.35)',
-                        border: `1px solid ${autoParams.symbols.includes(s) ? 'rgba(206,147,216,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                      }}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                <label className="mb-1.5 flex items-center gap-2 text-[10px] font-bold" style={{ color: '#CE93D8' }}>
+                  <input type="checkbox" checked={autoParams.selectAll}
+                    onChange={(e) => setAutoParams((p) => ({ ...p, selectAll: e.target.checked }))} className="accent-[#CE93D8]" />
+                  EMIL selects instruments himself — full universe ({Object.keys(prices).filter((s) => prices[s]?.bid != null).length} instruments), all styles (M15 scalp-style → D1 positional)
+                </label>
+                {!autoParams.selectAll && (
+                  <>
+                    <div className="mb-1 text-[9px] uppercase tracking-wide text-white/40">Restrict EMIL to these instruments</div>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.keys(prices).filter((s) => prices[s]?.bid != null).map((s) => (
+                        <button key={s}
+                          onClick={() => setAutoParams((p) => ({ ...p, symbols: p.symbols.includes(s) ? p.symbols.filter((x) => x !== s) : [...p.symbols, s] }))}
+                          className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold transition-all"
+                          style={{
+                            backgroundColor: autoParams.symbols.includes(s) ? 'rgba(206,147,216,0.25)' : 'rgba(255,255,255,0.04)',
+                            color: autoParams.symbols.includes(s) ? '#CE93D8' : 'rgba(255,255,255,0.35)',
+                            border: `1px solid ${autoParams.symbols.includes(s) ? 'rgba(206,147,216,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                          }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <label className="mt-1.5 flex items-center gap-2 text-[10px] text-white/60">
+                  <input type="checkbox" checked={autoParams.autoHedge}
+                    onChange={(e) => setAutoParams((p) => ({ ...p, autoHedge: e.target.checked }))} className="accent-[#CE93D8]" />
+                  Auto-hedge: when a position goes ≥0.5R adverse and the council is uncertain, EMIL may place a viable hedge leg (efficiency-gated, tagged EMIL:HEDGE)
+                </label>
               </div>
               <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                 {([
+                  ['Base lot (floor)', 'baseLot', 0.01, 5, 0.01],
                   ['Risk % / trade', 'riskPct', 0.25, 3, 0.25],
                   ['Min score', 'minScore', 50, 95, 5],
                   ['Min council conf', 'minCouncilConf', 40, 90, 5],
@@ -498,15 +593,15 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 <button
                   onClick={() => {
                     if (gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL') return;
-                    if (!autoParams.symbols.length) return;
+                    if (!autoParams.selectAll && !autoParams.symbols.length) return;
                     saveEmilAutoParams(autoParams);
                     recordEmilAutoConsent(gateTyped.trim(), autoParams);
                     setGateOpen(false); setGateTyped('');
                     setMode('auto');
-                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.symbols.join(', ')} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}`);
+                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.selectAll ? 'EMIL selects instruments (full universe)' : autoParams.symbols.join(', ')} · base lot ${autoParams.baseLot} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}${autoParams.autoHedge ? ' · auto-hedge ON' : ''} · learning always on`);
                     setLogTick((t) => t + 1);
                   }}
-                  disabled={gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL' || !autoParams.symbols.length}
+                  disabled={gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL' || (!autoParams.selectAll && !autoParams.symbols.length)}
                   className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
                   style={{ background: 'linear-gradient(180deg,#CE93D8,#AB47BC)', boxShadow: '0 0 14px rgba(171,71,188,0.5)' }}>
                   ARM AUTONOMOUS PILOT

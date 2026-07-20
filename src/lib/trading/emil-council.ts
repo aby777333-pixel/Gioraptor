@@ -183,7 +183,8 @@ export function buildCouncil(params: {
 // ── EMIL automation envelope (Confirm / Autonomous Pilot) ───────
 
 export interface EmilAutoParams {
-  symbols: string[];        // instrument whitelist
+  selectAll: boolean;       // EMIL selects instruments himself (whole universe)
+  symbols: string[];        // optional restriction list (used when selectAll off)
   minScore: number;         // scanner score floor
   minCouncilConf: number;   // council confidence floor
   maxPerDay: number;        // max EMIL entries per day
@@ -191,9 +192,12 @@ export interface EmilAutoParams {
   dailyLossStop: number;    // $ realized EMIL loss → pause for the day
   dailyProfitLock: number;  // $ realized EMIL profit → bank & pause (0 = off)
   riskPct: number;          // % balance risked per entry (sizing)
+  baseLot: number;          // default/floor lot (0.01 by default)
+  autoHedge: boolean;       // may hedge adverse positions when the council is uncertain
 }
 
 export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
+  selectAll: true,
   symbols: ['EURUSD', 'GBPUSD', 'XAUUSD'],
   minScore: 70,
   minCouncilConf: 55,
@@ -202,6 +206,8 @@ export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
   dailyLossStop: 300,
   dailyProfitLock: 0,
   riskPct: 1,
+  baseLot: 0.01,
+  autoHedge: true,
 };
 
 const EMIL_PARAMS_KEY = 'raptor_emil_autoparams_v1';
@@ -240,6 +246,41 @@ export function emilLog(kind: EmilLogEntry['kind'], text: string): void {
 
 export function loadEmilLog(): EmilLogEntry[] {
   try { return JSON.parse(localStorage.getItem(EMIL_LOG_KEY) || '[]'); } catch { return []; }
+}
+
+// ── EMIL continuous learning (transparent, risk-reducing only) ──
+// EMIL tracks his OWN closed results per symbol × timeframe bucket and stops
+// trading buckets that keep losing. This only ever REDUCES risk (avoidance),
+// never raises it — so it applies automatically and is fully logged. The
+// broader approval-gated preference learning belongs to a later phase.
+
+const EMIL_LEARN_KEY = 'raptor_emil_learn_v1';
+
+interface LearnBucket { n: number; wins: number }
+type LearnStore = Record<string, LearnBucket>;
+
+function loadLearn(): LearnStore {
+  try { return JSON.parse(localStorage.getItem(EMIL_LEARN_KEY) || '{}'); } catch { return {}; }
+}
+
+export function recordEmilOutcome(symbol: string, tf: string, win: boolean): { avoided: boolean; bucket: LearnBucket } {
+  const store = loadLearn();
+  const key = `${symbol}|${tf}`;
+  const b = (store[key] ??= { n: 0, wins: 0 });
+  b.n += 1;
+  if (win) b.wins += 1;
+  try { localStorage.setItem(EMIL_LEARN_KEY, JSON.stringify(store)); } catch { /* ignore */ }
+  return { avoided: b.n >= 3 && b.wins / b.n < 0.34, bucket: b };
+}
+
+export function emilShouldAvoid(symbol: string, tf: string): boolean {
+  const b = loadLearn()[`${symbol}|${tf}`];
+  return !!b && b.n >= 3 && b.wins / b.n < 0.34;
+}
+
+export function loadEmilLearning(): { key: string; n: number; wins: number; avoided: boolean }[] {
+  const store = loadLearn();
+  return Object.entries(store).map(([key, b]) => ({ key, n: b.n, wins: b.wins, avoided: b.n >= 3 && b.wins / b.n < 0.34 }));
 }
 
 // ── EMIL onboarding / consent (v1: observe-only) ────────────────
