@@ -23,8 +23,11 @@ import {
   type EmilConsensus, type CouncilStance, type EmilAutoParams,
 } from '@/lib/trading/emil-council';
 import { findHedges } from '@/lib/trading/hedge-engine';
-import { getLock } from '@/lib/trading/protection';
+import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
+import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, type RiskMood, type ForecastRead, type EventGuidance } from '@/lib/trading/emil-macro';
+import { classifyMarketState } from '@/lib/nexus/market-state';
+import { highImpactWithin, fmtEta } from '@/lib/trading/news-guard';
 
 type EmilMode = 'observe' | 'confirm' | 'auto';
 
@@ -57,6 +60,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [gateTyped, setGateTyped] = useState('');
   const [emilStatus, setEmilStatus] = useState('Watching');
   const [riskState, setRiskState] = useState('Normal');
+  const [macro, setMacro] = useState<{ mood: RiskMood; forecast: ForecastRead | null; events: EventGuidance[] } | null>(null);
   const [placing, setPlacing] = useState(false);
   const [logTick, setLogTick] = useState(0);
   const builderRef = useRef(ohlcvBuilder);
@@ -90,6 +94,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         history, specs, accountId: activeAccountId,
         balance: Number(accountSummary?.balance ?? 0), isLiveData,
       }));
+      setMacro({
+        mood: riskMood(builder),
+        forecast: forecastScenarios(builder, activeSymbol, prices[activeSymbol], calendar),
+        events: eventGuidance(symbolCurrencies(activeSymbol), calendar),
+      });
     };
     compute();
     const id = setInterval(compute, 20_000);
@@ -169,10 +178,13 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
             const sym = (r as unknown as { symbol?: string }).symbol ?? '?';
             const win = Number(r.realized_pnl ?? 0) > 0;
             const learned = recordEmilOutcome(sym, tf, win);
+            // Self-evaluation (§14): every close gets a short honest review.
+            const closeState = classifyMarketState(builder.getAllBars(sym, '60'));
+            emilLog('mode', `review: ${sym} ${tf} ${win ? 'WIN' : 'LOSS'} ${Number(r.realized_pnl ?? 0) >= 0 ? '+' : ''}$${Number(r.realized_pnl ?? 0).toFixed(2)} · regime at close: ${closeState?.state ?? 'unknown'} · bucket now ${learned.bucket.wins}/${learned.bucket.n}${win ? '' : ' · lesson: was the entry chased, or did the regime flip? probabilities updated'}`);
             if (learned.avoided) {
               emilLog('lock', `learned: avoiding ${sym} ${tf} for now (${learned.bucket.wins}/${learned.bucket.n} wins) — losing buckets get benched, not repeated.`);
-              setLogTick((x) => x + 1);
             }
+            setLogTick((x) => x + 1);
           }
         }
         if (newestClosed != null) lastEmilClosedRef.current = newestClosed;
@@ -316,7 +328,12 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
           if (!aligned) continue;
           if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) continue; // slice of profits only
-          candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) });
+          // News buffer: no entries within 30 min of a red-flag event on the symbol.
+          if (highImpactWithin(symbolCurrencies(symbol), calendar, 30).length) continue;
+          // Uncertainty gate: EMIL refuses to enter markets he cannot read.
+          const unc = uncertaintyScore(builder, symbol, ticks[symbol], calendar);
+          if (unc.level === 'HIGH') continue;
+          candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) });
         }
         if (candidates.length) {
           setEmilStatus('Trading');
@@ -496,6 +513,63 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 </div>
               )}
 
+              {/* ── Global Macro Intelligence (real data only) ── */}
+              {macro && (
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {/* Risk mood + uncertainty */}
+                  <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">Global risk mood · cross-asset, last 24h</div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[16px] font-bold" style={{ color: macro.mood.color, textShadow: `0 0 8px ${macro.mood.color}66` }}>{macro.mood.label}</span>
+                      <div className="h-2.5 flex-1 rounded bg-white/[0.05]">
+                        <div className="h-full rounded" style={{ width: `${(macro.mood.score + 100) / 2}%`, background: 'linear-gradient(90deg,#FF5252,#FFB300,#00C27A)' }} />
+                      </div>
+                      <span className="font-mono text-[11px] text-white/60">{macro.mood.score > 0 ? '+' : ''}{macro.mood.score}</span>
+                    </div>
+                    {macro.mood.evidence.map((e, i) => <p key={i} className="mt-1 text-[9px] text-white/40">· {e}</p>)}
+                    {macro.forecast && (
+                      <div className="mt-2 border-t pt-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-white/40">
+                          Uncertainty · {activeSymbol}: <span style={{ color: macro.forecast.uncertainty.level === 'HIGH' ? '#FF5252' : macro.forecast.uncertainty.level === 'ELEVATED' ? '#FFB300' : '#00C27A' }}>{macro.forecast.uncertainty.level} ({macro.forecast.uncertainty.score}/100)</span>
+                        </div>
+                        {macro.forecast.uncertainty.reasons.slice(0, 3).map((r, i) => <p key={i} className="text-[9px] text-white/40">· {r}</p>)}
+                        {macro.forecast.uncertainty.level === 'HIGH' && <p className="mt-1 text-[9px] font-bold" style={{ color: '#FF5252' }}>Pilot entries suspended on unreadable markets — No Trade is a decision.</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Probabilistic forecast */}
+                  <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">
+                      Scenario forecast · {activeSymbol} · confidence {macro.forecast?.confidence ?? '—'}% (decays with uncertainty)
+                    </div>
+                    {macro.forecast ? (
+                      <>
+                        {macro.forecast.scenarios.map((s) => (
+                          <div key={s.name} className="mb-1 flex items-center gap-2 text-[10px]">
+                            <span className="w-40 shrink-0 text-white/60">{s.name}</span>
+                            <div className="h-2 flex-1 rounded bg-white/[0.05]">
+                              <div className="h-full rounded" style={{ width: `${s.probability}%`, backgroundColor: s.name.includes('Bullish') || s.name.includes('up') ? 'rgba(0,194,122,0.7)' : s.name.includes('Bearish') || s.name.includes('down') ? 'rgba(255,82,82,0.7)' : 'rgba(255,179,0,0.7)' }} />
+                            </div>
+                            <span className="w-10 shrink-0 text-right font-mono text-white/70">{s.probability}%</span>
+                          </div>
+                        ))}
+                        <p className="mt-1 text-[9px] text-white/40">Invalidation: {macro.forecast.invalidation}</p>
+                        <p className="text-[9px] text-white/30">Horizon: {macro.forecast.horizon}. Probabilities, never certainty.</p>
+                      </>
+                    ) : <p className="text-[10px] text-white/40">Collecting bars…</p>}
+                    {macro.events.length > 0 && (
+                      <div className="mt-2 border-t pt-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-white/40">Event risk ahead ({activeSymbol} currencies)</div>
+                        {macro.events.slice(0, 3).map((g, i) => (
+                          <p key={i} className="text-[9px] text-white/45">📅 {g.ev.currency} “{g.ev.title}” {fmtEta(g.ev.timeMs)} — {g.impactNote}. EMIL waits ~{g.waitMin} min after the release.</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Confirm-to-Trade: EMIL's prepared ticket for the council's best setup */}
               {mode === 'confirm' && council?.bestOpp && (council.stance === 'BULLISH LEAN' || council.stance === 'BEARISH LEAN') &&
                ((council.stance === 'BULLISH LEAN' && council.bestOpp.direction === 'BUY') || (council.stance === 'BEARISH LEAN' && council.bestOpp.direction === 'SELL')) && (
@@ -537,11 +611,32 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   ))}
                   {loadEmilLog().length === 0 && <p className="text-[9px] text-white/30">No EMIL actions yet.</p>}
                   {loadEmilLearning().length > 0 && (
-                    <p className="mt-1.5 border-t pt-1.5 text-[9px] text-white/35" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                      📚 Learning (never stops):{' '}
-                      {loadEmilLearning().slice(0, 6).map((l) => `${l.key.replace('|', ' ')} ${l.wins}/${l.n}${l.avoided ? ' ⛔benched' : ''}`).join(' · ')}
-                      {' '}— losing buckets are benched automatically (risk-reducing only).
-                    </p>
+                    <div className="mt-1.5 border-t pt-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <p className="text-[9px] text-white/35">
+                        📚 Knowledge evolution (learning never stops):{' '}
+                        {loadEmilLearning().slice(0, 6).map((l) => `${l.key.replace('|', ' ')} ${l.wins}/${l.n}${l.avoided ? ' ⛔benched' : ''}`).join(' · ')}
+                        {' '}— benching is risk-reducing only; risk-raising changes always need your approval.
+                      </p>
+                      <div className="mt-1 flex gap-1.5">
+                        <button onClick={() => {
+                          const blob = new Blob([JSON.stringify({ learning: loadEmilLearning(), log: loadEmilLog(), exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+                          const a = document.createElement('a');
+                          a.href = URL.createObjectURL(blob);
+                          a.download = `emil-knowledge-${new Date().toISOString().slice(0, 10)}.json`;
+                          a.click(); URL.revokeObjectURL(a.href);
+                        }} className="rounded px-2 py-0.5 text-[8px] font-bold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                          Export knowledge
+                        </button>
+                        <button onClick={() => {
+                          if (!window.confirm('Reset EMIL learning? All learned bucket statistics and benchings are cleared. This cannot be undone.')) return;
+                          try { localStorage.removeItem('raptor_emil_learn_v1'); } catch { /* ignore */ }
+                          emilLog('mode', 'learning RESET by trader — bucket statistics cleared, EMIL starts observing fresh');
+                          setLogTick((t) => t + 1);
+                        }} className="rounded px-2 py-0.5 text-[8px] font-bold transition-colors hover:brightness-125" style={{ color: '#FF8A65', border: '1px solid rgba(255,138,101,0.3)' }}>
+                          Reset learning
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
