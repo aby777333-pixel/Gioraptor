@@ -102,9 +102,10 @@ export default function EmilLanguagePanel({ onLog }: { onLog: (text: string) => 
         parser. Indian-language or mixed text is translated by Sarvam (when enabled + configured), then the SAME rule
         parser, read-back and your explicit Apply click follow — translation can never trigger a trade, and ambiguous
         commands are flagged, never guessed. If Sarvam is slow, down or unconfigured, EMIL says so and the English engine
-        continues. Voice (speech-to-text / text-to-speech) arrives when the Sarvam speech services are wired server-side —
-        not claimed before it exists. Expected languages: {EXPECTED_LANGS.map((l) => l.name).join(', ')} (live list follows
-        the connected service).
+        continues. Voice: the 🎤 button in Mission Control records your mic, Sarvam speech-to-text-translate returns an
+        English transcript, and the SAME read-back + Apply pipeline follows — spoken words can never trade on their own.
+        Text-to-speech replies are a future phase. Expected languages: {EXPECTED_LANGS.map((l) => l.name).join(', ')}
+        (live list follows the connected service).
       </p>
 
       {audit.length > 0 && (

@@ -24,7 +24,7 @@ const HEALTH_COLORS: Record<HealthStatus, string> = {
 interface ClosedRowLite { realized_pnl: number | null; closed_at: string | null; comment?: string | null }
 interface OpenPosLite { symbol: string; direction: string; size: number; open_price: number; sl: number | null; comment?: string | null }
 
-export default function EmilGovernance({ builder, council, prices, calendar, autoParams, mode, sleepNoNew, adaptEmil, closedRows, openPositions, logTick, onLog }: {
+export default function EmilGovernance({ builder, council, prices, calendar, autoParams, mode, sleepNoNew, adaptEmil, closedRows, openPositions, logTick, onLog, sarvamOk }: {
   builder: OHLCVBuilder | null;
   council: EmilConsensus | null;
   prices: Record<string, { bid?: number; ask?: number } | undefined>;
@@ -37,6 +37,7 @@ export default function EmilGovernance({ builder, council, prices, calendar, aut
   openPositions: OpenPosLite[];
   logTick: number;
   onLog: (text: string) => void;
+  sarvamOk?: boolean;
 }) {
   const [showConstitution, setShowConstitution] = useState(false);
   const [showReplays, setShowReplays] = useState(false);
@@ -82,9 +83,9 @@ export default function EmilGovernance({ builder, council, prices, calendar, aut
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logTick]);
   const health = useMemo(
-    () => healthChecks({ prices, calendarCount: calendar.length, notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported', lastBlockedText: lastBlocked }),
+    () => healthChecks({ prices, calendarCount: calendar.length, notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported', lastBlockedText: lastBlocked, sarvamConfigured: sarvamOk }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [calendar.length, lastBlocked, logTick],
+    [calendar.length, lastBlocked, logTick, sarvamOk],
   );
 
   const replays = loadReplays();

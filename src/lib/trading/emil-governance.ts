@@ -344,8 +344,9 @@ export function healthChecks(params: {
   calendarCount: number;
   notificationPermission: string;
   lastBlockedText: string | null;
+  sarvamConfigured?: boolean;
 }): HealthItem[] {
-  const { prices, calendarCount, notificationPermission, lastBlockedText } = params;
+  const { prices, calendarCount, notificationPermission, lastBlockedText, sarvamConfigured } = params;
   const liveSymbols = Object.keys(prices).filter((s) => prices[s]?.bid != null).length;
   let storageOk = true;
   try { localStorage.setItem('raptor_health_probe', '1'); localStorage.removeItem('raptor_health_probe'); } catch { storageOk = false; }
@@ -358,7 +359,7 @@ export function healthChecks(params: {
     { name: 'Learning engine', status: storageOk ? 'Healthy' : 'Critical', note: storageOk ? 'buckets persisting' : 'localStorage unavailable — learning cannot persist' },
     { name: 'Audit & logs', status: storageOk ? 'Healthy' : 'Critical', note: storageOk ? 'activity, identity, replay and shadow logs writable' : 'storage failed' },
     { name: 'Notifications', status: notificationPermission === 'granted' ? 'Healthy' : 'Degraded', note: notificationPermission === 'granted' ? 'wake alerts deliverable' : `permission ${notificationPermission} — grant it for wake alerts` },
-    { name: 'Voice engine', status: 'Offline', note: 'arrives with the language-services phase — never claimed early' },
+    { name: 'Voice engine', status: sarvamConfigured ? 'Healthy' : 'Offline', note: sarvamConfigured ? 'Sarvam speech-to-text-translate via server proxy — read-back + confirm always required' : 'needs Sarvam configured server-side — never claimed early' },
     { name: 'Liquidity / broker link', status: 'Degraded', note: 'simulated platform feed — real LP connection is the known open milestone' },
   ];
 }

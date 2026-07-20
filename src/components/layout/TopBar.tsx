@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Sun,
-  Moon,
   ChevronDown,
   LogOut,
   Settings,
@@ -115,7 +113,6 @@ export default function TopBar() {
   const {
     activeSymbol,
     theme,
-    toggleTheme,
     setActiveAccountId,
   } = useTradingStore();
 
@@ -379,17 +376,7 @@ export default function TopBar() {
           <RefreshCw size={15} className="opacity-50" />
         </button>
 
-        <button
-          onClick={() => {
-            const newTheme = theme === 'dark' ? 'light' : 'dark';
-            toggleTheme();
-            document.documentElement.setAttribute('data-theme', newTheme);
-          }}
-          className="p-2 rounded hover:opacity-70 transition-opacity"
-          title="Toggle theme"
-        >
-          {theme === 'dark' ? <Sun size={15} className="opacity-60" /> : <Moon size={15} className="opacity-60" />}
-        </button>
+        {/* Theme toggle hidden per owner request (dark theme is the platform look). */}
 
         {/* Price Alerts */}
         <div className="relative">

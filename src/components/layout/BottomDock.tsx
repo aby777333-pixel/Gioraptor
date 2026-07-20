@@ -40,17 +40,21 @@ export default function BottomDock({ children, initialHeight = 220 }: { children
 
   return (
     <>
-      {/* Dragger */}
-      <div onMouseDown={onDown} className="relative shrink-0" style={{ height: 6, cursor: 'row-resize', zIndex: 50 }}>
+      {/* Dragger — deliberately prominent so it's never missed */}
+      <div onMouseDown={onDown} className="group relative shrink-0" title="Drag up/down to resize this panel"
+        style={{ height: 12, cursor: 'row-resize', zIndex: 50 }}>
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,145,213,0.1) 50%, rgba(255,255,255,0.02) 100%)',
-          borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,145,213,0.22) 50%, rgba(255,255,255,0.02) 100%)',
+          borderTop: '1px solid rgba(0,145,213,0.45)', borderBottom: '1px solid rgba(0,145,213,0.45)',
         }}>
-          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', gap: 3 }}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)' }} />
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'rgba(41,171,226,0.75)', boxShadow: '0 0 4px rgba(41,171,226,0.6)' }} />
             ))}
+            <span className="ml-2 font-mono text-[8px] font-bold uppercase tracking-wider opacity-0 transition-opacity group-hover:opacity-100" style={{ color: '#29ABE2' }}>
+              ⇕ drag to resize
+            </span>
           </div>
         </div>
       </div>

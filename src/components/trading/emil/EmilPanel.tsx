@@ -27,7 +27,7 @@ import {
   objectiveEffects, loadObjectives, riskBudget, trackDayPeak,
   recordShadow, recordReplay, decisionScores,
 } from '@/lib/trading/emil-governance';
-import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, langAudit } from '@/lib/trading/emil-language';
+import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
 import { getPipSize, calcPipValue } from '@/lib/trading/ticket-math';
 import EmilGovernance from '@/components/trading/emil/EmilGovernance';
 import EmilLanguagePanel from '@/components/trading/emil/EmilLanguagePanel';
@@ -124,6 +124,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [adaptGate, setAdaptGate] = useState(false);
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
   const [sarvamOk, setSarvamOk] = useState<boolean | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const voiceCapRef = useRef<VoiceCapture | null>(null);
   const givebackDayRef = useRef<string>('');
   const streakDayRef = useRef<string>('');
   const [sleepNoNew, setSleepNoNew] = useState(false);
@@ -249,6 +252,72 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     emilLog('mode', `ADAPTATION: ${readback}`);
     setLogTick((t) => t + 1);
   }, []);
+
+  // Mission parsing pipeline — shared by typed text AND voice transcripts.
+  // §Language routing: English → rule parser directly; Indian/mixed text →
+  // Sarvam translate (consented + configured) → the SAME rule parser +
+  // read-back + explicit Apply. Never guessed; never executes on its own.
+  const runMissionParse = useCallback(async (text: string) => {
+    const pricesNow = useTradingStore.getState().prices;
+    const universe = Object.keys(pricesNow).filter((s) => pricesNow[s]?.bid != null);
+    const route = routeCommand(text, loadLangPrefs(), sarvamOk === true);
+    let textToParse = text;
+    const preRules: { label: string; detail: string }[] = [];
+    if (route.engine === 'sarvam+rules') {
+      const tr = await sarvamTranslate(text, route.detect.lang);
+      if (tr.ok && tr.translated) {
+        textToParse = tr.translated;
+        preRules.push({ label: 'Sarvam translation', detail: `“${tr.translated}” — review the read-back below before applying` });
+        langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'mission parsed' });
+      } else {
+        preRules.push({ label: 'Language service', detail: `${tr.error} — parsed with the English rule engine instead` });
+        langAudit({ original: text.slice(0, 200), detected: route.detect.label, engine: 'rules(fallback)', translated: null, action: 'sarvam unavailable' });
+      }
+    } else if (route.detect.lang !== 'en' || route.detect.mixed) {
+      preRules.push({ label: 'Language routing', detail: route.reason });
+    }
+    const parsed = parseMission(textToParse, universe);
+    parsed.rules.unshift(...preRules);
+    setMissionParse(parsed);
+  }, [sarvamOk]);
+
+  // Voice command: mic → 16kHz WAV → Sarvam speech-to-text-translate →
+  // English transcript → the same mission pipeline. Nothing executes from
+  // voice alone — the read-back + Apply click are always required (§7).
+  const handleVoice = useCallback(async () => {
+    if (voiceCapRef.current) {
+      setVoiceBusy(true);
+      try {
+        const cap = voiceCapRef.current;
+        voiceCapRef.current = null;
+        setRecording(false);
+        const { base64, seconds } = await cap.stop();
+        if (seconds < 1) { emilLog('mode', 'voice: recording too short — try again.'); setLogTick((t) => t + 1); return; }
+        const res = await sarvamSpeech(base64);
+        if (res.ok && res.transcript) {
+          setMissionText(res.transcript);
+          langAudit({ original: `[voice ${seconds}s]`, detected: res.language ?? 'unknown', engine: 'sarvam-stt-translate', translated: res.transcript.slice(0, 200), action: 'voice transcribed' });
+          emilLog('mode', `voice heard (${res.language ?? 'language unknown'}): “${res.transcript.slice(0, 120)}” — read-back below; nothing applies without your click.`);
+          setLogTick((t) => t + 1);
+          await runMissionParse(res.transcript);
+        } else {
+          emilLog('mode', `voice: ${res.error} — type the command instead; nothing was executed.`);
+          setLogTick((t) => t + 1);
+        }
+      } finally { setVoiceBusy(false); }
+      return;
+    }
+    const prefs = loadLangPrefs();
+    if (!prefs.sarvamEnabled || !prefs.consentAt) { emilLog('mode', 'voice needs Sarvam enabled + consent — see the Language & Voice panel below.'); setLogTick((t) => t + 1); return; }
+    if (sarvamOk !== true) { emilLog('mode', 'voice: Sarvam is not configured on the server — voice stays off, honestly.'); setLogTick((t) => t + 1); return; }
+    try {
+      voiceCapRef.current = await startVoiceCapture();
+      setRecording(true);
+    } catch {
+      emilLog('mode', 'voice: microphone unavailable or permission denied.');
+      setLogTick((t) => t + 1);
+    }
+  }, [sarvamOk, runMissionParse]);
 
   const stopEverything = useCallback((reason: string) => {
     setMode('observe');
@@ -868,38 +937,22 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
 
               {/* 🎯 Mission Control */}
               <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,213,79,0.25)' }}>
-                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>🎯 Mission Control — tell EMIL the mission in plain language</div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>🎯 Mission Control — tell EMIL what you want, typed or spoken, in English or your language</div>
                 <div className="flex gap-2">
                   <input value={missionText} onChange={(e) => setMissionText(e.target.value)}
                     placeholder='e.g. "Only trade gold and EURUSD. Risk no more than 0.5 percent. Stop after two losses. Lock the day at a $300 target."'
-                    className="min-w-0 flex-1 rounded bg-white/[0.06] px-2 py-1.5 text-[11px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
-                  <button onClick={async () => {
-                    // §Language routing: English → rule parser directly; Indian/mixed
-                    // text → Sarvam translate (consented + configured) → the SAME
-                    // rule parser + read-back + Apply pipeline. Never guessed.
-                    const universe = Object.keys(prices).filter((s) => prices[s]?.bid != null);
-                    const route = routeCommand(missionText, loadLangPrefs(), sarvamOk === true);
-                    let textToParse = missionText;
-                    const preRules: { label: string; detail: string }[] = [];
-                    if (route.engine === 'sarvam+rules') {
-                      const tr = await sarvamTranslate(missionText);
-                      if (tr.ok && tr.translated) {
-                        textToParse = tr.translated;
-                        preRules.push({ label: 'Sarvam translation', detail: `“${tr.translated}” — review the read-back below before applying` });
-                        langAudit({ original: missionText.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'mission parsed' });
-                      } else {
-                        preRules.push({ label: 'Language service', detail: `${tr.error} — parsed with the English rule engine instead` });
-                        langAudit({ original: missionText.slice(0, 200), detected: route.detect.label, engine: 'rules(fallback)', translated: null, action: 'sarvam unavailable' });
-                      }
-                    } else if (route.detect.lang !== 'en' || route.detect.mixed) {
-                      preRules.push({ label: 'Language routing', detail: route.reason });
-                    }
-                    const parsed = parseMission(textToParse, universe);
-                    parsed.rules.unshift(...preRules);
-                    setMissionParse(parsed);
-                  }}
+                    className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2.5 text-[13px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
+                  <button onClick={handleVoice} disabled={voiceBusy}
+                    title={recording ? 'Stop recording and transcribe' : 'Voice command via Sarvam — speak English or an Indian language; EMIL reads back before anything applies'}
+                    className="shrink-0 rounded px-3 py-2.5 text-[12px] font-bold transition-all hover:brightness-110 disabled:opacity-40"
+                    style={recording
+                      ? { backgroundColor: 'rgba(255,82,82,0.2)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.7)', boxShadow: '0 0 12px rgba(255,82,82,0.5)', animation: 'pulse 1.2s infinite' }
+                      : { backgroundColor: 'rgba(255,138,101,0.12)', color: '#FF8A65', border: '1px solid rgba(255,138,101,0.4)' }}>
+                    {voiceBusy ? '…' : recording ? '⏹ Stop' : '🎤'}
+                  </button>
+                  <button onClick={() => runMissionParse(missionText)}
                     disabled={!missionText.trim()}
-                    className="shrink-0 rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-30"
+                    className="shrink-0 rounded px-4 py-2.5 text-[12px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-30"
                     style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)' }}>
                     Parse mission
                   </button>
@@ -1420,6 +1473,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 openPositions={positions as unknown as Array<{ symbol: string; direction: string; size: number; open_price: number; sl: number | null; comment?: string | null }>}
                 logTick={logTick}
                 onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }}
+                sarvamOk={sarvamOk === true}
               />
 
               {/* ── Language & Voice: Sarvam multilingual layer (additive) ── */}
@@ -1490,9 +1544,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         {/* ── Autonomous Pilot gate: limit envelope + typed consent ── */}
         {gateOpen && (
           <div className="fixed inset-0 z-[9600] flex items-center justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) setGateOpen(false); }}>
-            <div className="my-4 w-full max-w-[560px] rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(206,147,216,0.5)' }}>
-              <div className="mb-2 text-[14px] font-bold text-white">Arm the Autonomous Pilot — your limit envelope</div>
-              <p className="mb-3 text-[10px] leading-relaxed text-white/55">
+            <div className="my-4 w-full max-w-[860px] rounded-xl border p-6 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(206,147,216,0.5)' }}>
+              <div className="mb-2 text-[17px] font-bold text-white">Arm the Autonomous Pilot — your limit envelope</div>
+              <p className="mb-3 text-[11px] leading-relaxed text-white/55">
                 Inside this envelope EMIL may enter (council-aligned scanner setups, SL + TP attached, one entry per cycle,
                 one per symbol) and exit (break-even at +1R, council-flip close, daily profit lock, daily loss stop).
                 Outside it, EMIL refuses and tells you why. Every order passes your Shield rules.
@@ -1622,10 +1676,10 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   ['Daily profit lock $ (0=off)', 'dailyProfitLock', 0, 100000, 50],
                   ['Max profit giveback $ (0=off)', 'maxGiveback', 0, 100000, 25],
                 ] as const).map(([label, key, min, max, step]) => (
-                  <label key={key} className="text-[9px] text-white/45">{label}
+                  <label key={key} className="text-[10px] text-white/45">{label}
                     <input type="number" min={min} max={max} step={step} value={autoParams[key] as number}
                       onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setAutoParams((p) => ({ ...p, [key]: Math.max(min, Math.min(max, v)) })); }}
-                      className="mt-0.5 block w-full rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white outline-none" style={{ border: '1px solid rgba(206,147,216,0.3)' }} />
+                      className="mt-1 block w-full rounded bg-white/[0.06] px-2 py-1.5 font-mono text-[12px] text-white outline-none" style={{ border: '1px solid rgba(206,147,216,0.3)' }} />
                   </label>
                 ))}
               </div>
@@ -1643,10 +1697,10 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
               <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
                 {EMIL_DISCLAIMER}
               </p>
-              <label className="mb-3 block text-[10px] text-white/60">
+              <label className="mb-3 block text-[11px] text-white/60">
                 Type <span className="font-mono font-bold text-white">I AUTHORIZE EMIL</span> to arm the pilot:
                 <input value={gateTyped} onChange={(e) => setGateTyped(e.target.value)} placeholder="I AUTHORIZE EMIL"
-                  className="mt-1 block w-full rounded bg-white/[0.06] px-2 py-1.5 font-mono text-[11px] text-white placeholder:text-white/20 outline-none" style={{ border: '1px solid rgba(206,147,216,0.4)' }} />
+                  className="mt-1.5 block w-full rounded bg-white/[0.06] px-3 py-2 font-mono text-[13px] text-white placeholder:text-white/20 outline-none" style={{ border: '1px solid rgba(206,147,216,0.4)' }} />
               </label>
               <div className="flex justify-end gap-2">
                 <button onClick={() => setGateOpen(false)} className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>Cancel</button>

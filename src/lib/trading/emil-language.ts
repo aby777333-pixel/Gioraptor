@@ -98,12 +98,14 @@ export function routeCommand(text: string, prefs: LangPrefs, sarvamConfigured: b
   return { engine: 'sarvam+rules', reason: `${detect.label} detected — Sarvam translates, then the SAME rule parser + read-back + confirm pipeline applies`, detect };
 }
 
-/** Translate via the server proxy. Never throws — falls back honestly. */
-export async function sarvamTranslate(text: string): Promise<{ ok: boolean; translated: string | null; error: string | null }> {
+/** Translate via the server proxy. Never throws — falls back honestly.
+ *  Pass the locally-detected script code as sourceLang: Sarvam requires an
+ *  explicit (or detectable) source language. */
+export async function sarvamTranslate(text: string, sourceLang?: string | null): Promise<{ ok: boolean; translated: string | null; error: string | null }> {
   try {
     const r = await fetch('/api/sarvam', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'translate', text, targetLang: 'en-IN' }),
+      body: JSON.stringify({ action: 'translate', text, targetLang: 'en-IN', sourceLang: sourceLang ?? undefined }),
     });
     const j = await r.json();
     if (j.ok && j.translated) return { ok: true, translated: String(j.translated), error: null };
@@ -111,6 +113,67 @@ export async function sarvamTranslate(text: string): Promise<{ ok: boolean; tran
   } catch {
     return { ok: false, translated: null, error: 'language service unreachable — default engine continues' };
   }
+}
+
+/** Voice command via Sarvam speech-to-text-translate: returns an ENGLISH
+ *  transcript (translation happens server-side in one hop) plus the detected
+ *  spoken language. Never throws. */
+export async function sarvamSpeech(audioBase64: string): Promise<{ ok: boolean; transcript: string | null; language: string | null; error: string | null }> {
+  try {
+    const r = await fetch('/api/sarvam', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'stt', audioBase64 }),
+    });
+    const j = await r.json();
+    if (j.ok && j.transcript) return { ok: true, transcript: String(j.transcript), language: j.language ? String(j.language) : null, error: null };
+    return { ok: false, transcript: null, language: null, error: String(j.error ?? 'speech service unavailable') };
+  } catch {
+    return { ok: false, transcript: null, language: null, error: 'speech service unreachable' };
+  }
+}
+
+// ── Microphone → 16 kHz mono WAV (what Sarvam's speech API expects) ──
+
+export interface VoiceCapture { stop: () => Promise<{ base64: string; seconds: number }> }
+
+export async function startVoiceCapture(): Promise<VoiceCapture> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true } });
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  const source = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks: Float32Array[] = [];
+  proc.onaudioprocess = (e) => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  source.connect(proc);
+  proc.connect(ctx.destination);
+  const startedAt = Date.now();
+  return {
+    stop: async () => {
+      proc.disconnect(); source.disconnect();
+      stream.getTracks().forEach((t) => t.stop());
+      const sampleRate = ctx.sampleRate;
+      await ctx.close();
+      const total = chunks.reduce((a, c) => a + c.length, 0);
+      const pcm = new Float32Array(total);
+      let off = 0;
+      for (const c of chunks) { pcm.set(c, off); off += c.length; }
+      // Encode 16-bit PCM WAV.
+      const buf = new ArrayBuffer(44 + pcm.length * 2);
+      const dv = new DataView(buf);
+      const wStr = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+      wStr(0, 'RIFF'); dv.setUint32(4, 36 + pcm.length * 2, true); wStr(8, 'WAVE');
+      wStr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+      dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+      wStr(36, 'data'); dv.setUint32(40, pcm.length * 2, true);
+      for (let i = 0; i < pcm.length; i++) {
+        const s = Math.max(-1, Math.min(1, pcm[i]));
+        dv.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      return { base64: btoa(bin), seconds: Math.round((Date.now() - startedAt) / 1000) };
+    },
+  };
 }
 
 export async function sarvamHealth(): Promise<boolean> {
