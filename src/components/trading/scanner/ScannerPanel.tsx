@@ -22,6 +22,7 @@ import { getCalendar, fmtEta, type NewsEvent } from '@/lib/trading/news-guard';
 import {
   runScan, loadScanFilters, saveScanFilters, SCAN_TFS,
   appendSignalLog, loadSignalLog,
+  recordScanGrades, resolveScanGrades, scanGradeSummary,
   type Opportunity, type ScanFilters, type AssetClass,
 } from '@/lib/trading/scanner-engine';
 import EmilStrip from '@/components/trading/emil/EmilStrip';
@@ -87,6 +88,8 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
     });
     setOpps(found);
     setScannedAt(Date.now());
+    // Self-grading: remember strong cards, resolve older ones vs real bars.
+    try { recordScanGrades(found); resolveScanGrades(builder); } catch { /* grading never breaks the scan */ }
     for (const o of found) {
       if (o.score >= 70 && !loggedRef.current.has(o.id)) {
         loggedRef.current.add(o.id);
@@ -347,6 +350,20 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
           {mode === 'off' && (
             <p className="py-8 text-center text-[12px] text-white/40">Scanner is OFF. Switch to SIGNAL ONLY to analyse the market.</p>
           )}
+
+          {/* 📋 Self-grade scoreboard: the scanner grades ITSELF against real bars */}
+          {(() => {
+            const g = scanGradeSummary();
+            const resolved = g.reduce((a, x) => a + x.wins + x.losses, 0);
+            const pending = g.reduce((a, x) => a + x.open, 0);
+            return resolved + pending > 0 ? (
+              <p className="mb-2 text-[9px] text-white/40">
+                📋 <b className="text-white/60">Scanner self-grade</b> (strong cards resolved vs real bars, stop-first = loss):{' '}
+                {resolved > 0 ? g.filter((x) => x.wins + x.losses > 0).map((x) => `${x.style} ${x.wins}W/${x.losses}L`).join(' · ') : 'no cards resolved yet'}
+                {pending > 0 ? ` · ${pending} pending` : ''} — the scanner is graded publicly, wins and losses alike.
+              </p>
+            ) : null;
+          })()}
 
           {/* Signal log — rendered at the TOP of the body so toggling it gives
               immediate visible feedback (it used to sit below dozens of cards,

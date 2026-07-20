@@ -24,7 +24,7 @@ import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { symbolCurrencies } from '@/lib/trading/protection';
 import { getCalendar, upcomingHighImpact, fmtEta, type NewsEvent } from '@/lib/trading/news-guard';
 import {
-  findHedges, currencyExposureMap, loadHedgeGroups, saveHedgeGroups, correlationRead, decayForecast,
+  findHedges, currencyExposureMap, loadHedgeGroups, saveHedgeGroups, correlationRead, decayForecast, portfolioHedgeSuggestion,
   stressTest, leadLag, spreadZ, weekendGap, correlationMatrix,
   type HedgeCandidate, type HedgeInputs, type HedgeGroup, type StressResult,
 } from '@/lib/trading/hedge-engine';
@@ -94,7 +94,41 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
     return hits[0] ?? null;
   }, [calendar]);
 
-  const exposure = useMemo(() => (specs ? currencyExposureMap(positions, specs) : []), [positions, specs]);
+  // Standalone windows: the shared store's positions array is only
+  // populated on the main terminal — fall back to a direct fetch so the
+  // exposure map and portfolio suggestion work everywhere.
+  const [fetchedPositions, setFetchedPositions] = useState<typeof positions>([]);
+  useEffect(() => {
+    // STANDALONE pages only: the terminal popup always has store positions,
+    // and adding any periodic setState to the popup during the per-tick
+    // subscriber cascade can tip React's nested-update clamp (measured —
+    // see the audit gap entry; real fix = store tick batching).
+    if (!standalone || !activeAccountId) return;
+    let alive = true;
+    const load = () => {
+      // Store-populated pages don't need the fallback (read via getState to
+      // keep deps minimal — this effect must stay quiet during render storms).
+      if (useTradingStore.getState().positions.length > 0) return;
+      orderService.getOpenPositions(activeAccountId)
+        .then((rows) => {
+          if (!alive || !Array.isArray(rows)) return;
+          // Only update state when the position set actually changed — a
+          // no-op set during a busy update cascade can tip React's nested-
+          // update clamp and kill the whole panel (measured live).
+          setFetchedPositions((prev) => {
+            const key = (l: typeof prev) => l.map((p) => `${(p as { id?: string }).id ?? p.symbol}:${p.size}`).join('|');
+            return key(prev) === key(rows as typeof prev) ? prev : (rows as typeof prev);
+          });
+        })
+        .catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [standalone, activeAccountId]);
+  const posSource = positions.length > 0 ? positions : fetchedPositions;
+
+  const exposure = useMemo(() => (specs ? currencyExposureMap(posSource, specs) : []), [posSource, specs]);
 
   // The matrix auto-computes when the panel opens (it also powers the
   // opportunity scanner); Recompute refreshes it on demand.
@@ -452,6 +486,25 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
               </div>
             )}
           </div>
+
+          {/* ── 🎯 Portfolio-level hedge suggestion (one trade, biggest cut) ── */}
+          {(() => {
+            const sug = portfolioHedgeSuggestion({ positions: posSource, universe, symbolCurrenciesFn: symbolCurrencies });
+            return sug ? (
+              <div className="mb-3 rounded-lg border p-3" style={{ borderColor: 'rgba(0,229,160,0.35)', backgroundColor: 'rgba(0,229,160,0.04)' }}>
+                <div className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: MINT }}>🎯 Portfolio hedge — one trade to cut your biggest concentration</div>
+                <p className="text-[10px] text-white/60">
+                  <span className="font-mono font-bold" style={{ color: sug.direction === 'BUY' ? '#00C27A' : '#FF5252' }}>{sug.direction} {sug.lots} {sug.instrument}</span>
+                  <span className="text-white/45"> — {sug.rationale}</span>
+                </p>
+                <button onClick={() => { setPrimary(sug.instrument); say(`${sug.instrument} loaded in the finder — review the correlation-adjusted math, then confirm like any order.`); }}
+                  className="mt-1.5 rounded px-2.5 py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                  style={{ color: MINT, border: '1px solid rgba(0,229,160,0.45)' }}>
+                  Load in the finder →
+                </button>
+              </div>
+            ) : null;
+          })()}
 
           {/* ── Currency exposure map ── */}
           {exposure.length > 0 && (

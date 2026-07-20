@@ -419,6 +419,72 @@ export function runScan(params: {
   return out.sort((a, b) => b.score - a.score);
 }
 
+// ── Scanner self-grading: cards resolved against REAL bars ──────
+// Every strong card (score ≥70) is remembered once per symbol×TF×day;
+// later sweeps walk the actual bars — stop touched first counts as a
+// loss (conservative), target first a win, 48h unresolved expires.
+// The scoreboard grades the SCANNER itself, publicly, per style.
+
+export interface ScanGrade {
+  ts: number; symbol: string; tf: string; style: string; direction: 'BUY' | 'SELL';
+  entry: number; stop: number; target: number;
+  status: 'open' | 'win' | 'loss' | 'expired';
+}
+
+const GRADES_KEY = 'raptor_scanner_grades_v1';
+
+export function loadScanGrades(): ScanGrade[] {
+  try { return JSON.parse(localStorage.getItem(GRADES_KEY) || '[]'); } catch { return []; }
+}
+
+function saveScanGrades(list: ScanGrade[]): void {
+  try { localStorage.setItem(GRADES_KEY, JSON.stringify(list.slice(-200))); } catch { /* ignore */ }
+}
+
+export function recordScanGrades(opps: Opportunity[]): void {
+  const list = loadScanGrades();
+  const today = new Date().toDateString();
+  let changed = false;
+  for (const o of opps) {
+    if (o.score < 70) continue;
+    if (list.some((g) => g.symbol === o.symbol && g.tf === o.tfLabel && new Date(g.ts).toDateString() === today)) continue;
+    list.push({ ts: Date.now(), symbol: o.symbol, tf: o.tfLabel, style: o.style, direction: o.direction, entry: o.zone.preferred, stop: o.zone.stop, target: o.zone.target1, status: 'open' });
+    changed = true;
+  }
+  if (changed) saveScanGrades(list);
+}
+
+export function resolveScanGrades(builder: OHLCVBuilder): void {
+  const list = loadScanGrades();
+  let changed = false;
+  for (const g of list) {
+    if (g.status !== 'open') continue;
+    if (Date.now() - g.ts > 48 * 3_600_000) { g.status = 'expired'; changed = true; continue; }
+    const res = SCAN_TFS.find((t) => t.label === g.tf)?.res ?? '15';
+    const bars = builder.getAllBars(g.symbol, res).filter((b) => (b.time as number) * 1000 > g.ts);
+    const dir = g.direction === 'BUY' ? 1 : -1;
+    for (const b of bars) {
+      const hitStop = dir > 0 ? b.low <= g.stop : b.high >= g.stop;
+      const hitTarget = dir > 0 ? b.high >= g.target : b.low <= g.target;
+      if (hitStop) { g.status = 'loss'; changed = true; break; } // ambiguous bars count against us
+      if (hitTarget) { g.status = 'win'; changed = true; break; }
+    }
+  }
+  if (changed) saveScanGrades(list);
+}
+
+export function scanGradeSummary(): Array<{ style: string; wins: number; losses: number; open: number }> {
+  const by = new Map<string, { wins: number; losses: number; open: number }>();
+  for (const g of loadScanGrades()) {
+    const cell = by.get(g.style) ?? { wins: 0, losses: 0, open: 0 };
+    if (g.status === 'win') cell.wins++;
+    else if (g.status === 'loss') cell.losses++;
+    else if (g.status === 'open') cell.open++;
+    by.set(g.style, cell);
+  }
+  return [...by.entries()].map(([style, c]) => ({ style, ...c })).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses));
+}
+
 // ── Scanner signal log (audit-lite, exportable) ─────────────────
 
 const LOG_KEY = 'raptor_scanner_log_v1';

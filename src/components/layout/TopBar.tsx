@@ -32,6 +32,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import VoiceTrading from '@/components/trading/VoiceTrading';
 import TopBarCockpit from '@/components/layout/TopBarCockpit';
+import CommandPalette from '@/components/layout/CommandPalette';
 import AlertsPanel from '@/components/trading/alerts/AlertsPanel';
 import Logo from '@/components/Logo';
 import { useTradingStore } from '@/stores/trading';
@@ -358,6 +359,9 @@ export default function TopBar() {
       <div className="flex min-w-0 flex-1 items-center justify-center">
         {pathname?.startsWith('/terminal') && <TopBarCockpit />}
       </div>
+
+      {/* ⌘K command palette — global hotkey, renders nothing until opened */}
+      <CommandPalette />
 
       {/* ── Right side controls (shrink-0: the cockpit strip must never
              overlap these — owner rule: no overlaps anywhere) ── */}

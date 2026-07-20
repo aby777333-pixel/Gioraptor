@@ -70,6 +70,46 @@ export interface CorrelationRead {
   labelColor: string;
 }
 
+/** Portfolio-level hedge suggestion: instead of pair-by-pair, find the
+ *  single instrument that best offsets the LARGEST net currency exposure
+ *  across all open positions. Estimate-grade by design (lot-for-lot on
+ *  the dominant currency, default 50% trim) — the full pair-level math
+ *  still lives in the finder; this answers "one trade to cut my biggest
+ *  concentration". */
+export function portfolioHedgeSuggestion(params: {
+  positions: Array<{ symbol: string; direction: string; size: number; status?: string }>;
+  universe: string[];
+  symbolCurrenciesFn: (s: string) => string[];
+}): { ccy: string; netLots: number; instrument: string; direction: 'BUY' | 'SELL'; lots: number; rationale: string } | null {
+  const { positions, universe, symbolCurrenciesFn } = params;
+  const open = positions.filter((p) => (p.status ?? 'open') === 'open');
+  if (!open.length) return null;
+  const net = new Map<string, number>();
+  for (const p of open) {
+    const ccys = symbolCurrenciesFn(p.symbol);
+    const sign = p.direction === 'BUY' ? 1 : -1;
+    if (ccys[0]) net.set(ccys[0], (net.get(ccys[0]) ?? 0) + sign * Number(p.size));
+    if (ccys[1]) net.set(ccys[1], (net.get(ccys[1]) ?? 0) - sign * Number(p.size));
+  }
+  const ranked = [...net.entries()].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const top = ranked[0];
+  if (!top || Math.abs(top[1]) < 0.02) return null; // nothing concentrated enough to bother
+  const [ccy, netLots] = top;
+  // Prefer a liquid instrument where the target currency is the BASE (clean
+  // direction math): net long base → SELL reduces it; net short → BUY.
+  const baseFirst = universe.filter((s) => symbolCurrenciesFn(s)[0] === ccy);
+  const quoteSide = universe.filter((s) => symbolCurrenciesFn(s)[1] === ccy);
+  const instrument = baseFirst[0] ?? quoteSide[0];
+  if (!instrument) return null;
+  const isBase = symbolCurrenciesFn(instrument)[0] === ccy;
+  const direction: 'BUY' | 'SELL' = (netLots > 0) === isBase ? 'SELL' : 'BUY';
+  const lots = Math.max(0.01, Math.round(Math.abs(netLots) * 0.5 * 100) / 100);
+  return {
+    ccy, netLots: Math.round(netLots * 100) / 100, instrument, direction, lots,
+    rationale: `your largest net exposure is ${ccy} ${netLots > 0 ? '+' : ''}${netLots.toFixed(2)} lots across ${open.length} position(s); ${direction} ${lots} ${instrument} trims roughly half of it. Estimate-grade (lot-for-lot on ${ccy}) — load the pair in the finder for the full correlation-adjusted math, and confirm like any order.`,
+  };
+}
+
 /** Hedge decay forecast: turns the measured stability + trend into a
  *  forward-looking maintenance read. Deterministic mapping over real
  *  measurements — a review schedule, never a prediction of prices. */
