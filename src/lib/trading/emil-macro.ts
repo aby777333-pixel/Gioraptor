@@ -176,6 +176,26 @@ export function forecastScenarios(
   };
 }
 
+// ── Market Mood (deterministic mapping over regime + vol + uncertainty) ──
+
+export interface MoodRead { label: string; color: string; note: string }
+
+export function marketMood(builder: OHLCVBuilder, symbol: string, tick: { bid?: number; ask?: number } | undefined, calendar: NewsEvent[]): MoodRead {
+  const bars = builder.getAllBars(symbol, '60');
+  const state = classifyMarketState(bars);
+  const unc = uncertaintyScore(builder, symbol, tick, calendar);
+  if (!state) return { label: 'Unreadable', color: '#8B93A7', note: 'not enough data to read the mood' };
+  if (unc.level === 'HIGH') return { label: 'Chaotic', color: '#FF5252', note: unc.reasons[0] };
+  if (unc.level === 'ELEVATED') return { label: 'Nervous', color: '#FFB300', note: unc.reasons[0] };
+  const strong = state.state.includes('Strong');
+  const trending = state.state.includes('trend') || state.state.includes('Uptrend') || state.state.includes('Downtrend');
+  if (strong && state.volatility === 'High Volatility') return { label: 'Aggressive', color: '#FF7043', note: `${state.state} with expanded ranges` };
+  if (strong) return { label: 'Expansion', color: '#00C27A', note: `${state.state}, orderly momentum` };
+  if (trending && state.state.includes('Weak')) return { label: state.volatility === 'High Volatility' ? 'Exhausted' : 'Recovering', color: '#9CCC65', note: `${state.state}` };
+  if (state.volatility === 'Low Volatility') return { label: 'Compression', color: '#29ABE2', note: 'coiled range — expansion often follows' };
+  return { label: 'Calm', color: '#00BFA5', note: `${state.state}, contained volatility` };
+}
+
 // ── Economic event guidance (§3) — heuristics, labelled as such ──
 
 export interface EventGuidance {

@@ -25,7 +25,9 @@ import {
 import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
-import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, type RiskMood, type ForecastRead, type EventGuidance } from '@/lib/trading/emil-macro';
+import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, marketMood, type RiskMood, type ForecastRead, type EventGuidance, type MoodRead } from '@/lib/trading/emil-macro';
+import { parseMission, type MissionParse } from '@/lib/trading/emil-mission';
+import { runScan, DEFAULT_FILTERS, type Opportunity } from '@/lib/trading/scanner-engine';
 import { SCAN_TFS } from '@/lib/trading/scanner-engine';
 import { sessionSnapshot, fmtMins, type SessionSnapshot } from '@/lib/trading/emil-sessions';
 
@@ -94,7 +96,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [gateTyped, setGateTyped] = useState('');
   const [emilStatus, setEmilStatus] = useState('Watching');
   const [riskState, setRiskState] = useState('Normal');
-  const [macro, setMacro] = useState<{ mood: RiskMood; forecast: ForecastRead | null; events: EventGuidance[] } | null>(null);
+  const [macro, setMacro] = useState<{ mood: RiskMood; forecast: ForecastRead | null; events: EventGuidance[]; symMood: MoodRead | null } | null>(null);
+  const [debate, setDebate] = useState(false);
+  const [missionText, setMissionText] = useState('');
+  const [missionParse, setMissionParse] = useState<MissionParse | null>(null);
+  const [radar, setRadar] = useState<Opportunity[]>([]);
   const [modeBoard, setModeBoard] = useState<{ mode: string; conf: number }[]>([]);
   const [wake, setWake] = useState<WakeSettings>(loadWake);
   const [sessions, setSessions] = useState<SessionSnapshot | null>(null);
@@ -143,7 +149,16 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         mood: riskMood(builder),
         forecast: forecastScenarios(builder, activeSymbol, prices[activeSymbol], calendar),
         events: eventGuidance(symbolCurrencies(activeSymbol), calendar),
+        symMood: marketMood(builder, activeSymbol, prices[activeSymbol], calendar),
       });
+      // Opportunity radar: top setups across the whole market right now.
+      const found = runScan({
+        builder, universe: Object.keys(prices).filter((s) => prices[s]?.bid != null),
+        ticks: prices, calendar, openPositions: positions,
+        balance: Number(accountSummary?.balance ?? 0), isLiveData,
+        filters: { ...DEFAULT_FILTERS, minScore: 60 },
+      });
+      setRadar(found.slice(0, 6));
     };
     compute();
     const id = setInterval(compute, 20_000);
@@ -613,7 +628,29 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     <span className="text-[9px] text-white/35">protection {council.protectionState} · updated {new Date(council.computedAt).toLocaleTimeString()}</span>
                   </>
                 )}
+                {/* Confidence meter (grey = "I don't know") + market mood */}
+                {council && (() => {
+                  const noEdge = council.stance === 'NO EDGE' || council.stance === 'STAND ASIDE';
+                  const col = noEdge ? '#8B93A7' : council.confidence >= 75 ? '#00C27A' : council.confidence >= 60 ? '#D4E157' : council.confidence >= 45 ? '#FFB300' : '#FF5252';
+                  return (
+                    <span className="flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-bold" style={{ border: `1px solid ${col}55`, color: col }}
+                      title={noEdge ? 'EMIL honestly does not know — grey means no directional confidence' : `Directional confidence ${council.confidence}%`}>
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: col, boxShadow: `0 0 6px ${col}` }} />
+                      {noEdge ? "I don't know" : `${council.confidence}%`}
+                    </span>
+                  );
+                })()}
+                {macro?.symMood && (
+                  <span className="rounded px-2 py-1 text-[10px] font-bold" style={{ border: `1px solid ${macro.symMood.color}55`, color: macro.symMood.color }}
+                    title={`Market mood: ${macro.symMood.note}`}>
+                    {macro.symMood.label}
+                  </span>
+                )}
                 <div className="ml-auto flex gap-2">
+                  <button onClick={() => setDebate((d) => !d)} className="rounded px-2.5 py-1 text-[10px] font-bold transition-all hover:brightness-125"
+                    style={{ backgroundColor: debate ? 'rgba(41,171,226,0.18)' : 'rgba(41,171,226,0.08)', color: '#29ABE2', border: '1px solid rgba(41,171,226,0.35)' }}>
+                    {debate ? 'Grid view' : '🗣 Debate room'}
+                  </button>
                   <button onClick={() => setShowWhy((s) => !s)} className="rounded px-2.5 py-1 text-[10px] font-bold transition-all hover:brightness-125"
                     style={{ backgroundColor: 'rgba(255,213,79,0.1)', color: '#FFD54F', border: '1px solid rgba(255,213,79,0.35)' }}>
                     {showWhy ? 'Hide reasoning' : 'Why? / What could go wrong'}
@@ -632,8 +669,62 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 </div>
               )}
 
-              {/* Agent Council grid */}
-              {council && (
+              {/* 🎯 Mission Control */}
+              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,213,79,0.25)' }}>
+                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>🎯 Mission Control — tell EMIL the mission in plain language</div>
+                <div className="flex gap-2">
+                  <input value={missionText} onChange={(e) => setMissionText(e.target.value)}
+                    placeholder='e.g. "Only trade gold and EURUSD. Risk no more than 0.5 percent. Stop after two losses. Lock the day at a $300 target."'
+                    className="min-w-0 flex-1 rounded bg-white/[0.06] px-2 py-1.5 text-[11px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
+                  <button onClick={() => setMissionParse(parseMission(missionText, Object.keys(prices).filter((s) => prices[s]?.bid != null)))}
+                    disabled={!missionText.trim()}
+                    className="shrink-0 rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-30"
+                    style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)' }}>
+                    Parse mission
+                  </button>
+                </div>
+                {missionParse && (
+                  <div className="mt-2 text-[10px]">
+                    {missionParse.rules.map((r, i) => <p key={i} style={{ color: '#00C27A' }}>✓ <b>{r.label}:</b> <span className="text-white/60">{r.detail}</span></p>)}
+                    {missionParse.unknown.map((u, i) => <p key={i} style={{ color: '#FFB300' }}>⚠ {u}</p>)}
+                    {missionParse.rules.length > 0 && (
+                      <button onClick={() => {
+                        setAutoParams((p) => { const next = { ...p, ...missionParse.patch }; saveEmilAutoParams(next); return next; });
+                        if (missionParse.wakeMinConviction) {
+                          const w = { ...loadWake(), minConviction: missionParse.wakeMinConviction };
+                          setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ }
+                        }
+                        emilLog('mode', `MISSION accepted: ${missionParse.rules.map((r) => `${r.label} → ${r.detail}`).join(' · ')}. Read-back confirmed; arm the pilot to run it.`);
+                        setMissionParse(null); setMissionText('');
+                        setLogTick((t) => t + 1);
+                      }}
+                        className="mt-1.5 rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110"
+                        style={{ background: 'linear-gradient(180deg,#00E5A0,#00B87F)' }}>
+                        Apply mission to the envelope
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Agent Council: debate room or grid */}
+              {council && debate && (
+                <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(41,171,226,0.3)' }}>
+                  <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#29ABE2' }}>🗣 The council debates {council.symbol}</div>
+                  {council.votes.map((v) => (
+                    <p key={v.agent} className="mb-1 text-[10px] leading-relaxed">
+                      <span className="font-bold text-white/75">{v.icon} {v.agent}:</span>{' '}
+                      <span style={{ color: stanceColor(v.stance) }}>
+                        “{v.stance === 'bull' ? 'I lean long' : v.stance === 'bear' ? 'I lean short' : 'I stay neutral'} ({v.confidence}%) — {v.note}.”
+                      </span>
+                    </p>
+                  ))}
+                  <p className="mt-2 border-t pt-1.5 text-[11px] font-bold" style={{ borderColor: 'rgba(255,255,255,0.08)', color: council.stance === 'BULLISH LEAN' ? '#00C27A' : council.stance === 'BEARISH LEAN' ? '#FF5252' : '#FFB300' }}>
+                    🧠 EMIL summarises: {council.stance === 'NO EDGE' ? 'the council disagrees — Decision: No Trade.' : council.stance === 'STAND ASIDE' ? 'protection outranks every opinion — Decision: Stand Aside.' : `${council.bulls} for, ${council.bears} against — Decision: ${council.stance} at ${council.confidence}% confidence.`}
+                  </p>
+                </div>
+              )}
+              {council && !debate && (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {council.votes.map((v) => (
                     <div key={v.agent} className="rounded-lg border p-2.5" style={{ borderColor: `${stanceColor(v.stance)}33`, backgroundColor: 'rgba(255,255,255,0.02)' }}>
@@ -650,6 +741,30 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                       <p className="mt-1 text-[9px] leading-relaxed text-white/45">{v.note}</p>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* 📡 Opportunity radar — top live setups across the whole market */}
+              {radar.length > 0 && (
+                <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(41,171,226,0.25)' }}>
+                  <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">📡 Opportunity radar — strongest live setups (click to focus)</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {radar.map((o) => {
+                      const col = o.score >= 80 ? '#00C27A' : o.score >= 70 ? '#D4E157' : '#FFB300';
+                      const minsLeft = Math.max(0, Math.round((o.expiresAt - Date.now()) / 60_000));
+                      return (
+                        <button key={o.id} onClick={() => setActiveSymbol(o.symbol)}
+                          className="flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-[9px] transition-all hover:brightness-125"
+                          style={{ borderColor: `${col}55`, backgroundColor: `${col}12` }}
+                          title={`${o.label} · ${o.style} ${o.tfLabel} · ${o.zone.riskReward1}R · stale in ~${minsLeft}m`}>
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: o.direction === 'BUY' ? '#00C27A' : '#FF5252', boxShadow: `0 0 5px ${o.direction === 'BUY' ? '#00C27A' : '#FF5252'}` }} />
+                          <span className="text-white/80">{o.symbol}</span>
+                          <span style={{ color: col }}>{o.score}</span>
+                          <span className="text-white/35">{o.tfLabel} · {minsLeft}m</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -792,6 +907,25 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                             <span className="w-10 shrink-0 text-right font-mono text-white/70">{s.probability}%</span>
                           </div>
                         ))}
+                        {/* 🎺 Probability cone from the live entry plan */}
+                        {council?.bestOpp && (
+                          <div className="mt-1.5 rounded border px-2 py-1.5 font-mono text-[9px]" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+                            <span className="text-white/35">Cone: </span>
+                            <span style={{ color: '#FF5252' }}>pessimistic {council.bestOpp.zone.stop}</span>
+                            <span className="text-white/30"> ← </span>
+                            <span className="text-white/70">entry {council.bestOpp.zone.preferred}</span>
+                            <span className="text-white/30"> → </span>
+                            <span style={{ color: '#9CCC65' }}>likely {council.bestOpp.zone.target1}</span>
+                            <span className="text-white/30"> → </span>
+                            <span style={{ color: '#00C27A' }}>optimistic {council.bestOpp.zone.target2}</span>
+                          </div>
+                        )}
+                        {/* 📖 Market story — the read in plain words */}
+                        {macro.symMood && (
+                          <p className="mt-1.5 text-[10px] italic leading-relaxed text-white/55">
+                            📖 {activeSymbol} reads {macro.symMood.label.toLowerCase()} — {macro.symMood.note}. The council {council?.stance === 'NO EDGE' ? 'sees no edge, and waiting costs nothing' : council?.stance === 'STAND ASIDE' ? 'is standing aside: protection outranks opportunity right now' : `leans ${council?.stance === 'BULLISH LEAN' ? 'long' : 'short'}, but only a disciplined pullback entry keeps the risk honest`}.{macro.events.length ? ` Event risk sits ahead (${macro.events[0].ev.currency} ${macro.events[0].ev.title}), so plans can expire quickly.` : ''}
+                          </p>
+                        )}
                         <p className="mt-1 text-[9px] text-white/40">Invalidation: {macro.forecast.invalidation}</p>
                         <p className="text-[9px] text-white/30">Horizon: {macro.forecast.horizon}. Probabilities, never certainty.</p>
                       </>
@@ -836,6 +970,46 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   </button>
                 </div>
               )}
+
+              {/* 🛑 Guardian status + 📊 Trust score (measured outcomes only) */}
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(() => {
+                  const log = loadEmilLog();
+                  const vetoes = log.filter((e) => e.text.startsWith('GUARDIAN VETO')).length;
+                  const entries = log.filter((e) => e.kind === 'entry').length;
+                  const blocked = log.filter((e) => e.kind === 'blocked').length;
+                  const wakes = log.filter((e) => e.text.startsWith('WAKE')).length;
+                  const stops = log.filter((e) => e.text.startsWith('STOP EVERYTHING')).length;
+                  const learn = loadEmilLearning();
+                  const totalTrades = learn.reduce((a, l) => a + l.n, 0);
+                  const totalWins = learn.reduce((a, l) => a + l.wins, 0);
+                  return (
+                    <>
+                      <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,82,82,0.3)' }}>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#FF5252' }}>🛑 Guardian — independent, EMIL cannot silence it</div>
+                        <p className="text-[10px] text-white/55">6 watchdogs armed in the order path: duplicate-order · rate limit · missing stop-loss · stale quote · abnormal spread · unreadable market.</p>
+                        <p className="mt-1 font-mono text-[10px]" style={{ color: vetoes ? '#FF8A65' : '#00C27A' }}>
+                          {vetoes ? `${vetoes} veto(es) recorded — each logged with its reason` : 'no vetoes needed yet — every EMIL order passed independent checks'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-white/40">📊 Trust score — measured outcomes, not self-praise</div>
+                        <div className="grid grid-cols-2 gap-x-4 font-mono text-[10px] text-white/60">
+                          <span>Closed trades: {totalTrades}</span>
+                          <span>Win rate: {totalTrades ? Math.round((totalWins / totalTrades) * 100) + '%' : '—'}</span>
+                          <span>Entries logged: {entries}</span>
+                          <span>Refusals/blocks: {blocked}</span>
+                          <span>Benched buckets: {learn.filter((l) => l.avoided).length}</span>
+                          <span>Wakes fired: {wakes}</span>
+                          <span>Guardian vetoes: {vetoes}</span>
+                          <span>Hard stops used: {stops}</span>
+                        </div>
+                        <p className="mt-1 text-[8px] text-white/30">All counts from the real activity log and closed-trade learning — exportable via Knowledge Evolution.</p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
 
               {/* EMIL activity feed */}
               {(mode !== 'observe' || loadEmilLog().length > 0) && (
