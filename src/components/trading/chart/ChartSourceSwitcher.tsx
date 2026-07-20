@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic';
 // Market Insights module — lazy-loaded so the terminal bundle is untouched
 // unless the trader actually opens it.
 const InsightsPanel = dynamic(() => import('../insights/InsightsPanel'), { ssr: false });
+const HedgePanel = dynamic(() => import('../hedge/HedgePanel'), { ssr: false });
 const RiskPanel = dynamic(() => import('../insights/RiskPanel'), { ssr: false });
 const JournalPanel = dynamic(() => import('../insights/JournalPanel'), { ssr: false });
 import ChartPanel from './ChartPanel';
@@ -189,6 +190,9 @@ export default function ChartSourceSwitcher({
   // Trade Journal module (§5; entitlement trade_journal).
   const [journalEnabled, setJournalEnabled] = useState(true);
   const [journalOpen, setJournalOpen] = useState(false);
+  // AI Correlation Hedging Engine (entitlement hedging_tools; fail-open).
+  const [hedgeEnabled, setHedgeEnabled] = useState(true);
+  const [hedgeOpen, setHedgeOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -264,6 +268,7 @@ export default function ChartSourceSwitcher({
       if (ents['market_insights'] === false) setInsightsEnabled(false);
       if (ents['risk_tools'] === false) setRiskEnabled(false);
       if (ents['trade_journal'] === false) setJournalEnabled(false);
+      if (ents['hedging_tools'] === false) setHedgeEnabled(false);
     })();
     return () => { active = false; };
   }, []);
@@ -1108,7 +1113,18 @@ export default function ChartSourceSwitcher({
       {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
           The free space hosts the trader chips + the live trend signal beacon. */}
       <TimeframeBar
-        middle={<EdgeChips ohlcvBuilder={ohlcvBuilder} />}
+        middle={<>
+          <EdgeChips ohlcvBuilder={ohlcvBuilder} />
+          {hedgeEnabled && (
+            <button
+              onClick={() => setHedgeOpen(true)}
+              title="AI Correlation Hedging Engine — find, size and monitor portfolio hedges (estimates, never guarantees)"
+              className="raptor-hedge-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            >
+              ⇄ HEDGE
+            </button>
+          )}
+        </>}
         trailing={<>
           <TraderChips ohlcvBuilder={ohlcvBuilder} />
           <TrendSignal ohlcvBuilder={ohlcvBuilder} />
@@ -1301,6 +1317,9 @@ export default function ChartSourceSwitcher({
 
       {/* Trade Journal module — display-only overlay */}
       {journalOpen && <JournalPanel onClose={() => setJournalOpen(false)} />}
+
+      {/* AI Correlation Hedging Engine — trader-confirmed execution only */}
+      {hedgeOpen && <HedgePanel ohlcvBuilder={ohlcvBuilder} onClose={() => setHedgeOpen(false)} />}
 
       {/* Mandatory EA risk disclaimer — blocks attach until accepted */}
       {disclaimerFor && (

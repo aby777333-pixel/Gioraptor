@@ -487,3 +487,33 @@ body {
   color: #00C27A;
   animation: raptor-trade-blink 2.4s ease-in-out infinite;
 }
+
+/* Hedge engine chip: color blink (violet ⇄ cyan) in the timeframe bar. */
+@keyframes raptor-hedge-blink {
+  0%, 42% {
+    color: #CE93D8;
+    border-color: rgba(171, 71, 188, 0.85);
+    background: linear-gradient(180deg, rgba(171, 71, 188, 0.3) 0%, rgba(171, 71, 188, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(171, 71, 188, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(171, 71, 188, 0.9);
+  }
+  50%, 92% {
+    color: #00B4D8;
+    border-color: rgba(0, 180, 216, 0.85);
+    background: linear-gradient(180deg, rgba(0, 180, 216, 0.3) 0%, rgba(0, 180, 216, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(0, 180, 216, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(0, 180, 216, 0.9);
+  }
+  100% {
+    color: #CE93D8;
+    border-color: rgba(171, 71, 188, 0.85);
+    background: linear-gradient(180deg, rgba(171, 71, 188, 0.3) 0%, rgba(171, 71, 188, 0.08) 100%);
+    box-shadow: 0 0 12px rgba(171, 71, 188, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 8px rgba(171, 71, 188, 0.9);
+  }
+}
+.raptor-hedge-blink {
+  border: 1px solid rgba(171, 71, 188, 0.85);
+  color: #CE93D8;
+  animation: raptor-hedge-blink 2.8s ease-in-out infinite;
+}
