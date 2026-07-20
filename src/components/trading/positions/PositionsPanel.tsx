@@ -208,6 +208,13 @@ export default function PositionsPanel() {
     loadData();
   }, [loadData, refreshPositions]);
 
+  // Poll every 15s so trades placed in OTHER windows (EMIL pilot, standalone
+  // Scan & Trade / Hedge & Trade tabs) reflect here without a manual refresh.
+  useEffect(() => {
+    const id = setInterval(loadData, 15_000);
+    return () => clearInterval(id);
+  }, [loadData]);
+
   const prevPricesRef = useRef(prices);
   useEffect(() => {
     if (openPositions.length === 0) return;
@@ -601,9 +608,24 @@ export default function PositionsPanel() {
                         {pos.direction === 'BUY' ? 'Buy' : 'Sell'}
                       </span>
 
-                      {/* SYMBOL */}
+                      {/* SYMBOL (+ source badge: EMIL / Scanner / Hedge / EA trades are labelled) */}
                       <span className="font-semibold text-[11px]" style={{ color: '#fff' }}>
                         {pos.symbol}
+                        {(() => {
+                          const c = String((pos as unknown as { comment?: string | null }).comment ?? '');
+                          const badge = c.startsWith('EMIL') ? { t: '🧠 EMIL', color: '#FFD54F' }
+                            : c.startsWith('Scanner') ? { t: '📡 SCAN', color: '#29ABE2' }
+                            : c.startsWith('Hedge') ? { t: '⇄ HEDGE', color: '#CE93D8' }
+                            : c.startsWith('EA:') ? { t: '🤖 EA', color: '#00C27A' }
+                            : null;
+                          return badge ? (
+                            <span className="ml-1.5 rounded px-1 py-[1px] align-middle text-[8px] font-bold"
+                              style={{ backgroundColor: `${badge.color}1F`, color: badge.color, border: `1px solid ${badge.color}55` }}
+                              title={`Placed by ${badge.t.slice(2).trim()} — comment: ${c}`}>
+                              {badge.t}
+                            </span>
+                          ) : null;
+                        })()}
                       </span>
 
                       {/* LOT SIZE */}
