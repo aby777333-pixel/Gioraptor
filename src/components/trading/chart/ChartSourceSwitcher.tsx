@@ -44,6 +44,7 @@ import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
 import TrendSignal from './TrendSignal';
+import WorkspaceChip from './WorkspaceChip';
 import TraderChips from './TraderChips';
 import EdgeChips from './EdgeChips';
 import CustomEAInfoModal from './CustomEAInfoModal';
@@ -1110,6 +1111,7 @@ export default function ChartSourceSwitcher({
           {/* TrendSignal leads the trailing cluster so the BUY/SELL beacon
               never gets pushed off-screen by the wider chip groups. */}
           <TrendSignal ohlcvBuilder={ohlcvBuilder} />
+          <WorkspaceChip />
           <button onClick={() => window.open('/terminal/world', '_blank')}
             title="Global Market Command Center — interactive world map, Portfolio DNA, Digital Twin, News Studio, Watchdog, Memory Search (opens in a new tab)"
             className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"

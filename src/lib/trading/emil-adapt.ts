@@ -63,6 +63,9 @@ export function tfRoles(entryLabel: string): TfRoles | null {
 // ── Mode fusion (§8): honest composite labels from real evidence ─
 
 export function fusionLabel(opp: Opportunity): string {
+  if (opp.opportunityType.startsWith('Range')) {
+    return opp.regime.volatility === 'Low Volatility' ? 'Range + Mean Reversion + Compression' : 'Range + Mean Reversion';
+  }
   const parts = ['Trend Following', 'Pullback'];
   if (opp.regime.state.includes('Strong')) parts.push('Momentum');
   if (opp.regime.volatility === 'High Volatility') parts.push('Volatility Expansion');

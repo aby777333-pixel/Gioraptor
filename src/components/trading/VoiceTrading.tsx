@@ -5,7 +5,7 @@ import { Mic, MicOff, X, Check, AlertCircle, Volume2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { cn } from '@/lib/utils/format';
-import { loadLangPrefs, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
+import { loadLangPrefs, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, laraSpeak, type VoiceCapture } from '@/lib/trading/emil-language';
 
 /* ── Global type augmentation for Web Speech API ── */
 declare global {
@@ -220,6 +220,15 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
       sarvamHealth().then((ok) => setLaraReady(ok));
     }
   }, []);
+
+  // Spoken read-back (Lara TTS) when a command reaches confirmation —
+  // the exact display string is spoken so critical numbers stay identical.
+  useEffect(() => {
+    if (state === 'confirming' && parsed && sarvamReady) {
+      void laraSpeak(`Please confirm: ${parsed.displayText}. Say nothing — press the confirm button to execute.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   // Confirmation auto-cancel timer
   useEffect(() => {

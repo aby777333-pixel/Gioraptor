@@ -226,6 +226,139 @@ export function assessOpportunity(params: {
   };
 }
 
+// ── Range / mean-reversion module (additive) ────────────────────
+// Fades a WELL-ESTABLISHED range at its extreme, back toward the mid.
+// Deliberately strict and honestly capped: the range must be wide
+// (≥2.5×ATR), touched repeatedly on both sides, the market genuinely
+// range-classified, and price sitting AT an extreme — otherwise null.
+// Range setups never score above 82: ranges break, and "Exceptional"
+// would be a lie for a fade.
+
+export function assessRangeOpportunity(params: {
+  builder: OHLCVBuilder;
+  symbol: string;
+  tf: ScanTF;
+  tick: { bid?: number; ask?: number } | undefined;
+  calendar: NewsEvent[];
+  openPositionCurrencies: string[];
+  balance: number;
+  isLiveData: boolean;
+}): Opportunity | null {
+  const { builder, symbol, tf, tick, calendar, openPositionCurrencies, balance, isLiveData } = params;
+  const bars = builder.getAllBars(symbol, tf.res);
+  if (bars.length < 60) return null;
+  const state = classifyMarketState(bars);
+  if (!state) return null;
+  if (!(state.state === 'Range Bound' || state.state === 'Sideways / Consolidation')) return null;
+  if (state.volatility === 'High Volatility') return null; // expanding chop is not a fade
+
+  const win = bars.slice(-48);
+  const hi = Math.max(...win.map((b) => b.high));
+  const lo = Math.min(...win.map((b) => b.low));
+  const price = bars[bars.length - 1].close;
+  const width = hi - lo;
+  const closes = bars.map((b) => b.close);
+  const atrSeries = atr(bars.map((b) => b.high), bars.map((b) => b.low), closes, 14).filter((v): v is number => v != null);
+  const atrNow = atrSeries[atrSeries.length - 1] ?? 0;
+  if (atrNow <= 0 || width < 2.5 * atrNow) return null; // range too narrow to fade
+
+  // Touch counts: bars whose extreme came within 15% of the boundary.
+  const zone = width * 0.15;
+  const hiTouches = win.filter((b) => b.high >= hi - zone).length;
+  const loTouches = win.filter((b) => b.low <= lo + zone).length;
+  if (hiTouches < 2 || loTouches < 2) return null; // both walls must be proven
+
+  // Price must be AT an extreme right now.
+  let direction: 'BUY' | 'SELL';
+  if (price <= lo + zone) direction = 'BUY';
+  else if (price >= hi - zone) direction = 'SELL';
+  else return null; // mid-range: nothing to fade
+
+  const dp = price < 20 ? 5 : 2;
+  const sign = direction === 'BUY' ? 1 : -1;
+  const boundary = direction === 'BUY' ? lo : hi;
+  const mid = (hi + lo) / 2;
+  const preferred = Number(price.toFixed(dp));
+  const stop = Number((boundary - sign * 0.6 * atrNow).toFixed(dp));
+  const target1 = Number(mid.toFixed(dp));
+  const target2 = Number((direction === 'BUY' ? hi - zone : lo + zone).toFixed(dp));
+  const risk = Math.abs(preferred - stop);
+  if (risk <= 0) return null;
+  const rr1 = Math.round((Math.abs(target1 - preferred) / risk) * 100) / 100;
+  if (rr1 < 1) return null; // a fade that can't pay 1R isn't worth the break risk
+
+  const pip = getPipSize(symbol);
+  const spreadPips = tick?.bid != null && tick?.ask != null ? (tick.ask - tick.bid) / pip : null;
+  const ccys = symbolCurrencies(symbol);
+  const news = upcomingHighImpact(ccys, calendar, 2)[0] ?? null;
+  const shared = ccys.filter((c) => openPositionCurrencies.includes(c));
+
+  const components: ScoreComponent[] = [
+    { name: 'Range quality', weight: 0.30, score: Math.min(100, 40 + (hiTouches + loTouches) * 6), note: `${hiTouches} touches high wall · ${loTouches} low wall over 48 bars` },
+    { name: 'Range width', weight: 0.20, score: Math.min(100, (width / atrNow) * 22), note: `${(width / atrNow).toFixed(1)}×ATR wide — wide ranges pay the fade` },
+    { name: 'Extremity', weight: 0.20, score: Math.round(100 - (Math.abs(price - boundary) / zone) * 50), note: 'price is at the wall, not chasing the middle' },
+    { name: 'Risk : reward', weight: 0.10, score: Math.min(100, rr1 * 55), note: `${rr1}R to the mid` },
+    { name: 'Liquidity & spread', weight: 0.10, score: spreadPips == null ? 50 : Math.max(0, 100 - spreadPips * 12), note: spreadPips != null ? `${spreadPips.toFixed(1)} pips spread` : 'no live quote' },
+    { name: 'News risk', weight: 0.10, score: news ? 10 : 90, note: news ? `${news.currency} "${news.title}" within 2h — releases BREAK ranges` : 'no red-flag event inside 2h' },
+  ];
+  let score = Math.round(components.reduce((a, c) => a + c.score * c.weight, 0));
+  if (shared.length) score = Math.max(0, score - 8);
+  score = Math.max(0, Math.min(82, score)); // honest cap: ranges break
+
+  const { label, color: labelColor } = directionLabel(direction, score, !!news && (news.timeMs - Date.now()) < 45 * 60_000);
+  const now = Date.now();
+
+  let suggestedLots: number | null = null; let marginEstimate: number | null = null; let maxLossEstimate: number | null = null;
+  if (balance > 0) {
+    suggestedLots = lotsForRiskPct({ symbol, balance, pct: 1, entryPrice: preferred, sl: stop });
+    if (suggestedLots != null) {
+      marginEstimate = calcMarginRequired(symbol, suggestedLots, preferred);
+      maxLossEstimate = risk / pip * calcPipValue(symbol, suggestedLots);
+    }
+  }
+
+  return {
+    id: `${symbol}-${tf.label}-${direction}-RANGE`,
+    symbol, assetClass: assetClassOf(symbol),
+    venue: isLiveData ? 'RAPTOR live feed' : 'RAPTOR platform feed (simulated pricing)',
+    direction, label, labelColor,
+    opportunityType: 'Range fade at extreme',
+    style: tf.style, tfLabel: tf.label, holding: tf.holding,
+    expectedDurationNote: `fade toward the mid — typically a fraction of the ${tf.label} range cycle (estimate, not a promise)`,
+    regime: state, htfState: null, htfAligned: null,
+    zone: {
+      symbol, direction: direction === 'BUY' ? 'LONG' : 'SHORT',
+      aggressive: preferred, preferred, conservative: Number((boundary + sign * 0.1 * width).toFixed(dp)),
+      stop, target1, target2, riskReward1: rr1, confidence: Math.min(80, state.confidence + 10),
+      invalidation: `a confirmed ${tf.label} close beyond ${stop} breaks the range — exit, never argue with a breakout.`,
+      evidence: [`${hiTouches}+${loTouches} wall touches`, `${(width / atrNow).toFixed(1)}×ATR range width`],
+      note: 'range fade: enter at the wall, stop beyond it, first target the mid',
+    },
+    tp3: target2,
+    trailingNote: 'take the mid, trail the remainder only if the far wall stays intact',
+    breakEvenTrigger: target1,
+    expectedPips: Math.abs(target1 - preferred) / pip,
+    spreadPips, atrPct: price > 0 ? (atrNow / price) * 100 : 0,
+    score, scoreLabel: SCORE_LABELS(score), components,
+    reasonsFor: [
+      `${state.state} confirmed on ${tf.label} (confidence ${state.confidence}%)`,
+      `proven range: ${hiTouches}/${loTouches} wall touches, ${(width / atrNow).toFixed(1)}×ATR wide`,
+      `price at the ${direction === 'BUY' ? 'lower' : 'upper'} wall — fading toward the mid at ${rr1}R`,
+    ],
+    reasonsAgainst: [
+      'ranges END in breakouts — the stop beyond the wall is non-negotiable',
+      ...(news ? [`${news.currency} "${news.title}" due — releases break ranges; the news buffer applies`] : []),
+      ...(shared.length ? [`adds to existing ${shared.join('/')} exposure`] : []),
+      'score capped at 82 by design: no fade is ever "Exceptional"',
+    ],
+    invalidation: `a confirmed ${tf.label} close beyond the ${direction === 'BUY' ? 'low' : 'high'} wall breaks the range — exit immediately`,
+    news, suggestedLots, marginEstimate, maxLossEstimate,
+    correlatedExposure: shared.length ? shared.join('/') : null,
+    freshAt: now,
+    expiresAt: now + 45 * 60_000,
+  };
+}
+
 // ── Full scan ───────────────────────────────────────────────────
 
 export interface ScanFilters {
@@ -273,7 +406,10 @@ export function runScan(params: {
     if (filters.portfolioOnly && !openSymbols.includes(symbol)) continue;
     for (const tf of SCAN_TFS) {
       if (!filters.styles.includes(tf.style)) continue;
-      const opp = assessOpportunity({ builder, symbol, tf, tick: ticks[symbol], calendar, openPositionCurrencies: openCcys, balance, isLiveData });
+      // Trend-pullback first; when the market isn't trending, the range
+      // module gets its turn — ranges are now scanned, not just skipped.
+      const opp = assessOpportunity({ builder, symbol, tf, tick: ticks[symbol], calendar, openPositionCurrencies: openCcys, balance, isLiveData })
+        ?? assessRangeOpportunity({ builder, symbol, tf, tick: ticks[symbol], calendar, openPositionCurrencies: openCcys, balance, isLiveData });
       if (!opp) continue;
       if (filters.direction !== 'both' && opp.direction !== filters.direction) continue;
       if (opp.score < filters.minScore) continue;

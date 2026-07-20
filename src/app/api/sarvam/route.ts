@@ -15,7 +15,7 @@ const SARVAM_BASE = 'https://api.sarvam.ai';
 const TIMEOUT_MS = 8000;
 
 interface LaraBody {
-  action: 'health' | 'translate' | 'detect' | 'stt';
+  action: 'health' | 'translate' | 'detect' | 'stt' | 'tts';
   text?: string;
   targetLang?: string; // BCP-47 style codes Lara accepts, e.g. en-IN, hi-IN, ta-IN
   sourceLang?: string;
@@ -83,6 +83,19 @@ export async function POST(req: Request) {
       if (!r.ok) return NextResponse.json({ ok: false, configured: true, error: `Lara detect failed (${r.status})` }, { status: 502 });
       const j = await r.json();
       return NextResponse.json({ ok: true, configured: true, language: j.language_code ?? null, script: j.script_code ?? null });
+    }
+    // Voice output: text-to-speech read-backs (critical numbers stay exact —
+    // the caller passes the final display string verbatim).
+    if (body.action === 'tts') {
+      const r = await sarvamFetch('/text-to-speech', key, {
+        text: text.slice(0, 500),
+        target_language_code: body.targetLang ?? 'en-IN',
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, configured: true, error: `Lara speech-out failed (${r.status})` }, { status: 502 });
+      const j = await r.json();
+      const audio = Array.isArray(j.audios) ? j.audios[0] : null;
+      if (!audio) return NextResponse.json({ ok: false, configured: true, error: 'Lara returned no audio' }, { status: 502 });
+      return NextResponse.json({ ok: true, configured: true, audioBase64: audio });
     }
     if (body.action === 'translate') {
       // Lara needs an explicit (or detectable) source language and rejects

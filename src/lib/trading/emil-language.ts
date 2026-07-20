@@ -132,6 +132,25 @@ export async function sarvamSpeech(audioBase64: string): Promise<{ ok: boolean; 
   }
 }
 
+/** Spoken read-back via Lara text-to-speech. Plays through the browser;
+ *  never throws — returns false honestly when unavailable. The caller
+ *  passes the final display string verbatim so critical numbers stay exact. */
+export async function laraSpeak(text: string, lang?: string): Promise<boolean> {
+  try {
+    const prefs = loadLangPrefs();
+    if (!prefs.sarvamEnabled || !prefs.consentAt) return false;
+    const r = await fetch('/api/sarvam', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tts', text, targetLang: lang ?? (prefs.displayLang !== 'en' ? prefs.displayLang : 'en-IN') }),
+    });
+    const j = await r.json();
+    if (!j.ok || !j.audioBase64) return false;
+    const audio = new Audio(`data:audio/wav;base64,${j.audioBase64}`);
+    await audio.play();
+    return true;
+  } catch { return false; }
+}
+
 // ── Microphone → 16 kHz mono WAV (what Lara's speech API expects) ──
 
 export interface VoiceCapture { stop: () => Promise<{ base64: string; seconds: number }> }

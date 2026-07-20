@@ -18,7 +18,7 @@ import { loadEmilAutoParams } from '@/lib/trading/emil-council';
 import { loadReplays } from '@/lib/trading/emil-governance';
 import { assessOpportunity, SCAN_TFS } from '@/lib/trading/scanner-engine';
 import { atr } from '@/lib/trading/indicators';
-import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
+import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, laraSpeak, type VoiceCapture } from '@/lib/trading/emil-language';
 import {
   REGIONS, regionSnapshot, portfolioDNA, simulateTwin, buildBriefing, watchdogReview, searchMemory,
   type Region, type RegionSnapshot, type PortfolioDNA, type TwinResult, type BriefingKind, type WatchdogItem, type OpenPosLite,
@@ -316,11 +316,16 @@ export default function WorldCommandCenter({ ohlcvBuilder, isLiveData }: { ohlcv
               </button>
             ))}
             {briefing && (
-              <button onClick={() => {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([briefing], { type: 'text/plain' }));
-                a.download = `raptor-briefing-${new Date().toISOString().slice(0, 10)}.txt`; a.click(); URL.revokeObjectURL(a.href);
-              }} className="rounded px-2 py-1 text-[9px] font-bold text-white/50 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>Download</button>
+              <>
+                <button onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(new Blob([briefing], { type: 'text/plain' }));
+                  a.download = `raptor-briefing-${new Date().toISOString().slice(0, 10)}.txt`; a.click(); URL.revokeObjectURL(a.href);
+                }} className="rounded px-2 py-1 text-[9px] font-bold text-white/50 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>Download</button>
+                <button onClick={async () => { const ok = await laraSpeak(briefing.replace(/\n+/g, '. ').slice(0, 450)); if (!ok) setMemA(['🔊 Speak needs Lara enabled + consent (EMIL → Language & Voice) and the server key configured.']); }}
+                  title="Lara reads the briefing aloud (first section) — needs Lara enabled + consented"
+                  className="rounded px-2 py-1 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#FF8A65', border: '1px solid rgba(255,138,101,0.4)' }}>🔊 Speak</button>
+              </>
             )}
           </div>
           {briefing && <pre className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap rounded bg-white/[0.03] p-2 font-mono text-[9px] leading-relaxed text-white/60" style={{ scrollbarWidth: 'thin' }}>{briefing}</pre>}
