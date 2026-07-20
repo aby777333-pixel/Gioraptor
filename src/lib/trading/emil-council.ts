@@ -194,6 +194,10 @@ export interface EmilAutoParams {
   riskPct: number;          // % balance risked per entry (sizing)
   baseLot: number;          // default/floor lot (0.01 by default)
   autoHedge: boolean;       // may hedge adverse positions when the council is uncertain
+  smallSteady: boolean;     // Small & Steady: base lot only, stricter quality bar
+  profitOnly: boolean;      // capital never risked once armed: trade from profits only
+  protectedCapital: number; // $ balance line EMIL must never draw below with new risk
+  tradableProfitPct: number;// % of the profit cushion available to risk per trade
 }
 
 export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
@@ -208,6 +212,10 @@ export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
   riskPct: 1,
   baseLot: 0.01,
   autoHedge: true,
+  smallSteady: false,
+  profitOnly: false,
+  protectedCapital: 0,
+  tradableProfitPct: 20,
 };
 
 const EMIL_PARAMS_KEY = 'raptor_emil_autoparams_v1';
@@ -276,6 +284,14 @@ export function recordEmilOutcome(symbol: string, tf: string, win: boolean): { a
 export function emilShouldAvoid(symbol: string, tf: string): boolean {
   const b = loadLearn()[`${symbol}|${tf}`];
   return !!b && b.n >= 3 && b.wins / b.n < 0.34;
+}
+
+/** Safe-learning ranking bonus: buckets with a proven edge get preferred,
+ *  weak ones deprioritised (selection preference only — never a risk change). */
+export function emilLearnBonus(symbol: string, tf: string): number {
+  const b = loadLearn()[`${symbol}|${tf}`];
+  if (!b || b.n < 3) return 0;
+  return Math.round((b.wins / b.n - 0.5) * 20); // ±10 points max
 }
 
 export function loadEmilLearning(): { key: string; n: number; wins: number; avoided: boolean }[] {

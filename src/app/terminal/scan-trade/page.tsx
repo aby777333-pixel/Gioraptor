@@ -9,6 +9,7 @@
 // carries real prices automatically.
 
 import TopBar from '@/components/layout/TopBar';
+import BottomDock from '@/components/layout/BottomDock';
 import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
 import TermsGateModal from '@/components/trading/TermsGateModal';
@@ -28,10 +29,10 @@ export default function ScanTradeWindow() {
         <ScannerPanel ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} standalone onClose={() => window.close()} />
       </div>
 
-      {/* Bottom monitoring panel — same live positions/orders as the terminal */}
-      <div className="h-[220px] shrink-0 overflow-auto border-t border-[var(--border)]">
+      {/* Bottom monitoring panel — drag the grip to resize */}
+      <BottomDock>
         <PositionsPanel />
-      </div>
+      </BottomDock>
       <div className="shrink-0 border-t border-[var(--border)]">
         <AccountBar />
       </div>

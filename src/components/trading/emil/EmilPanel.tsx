@@ -23,6 +23,8 @@ import {
   type EmilConsensus, type CouncilStance, type EmilAutoParams,
 } from '@/lib/trading/emil-council';
 import { findHedges } from '@/lib/trading/hedge-engine';
+import { getLock } from '@/lib/trading/protection';
+import { emilLearnBonus } from '@/lib/trading/emil-council';
 
 type EmilMode = 'observe' | 'confirm' | 'auto';
 
@@ -53,6 +55,8 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [autoParams, setAutoParams] = useState<EmilAutoParams>(loadEmilAutoParams);
   const [gateOpen, setGateOpen] = useState(false);
   const [gateTyped, setGateTyped] = useState('');
+  const [emilStatus, setEmilStatus] = useState('Watching');
+  const [riskState, setRiskState] = useState('Normal');
   const [placing, setPlacing] = useState(false);
   const [logTick, setLogTick] = useState(0);
   const builderRef = useRef(ohlcvBuilder);
@@ -116,7 +120,8 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     if (!t?.bid || !t?.ask) { emilLog('blocked', `${opp.symbol}: no live quote — refusing stale data`); setLogTick((x) => x + 1); return false; }
     const p = loadEmilAutoParams();
     const base = opp.suggestedLots ?? p.baseLot; // scanner sizes at 1% risk; base lot is the floor
-    const lots = Math.max(p.baseLot, Math.round(base * p.riskPct * 100) / 100);
+    // Small & Steady: minimum size only — discipline over throughput.
+    const lots = p.smallSteady ? p.baseLot : Math.max(p.baseLot, Math.round(base * p.riskPct * 100) / 100);
     const fill = opp.direction === 'BUY' ? t.ask : t.bid;
     try {
       await orderService.placeMarketOrder({
@@ -269,26 +274,57 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           stopEverything('profit locked');
           return;
         }
-        if (m !== 'auto') return;
+        // ── Adaptive risk state — EMIL throttles himself before rules force him ──
+        const lock = getLock(activeAccountId);
+        const rs = lock ? 'Capital Lock'
+          : consec >= Math.max(1, p.stopAfterLosses - 1) ? 'Defensive'
+          : p.dailyProfitLock > 0 && realized >= 0.7 * p.dailyProfitLock ? 'Profit Protection'
+          : realized < 0 ? 'Cautious' : 'Normal';
+        setRiskState(rs);
+
+        if (m !== 'auto') { setEmilStatus('Managing'); return; }
         if (consec >= p.stopAfterLosses) { emilLog('lock', `${consec} EMIL losses in a row — pilot paused per your rule`); stopEverything('consecutive losses'); return; }
         const entriesToday = loadEmilLog().filter((e) => e.kind === 'entry' && e.ts >= midnight.getTime()).length;
-        if (entriesToday >= p.maxPerDay) return; // manage-only for the rest of the day
+        if (entriesToday >= p.maxPerDay) { setEmilStatus('Managing'); return; } // manage-only for the rest of the day
+        if (rs === 'Defensive' || rs === 'Capital Lock') { setEmilStatus('Protecting'); return; } // no new risk while defensive
 
-        // ── Seek ONE quality entry this cycle — EMIL selects the market ──
+        // Quality bar rises when cautious or in Small & Steady mode.
+        const minScoreEff = p.minScore + (rs === 'Cautious' ? 10 : 0) + (p.smallSteady ? 10 : 0);
+
+        // Profit-Only: capital is untouchable — new risk comes from the
+        // realized profit cushion only, and only a slice of it per trade.
+        const balanceNow = Number(useTradingStore.getState().accountSummary?.balance ?? 0);
+        const cushion = p.profitOnly ? balanceNow - p.protectedCapital : Infinity;
+        if (p.profitOnly && cushion <= 0) {
+          setEmilStatus('Protecting');
+          return; // capital protected; EMIL waits until profits exist to trade from
+        }
+        const maxRiskAllowed = p.profitOnly ? cushion * (p.tradableProfitPct / 100) : Infinity;
+
+        // ── Seek the BEST entry this cycle — EMIL selects the market ──
+        setEmilStatus('Scanning');
         const scanUniverse = p.selectAll ? universeAll : p.symbols;
+        const candidates: { c: EmilConsensus; opp: NonNullable<EmilConsensus['bestOpp']>; adj: number }[] = [];
         for (const symbol of scanUniverse) {
           if (emilOpenPos.some((x) => x.symbol === symbol)) continue; // one EMIL trade per symbol
-          const c = buildCouncil({ builder, symbol, ticks, calendar, positions: [], history: [], specs: null, accountId: activeAccountId, balance: Number(accountSummary?.balance ?? 0), isLiveData });
+          const c = buildCouncil({ builder, symbol, ticks, calendar, positions: [], history: [], specs: null, accountId: activeAccountId, balance: balanceNow, isLiveData });
           if (c.stance !== 'BULLISH LEAN' && c.stance !== 'BEARISH LEAN') continue;
           if (c.confidence < p.minCouncilConf) continue;
           const opp = c.bestOpp;
-          if (!opp || opp.score < p.minScore) continue;
+          if (!opp || opp.score < minScoreEff) continue;
           if (emilShouldAvoid(symbol, opp.tfLabel)) continue; // learned avoidance — losing buckets are benched
           const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
           if (!aligned) continue;
-          const ok = await placeEmilOrder(opp, `EMIL:AUTO:${opp.tfLabel}`);
-          if (ok) break; // one entry per cycle, never bursts
+          if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) continue; // slice of profits only
+          candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) });
         }
+        if (candidates.length) {
+          setEmilStatus('Trading');
+          candidates.sort((a, b) => b.adj - a.adj); // learned edge breaks the tie
+          const bestPick = candidates[0];
+          await placeEmilOrder(bestPick.opp, `EMIL:AUTO:${bestPick.opp.tfLabel}`);
+        }
+        setEmilStatus('Watching');
       } catch { /* never let the pilot crash the console */ }
     }, 45_000);
     return () => clearInterval(id);
@@ -321,6 +357,14 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           <span className="rounded px-2 py-0.5 font-mono text-[9px] font-bold" style={{ backgroundColor: `${orb.color}1F`, color: orb.color, border: `1px solid ${orb.color}66` }}>
             {orb.label}
           </span>
+          {onboarded && (
+            <span className="rounded px-2 py-0.5 font-mono text-[9px]" style={{
+              backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+              color: riskState === 'Normal' ? '#00C27A' : riskState === 'Cautious' || riskState === 'Profit Protection' ? '#FFB300' : '#FF5252',
+            }}>
+              EMIL: {mode === 'auto' ? emilStatus : mode === 'confirm' ? 'Preparing' : 'Watching'} · {Object.keys(prices).filter((s) => prices[s]?.bid != null).length} instruments · Risk {riskState}
+            </span>
+          )}
           {onboarded && (
             <div className="flex items-center gap-1.5">
               {([['observe', 'OBSERVE', '#29ABE2'], ['confirm', 'CONFIRM-TO-TRADE', '#FFB300'], ['auto', 'AUTONOMOUS PILOT', '#CE93D8']] as const).map(([m, label, color]) => (
@@ -561,6 +605,38 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     onChange={(e) => setAutoParams((p) => ({ ...p, autoHedge: e.target.checked }))} className="accent-[#CE93D8]" />
                   Auto-hedge: when a position goes ≥0.5R adverse and the council is uncertain, EMIL may place a viable hedge leg (efficiency-gated, tagged EMIL:HEDGE)
                 </label>
+                <label className="mt-1.5 flex items-center gap-2 text-[10px] text-white/60">
+                  <input type="checkbox" checked={autoParams.smallSteady}
+                    onChange={(e) => setAutoParams((p) => ({ ...p, smallSteady: e.target.checked }))} className="accent-[#CE93D8]" />
+                  <b>Small &amp; Steady mode</b>: base lot only, quality bar +10, discipline over throughput — pairs well with a daily profit lock
+                </label>
+                <div className="mt-1.5 rounded border p-2" style={{ borderColor: 'rgba(0,229,160,0.3)', backgroundColor: 'rgba(0,229,160,0.04)' }}>
+                  <label className="flex items-center gap-2 text-[10px] font-bold" style={{ color: '#00E5A0' }}>
+                    <input type="checkbox" checked={autoParams.profitOnly}
+                      onChange={(e) => setAutoParams((p) => ({ ...p, profitOnly: e.target.checked }))} className="accent-[#00E5A0]" />
+                    Profit-Only: capital is untouchable — EMIL trades from realized profits only
+                  </label>
+                  {autoParams.profitOnly && (
+                    <div className="mt-1.5 flex flex-wrap items-end gap-3">
+                      <label className="text-[9px] text-white/45">Protected capital $
+                        <input type="number" min={0} step={100} value={autoParams.protectedCapital}
+                          onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setAutoParams((p) => ({ ...p, protectedCapital: Math.max(0, v) })); }}
+                          className="mt-0.5 block w-[110px] rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white outline-none" style={{ border: '1px solid rgba(0,229,160,0.3)' }} />
+                      </label>
+                      <button onClick={() => setAutoParams((p) => ({ ...p, protectedCapital: Math.round(Number(accountSummary?.balance ?? 0)) }))}
+                        className="rounded px-2 py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                        style={{ backgroundColor: 'rgba(0,229,160,0.12)', color: '#00E5A0', border: '1px solid rgba(0,229,160,0.4)' }}>
+                        Set to current balance (${Number(accountSummary?.balance ?? 0).toFixed(0)})
+                      </button>
+                      <label className="text-[9px] text-white/45">% of profit cushion riskable / trade
+                        <input type="number" min={1} max={100} step={5} value={autoParams.tradableProfitPct}
+                          onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setAutoParams((p) => ({ ...p, tradableProfitPct: Math.max(1, Math.min(100, v)) })); }}
+                          className="mt-0.5 block w-[70px] rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[10px] text-white outline-none" style={{ border: '1px solid rgba(0,229,160,0.3)' }} />
+                      </label>
+                      <span className="text-[9px] text-white/40">Balance at/below the protected line → EMIL stops opening risk and only protects.</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                 {([
@@ -598,7 +674,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     recordEmilAutoConsent(gateTyped.trim(), autoParams);
                     setGateOpen(false); setGateTyped('');
                     setMode('auto');
-                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.selectAll ? 'EMIL selects instruments (full universe)' : autoParams.symbols.join(', ')} · base lot ${autoParams.baseLot} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}${autoParams.autoHedge ? ' · auto-hedge ON' : ''} · learning always on`);
+                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.selectAll ? 'EMIL selects instruments (full universe)' : autoParams.symbols.join(', ')} · base lot ${autoParams.baseLot} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}${autoParams.autoHedge ? ' · auto-hedge ON' : ''}${autoParams.smallSteady ? ' · Small&Steady' : ''}${autoParams.profitOnly ? ` · PROFIT-ONLY (capital $${autoParams.protectedCapital} protected, ${autoParams.tradableProfitPct}% of cushion/trade)` : ''} · learning always on`);
                     setLogTick((t) => t + 1);
                   }}
                   disabled={gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL' || (!autoParams.selectAll && !autoParams.symbols.length)}
