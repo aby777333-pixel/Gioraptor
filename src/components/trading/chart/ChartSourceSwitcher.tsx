@@ -37,6 +37,8 @@ import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
 import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle, glowStyle } from './header-theme';
+import TrendSignal from './TrendSignal';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
 import { effectiveEngineParams, builtinInputsFor } from '@/lib/trading/ea-params';
@@ -559,11 +561,8 @@ export default function ChartSourceSwitcher({
           <button
             key={tab.id}
             onClick={() => setSource(tab.id)}
-            className="rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-            style={{
-              backgroundColor: source === tab.id ? 'rgba(41,171,226,0.15)' : 'transparent',
-              color: source === tab.id ? '#0091D5' : 'rgba(255,255,255,0.45)',
-            }}
+            className="rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+            style={headerBtnStyle('source', source === tab.id)}
           >
             {tab.label}
           </button>
@@ -581,11 +580,12 @@ export default function ChartSourceSwitcher({
           title={algoLocked
             ? 'Algo Trading has been disabled platform-wide by the administrator.'
             : algoOn ? 'Algo Trading is ON — EAs run automatically. Click to pause.' : 'Algo Trading is OFF — EAs paused. Click to resume.'}
-          className="ml-auto flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-colors"
+          className="ml-auto flex items-center gap-1.5 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-all"
           style={{
             backgroundColor: algoOn ? 'rgba(0,194,122,0.15)' : 'rgba(255,82,82,0.15)',
             color: algoOn ? '#00C27A' : '#FF5252',
             border: `1px solid ${algoOn ? 'rgba(0,194,122,0.4)' : 'rgba(255,82,82,0.4)'}`,
+            ...(algoOn ? glowStyle('0,194,122') : {}),
           }}
         >
           <span style={{ fontSize: 9 }}>{algoOn ? '🟢' : '🔴'}</span>
@@ -597,12 +597,8 @@ export default function ChartSourceSwitcher({
           <button
             onClick={() => setQuickOpen((o) => !o)}
             title="QuickTrade — one-click Buy/Sell for the active symbol"
-            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-colors"
-            style={{
-              backgroundColor: quickOpen ? 'rgba(41,171,226,0.15)' : 'transparent',
-              color: quickOpen ? '#0091D5' : 'rgba(255,255,255,0.55)',
-              border: '1px solid rgba(41,171,226,0.35)',
-            }}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] font-bold transition-all"
+            style={headerBtnStyle('trade', quickOpen)}
           >
             <Zap size={12} /> <span className="hidden 2xl:inline">Trade</span> <ChevronDown size={10} />
           </button>
@@ -710,8 +706,8 @@ export default function ChartSourceSwitcher({
         {insightsEnabled && (
           <button
             onClick={() => setInsightsOpen(true)}
-            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-            style={{ color: insightsOpen ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+            style={headerBtnStyle('insights', insightsOpen)}
             title="Market Insights — heat map, sessions & regime (live platform data)"
           >
             <Grid3x3 size={12} /> Insights
@@ -722,8 +718,8 @@ export default function ChartSourceSwitcher({
         {riskEnabled && (
           <button
             onClick={() => setRiskOpen(true)}
-            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-            style={{ color: riskOpen ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+            style={headerBtnStyle('risk', riskOpen)}
             title="Risk Tools — dashboard & position sizer (real account data)"
           >
             <ShieldCheck size={12} /> Risk
@@ -734,8 +730,8 @@ export default function ChartSourceSwitcher({
         {journalEnabled && (
           <button
             onClick={() => setJournalOpen(true)}
-            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-            style={{ color: journalOpen ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+            className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+            style={headerBtnStyle('journal', journalOpen)}
             title="Trade Journal — annotate closed trades, analytics, CSV export"
           >
             <NotebookPen size={12} /> Journal
@@ -752,11 +748,8 @@ export default function ChartSourceSwitcher({
           <div className="relative ml-1" ref={eaMenuRef}>
             <button
               onClick={() => setEaMenuOpen(!eaMenuOpen)}
-              className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-              style={{
-                backgroundColor: eaMenuOpen ? 'rgba(41,171,226,0.15)' : 'transparent',
-                color: eaMenuOpen ? '#0091D5' : 'rgba(255,255,255,0.45)',
-              }}
+              className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+              style={headerBtnStyle('eas', eaMenuOpen)}
             >
               <Bot size={12} /> EAs / Robots <ChevronDown size={10} />
             </button>
@@ -843,8 +836,9 @@ export default function ChartSourceSwitcher({
         )}
       </div>
 
-      {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts */}
-      <TimeframeBar />
+      {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
+          The free space on the right hosts the live trend signal beacon. */}
+      <TimeframeBar trailing={<TrendSignal ohlcvBuilder={ohlcvBuilder} />} />
 
       {/* Active chart + shared EA overlays */}
       <div className="relative min-h-0 flex-1">

@@ -1,6 +1,7 @@
 'use client';
 
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle } from './header-theme';
 
 // Price Alerts engine (super-prompt §10). Lives in the shared chart header, so
 // it works over BOTH the TradingView and RAPTOR charts. Alerts are evaluated
@@ -190,8 +191,8 @@ export default function AlertsMenu({
       <button
         onClick={() => setOpen((o) => !o)}
         title="Price alerts"
-        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-        style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+        style={headerBtnStyle('alerts', open)}
       >
         <Bell size={12} /> <span className="hidden 2xl:inline">Alerts</span>{activeCount > 0 ? ` (${activeCount})` : ''} <ChevronDown size={10} />
       </button>

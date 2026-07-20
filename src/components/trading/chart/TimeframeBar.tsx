@@ -7,6 +7,7 @@
 // this bar always reflects the live timeframe.
 
 import { useTradingStore } from '@/stores/trading';
+import { headerBtnStyle } from './header-theme';
 
 // Full MT5/TradingView-style ladder. `value` matches the store's TF label.
 const TIMEFRAMES: { label: string; value: string }[] = [
@@ -21,7 +22,7 @@ const TIMEFRAMES: { label: string; value: string }[] = [
   { label: 'MN', value: '1Mo' },
 ];
 
-export default function TimeframeBar() {
+export default function TimeframeBar({ trailing }: { trailing?: React.ReactNode }) {
   const activeTimeframe = useTradingStore((s) => s.activeTimeframe);
   const setActiveTimeframe = useTradingStore((s) => s.setActiveTimeframe);
 
@@ -44,18 +45,17 @@ export default function TimeframeBar() {
             key={tf.value}
             onClick={() => select(tf.value)}
             title={`Set both charts to ${tf.label}`}
-            className="shrink-0 rounded px-2 py-0.5 font-mono text-[11px] font-semibold transition-colors"
-            style={{
-              backgroundColor: active ? 'rgba(41,171,226,0.18)' : 'transparent',
-              color: active ? '#0091D5' : 'rgba(255,255,255,0.5)',
-              border: `1px solid ${active ? 'rgba(41,171,226,0.45)' : 'transparent'}`,
-            }}
+            className="shrink-0 rounded px-2 py-0.5 font-mono text-[11px] font-semibold transition-all"
+            style={headerBtnStyle('tf', active)}
           >
             {tf.label}
           </button>
         );
       })}
-      <span className="ml-auto shrink-0 pl-2 text-[8px] uppercase tracking-wide text-white/20">both charts</span>
+      <div className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+        {trailing}
+        <span className="shrink-0 text-[8px] uppercase tracking-wide text-white/20">both charts</span>
+      </div>
     </div>
   );
 }

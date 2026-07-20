@@ -1,6 +1,7 @@
 'use client';
 
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle } from './header-theme';
 
 // Markets data hub (super-prompt §14–17): Economic Calendar, Market News and a
 // multi-asset Screener — all real data via TradingView's free embed widgets (no
@@ -82,8 +83,8 @@ export default function MarketsMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         title="Markets — calendar, news & screener"
-        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-        style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+        style={headerBtnStyle('markets', open)}
       >
         <Radar size={12} /> <span className="hidden 2xl:inline">Markets</span> <ChevronDown size={10} />
       </button>

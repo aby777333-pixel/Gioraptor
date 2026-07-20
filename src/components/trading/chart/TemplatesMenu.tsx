@@ -12,6 +12,7 @@ import { LayoutTemplate, Plus, Trash2, ChevronDown, Download, Check, Cloud } fro
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle } from './header-theme';
 
 interface ChartTemplate {
   id: string;
@@ -156,8 +157,8 @@ export default function TemplatesMenu({ onToast }: { onToast: (msg: string) => v
       <button
         onClick={() => setOpen((o) => !o)}
         title="Chart templates & layouts"
-        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-        style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+        style={headerBtnStyle('templates', open)}
       >
         <LayoutTemplate size={12} /> <span className="hidden 2xl:inline">Templates</span> <ChevronDown size={10} />
       </button>

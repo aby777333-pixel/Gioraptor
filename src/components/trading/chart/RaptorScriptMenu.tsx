@@ -1,6 +1,7 @@
 'use client';
 
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle } from './header-theme';
 
 // Raptor Script editor (super-prompt §5). A lightweight custom-indicator editor:
 // write a short script against the real bar series (close/high/low/open/volume)
@@ -72,8 +73,8 @@ export default function RaptorScriptMenu({
       <button
         onClick={() => setOpen((o) => !o)}
         title="Raptor Script — custom indicator editor"
-        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-        style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+        style={headerBtnStyle('script', open)}
       >
         <Code2 size={12} /> <span className="hidden 2xl:inline">Script</span> <ChevronDown size={10} />
       </button>

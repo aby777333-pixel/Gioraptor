@@ -1,6 +1,7 @@
 'use client';
 
 import HeaderPortal from './HeaderPortal';
+import { headerBtnStyle } from './header-theme';
 
 // DOM / Level-2 price ladder (super-prompt §12). A cTrader-style click-to-trade
 // ladder built from REAL top-of-book bid/ask (we don't fabricate depth). Each
@@ -138,8 +139,8 @@ export default function DomLadder({
       <button
         onClick={() => setOpen((o) => !o)}
         title="DOM — click-to-trade price ladder"
-        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-colors"
-        style={{ backgroundColor: open ? 'rgba(41,171,226,0.15)' : 'transparent', color: open ? '#0091D5' : 'rgba(255,255,255,0.45)' }}
+        className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
+        style={headerBtnStyle('dom', open)}
       >
         <AlignJustify size={12} /> <span className="hidden 2xl:inline">DOM</span> <ChevronDown size={10} />
       </button>
