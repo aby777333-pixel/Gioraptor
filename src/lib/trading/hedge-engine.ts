@@ -70,6 +70,18 @@ export interface CorrelationRead {
   labelColor: string;
 }
 
+/** Hedge decay forecast: turns the measured stability + trend into a
+ *  forward-looking maintenance read. Deterministic mapping over real
+ *  measurements — a review schedule, never a prediction of prices. */
+export function decayForecast(read: { stability: number; trend: string; breaking: boolean }): { label: string; color: string; note: string } {
+  if (read.breaking) return { label: 'BREAKING NOW', color: '#FF5252', note: 'short-window correlation has decoupled from the hedge horizon — this hedge may already not protect; review immediately' };
+  if (read.trend === 'reversing') return { label: 'Deteriorating fast', color: '#FF5252', note: 'the relationship is reversing sign — unwind or re-select; do not rely on this hedge overnight' };
+  if (read.trend === 'weakening') return { label: 'Deteriorating', color: '#FFB300', note: 'correlation is weakening across windows — review within the session; effectiveness is fading' };
+  if (read.stability < 0.5) return { label: 'Unstable', color: '#FFB300', note: 'windows disagree — treat protection estimates as loose; check daily' };
+  if (read.trend === 'strengthening') return { label: 'Improving', color: '#00C27A', note: 'relationship tightening — routine daily check is enough' };
+  return { label: 'Holding', color: '#00C27A', note: 'stable across windows — routine daily check is enough' };
+}
+
 export function correlationRead(
   builder: OHLCVBuilder, primary: string, candidate: string,
 ): CorrelationRead {

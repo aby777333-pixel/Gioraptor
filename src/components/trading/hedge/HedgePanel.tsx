@@ -24,7 +24,7 @@ import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { symbolCurrencies } from '@/lib/trading/protection';
 import { getCalendar, upcomingHighImpact, fmtEta, type NewsEvent } from '@/lib/trading/news-guard';
 import {
-  findHedges, currencyExposureMap, loadHedgeGroups, saveHedgeGroups, correlationRead,
+  findHedges, currencyExposureMap, loadHedgeGroups, saveHedgeGroups, correlationRead, decayForecast,
   stressTest, leadLag, spreadZ, weekendGap, correlationMatrix,
   type HedgeCandidate, type HedgeInputs, type HedgeGroup, type StressResult,
 } from '@/lib/trading/hedge-engine';
@@ -317,6 +317,11 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
                   <span className="font-mono text-[13px] font-bold text-white">{c.hedgeDirection} {c.suggestedLots} {c.symbol}</span>
                   <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: `${c.corr.labelColor}1A`, color: c.corr.labelColor, border: `1px solid ${c.corr.labelColor}55` }}>{c.corr.label}</span>
                   <span className="text-[9px] text-white/40">confidence {c.corr.confidence}% · stability {(c.corr.stability * 100).toFixed(0)}% · trend {c.corr.trend}</span>
+                  {(() => { const f = decayForecast(c.corr); return (
+                    <span className="rounded px-1.5 py-0.5 text-[8px] font-bold" title={f.note} style={{ color: f.color, border: `1px solid ${f.color}55`, backgroundColor: `${f.color}10` }}>
+                      ⏳ {f.label}
+                    </span>
+                  ); })()}
                   <button onClick={() => setPreview(c)}
                     className="ml-auto rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110"
                     style={{ background: 'linear-gradient(180deg, #CE93D8 0%, #AB47BC 100%)', boxShadow: '0 0 10px rgba(171,71,188,0.5)' }}>

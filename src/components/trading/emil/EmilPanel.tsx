@@ -726,6 +726,24 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           }
         }
 
+        // Session-scoped trading windows: when the trader restricted the
+        // pilot to specific sessions, NEW entries wait for one to open —
+        // existing positions keep their full approved management above.
+        if (Array.isArray(p.allowedSessions) && p.allowedSessions.length > 0 && p.allowedSessions.length < 4) {
+          const openNow = sessionSnapshot().sessions.filter((s) => s.open).map((s) => s.id);
+          if (!openNow.some((id) => p.allowedSessions.includes(id))) {
+            if (lastModeRef.current !== 'Session-window wait') {
+              emilLog('mode', `session window closed: your envelope allows entries only during ${p.allowedSessions.join('/')} — none is open (${openNow.join('/') || 'all desks closed'}). Managing existing positions; waiting for the window.`);
+              prevModeRef.current = lastModeRef.current;
+              lastModeRef.current = 'Session-window wait';
+              setLogTick((x) => x + 1);
+            }
+            setCurrentMode('Session-window wait');
+            setEmilStatus('Watching');
+            return;
+          }
+        }
+
         // Sleep Mode: manage existing only — no new entries while it holds.
         // §8 Setups skipped by sleep become shadow records against real bars.
         if (sleepNoNewRef.current) {
@@ -1824,6 +1842,21 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     <input type="number" min={min} max={max} step={step} value={autoParams[key] as number}
                       onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setAutoParams((p) => ({ ...p, [key]: Math.max(min, Math.min(max, v)) })); }}
                       className="mt-1 block w-full rounded bg-white/[0.06] px-2 py-1.5 font-mono text-[12px] text-white outline-none" style={{ border: '1px solid rgba(206,147,216,0.3)' }} />
+                  </label>
+                ))}
+              </div>
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-white/45">
+                <span>Session windows (new entries only while one is open; management always continues):</span>
+                {(['SYD', 'TYO', 'LON', 'NYC'] as const).map((id) => (
+                  <label key={id} className="flex items-center gap-1">
+                    <input type="checkbox"
+                      checked={(autoParams.allowedSessions ?? ['SYD', 'TYO', 'LON', 'NYC']).includes(id)}
+                      onChange={(e) => setAutoParams((p) => {
+                        const cur = p.allowedSessions ?? ['SYD', 'TYO', 'LON', 'NYC'];
+                        const next = e.target.checked ? [...cur, id] : cur.filter((x) => x !== id);
+                        return { ...p, allowedSessions: next.length ? next : cur }; // never allow an empty window set
+                      })} className="accent-[#CE93D8]" />
+                    {id}
                   </label>
                 ))}
               </div>

@@ -205,6 +205,7 @@ export interface EmilAutoParams {
   // Governance layer: profit-decay protection + autonomous permission expiry.
   maxGiveback: number;                       // $ of the day's peak EMIL P&L allowed to be given back (0 = off)
   expiryMode: 'session' | 'day' | 'week' | 'manual'; // when autonomous permission lapses to Prepare
+  allowedSessions: string[];                 // pilot may open NEW entries only while one of these is open (all 4 = always)
 }
 
 export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
@@ -228,6 +229,7 @@ export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
   enabledModes: SCAN_TFS.map((t) => t.style),
   maxGiveback: 0,
   expiryMode: 'session',
+  allowedSessions: ['SYD', 'TYO', 'LON', 'NYC'],
 };
 
 /** When the current autonomous consent was recorded (null if never). */

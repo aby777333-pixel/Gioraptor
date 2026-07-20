@@ -152,6 +152,35 @@ export default function ProtectionMenu({ onToast }: { onToast: (msg: string) => 
               obey them, including EAs.
             </p>
             {/* Master switch — arm/disarm everything, or pick rules individually below */}
+            {/* One-click presets — bundles of the same 12 rules, tuned by
+                temperament. Amounts are starting points; edit any rule after. */}
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              {([
+                ['🛡 Conservative', 'Tightest protection: $300 daily stop, 1% risk cap, mandatory SL, 2-loss cooldown, 5 trades/day, news guard on.', {
+                  dailyLossLimit: { on: true, amount: 300 }, profitLockIn: { on: false, amount: 1000 }, mandatorySL: { on: true },
+                  riskCap: { on: true, pct: 1 }, lossCooldown: { on: true, losses: 2, minutes: 60 }, revengeGuard: { on: true, minutes: 15 },
+                  overtradeGovernor: { on: true, maxPerDay: 5 }, correlationGuard: { on: true, maxSameCurrency: 2 }, marginLadder: { on: true },
+                  spreadGuard: { on: true, maxPips: 5 }, equityFloor: { on: false, equity: 0 }, newsGuard: { on: true, minutes: 30 },
+                }],
+                ['⚖ Balanced', 'Sensible defaults: $500 daily stop, 2% risk cap, mandatory SL, 3-loss cooldown, 10 trades/day, news guard on.', {
+                  dailyLossLimit: { on: true, amount: 500 }, profitLockIn: { on: false, amount: 1000 }, mandatorySL: { on: true },
+                  riskCap: { on: true, pct: 2 }, lossCooldown: { on: true, losses: 3, minutes: 30 }, revengeGuard: { on: true, minutes: 10 },
+                  overtradeGovernor: { on: true, maxPerDay: 10 }, correlationGuard: { on: true, maxSameCurrency: 3 }, marginLadder: { on: true },
+                  spreadGuard: { on: true, maxPips: 6 }, equityFloor: { on: false, equity: 0 }, newsGuard: { on: true, minutes: 30 },
+                }],
+                ['🌊 Minimal', 'Margin warnings only — every other rule off. You trade with no self-imposed protections.', {
+                  ...PROTECTION_DEFAULTS,
+                }],
+              ] as const).map(([label, desc, preset]) => (
+                <button key={label}
+                  onClick={() => { const next = JSON.parse(JSON.stringify(preset)) as ProtectionSettings; setSettings(next); saveProtectionSettings(accountId, next); }}
+                  title={desc}
+                  className="rounded py-1.5 text-[9px] font-bold transition-all hover:brightness-125"
+                  style={{ backgroundColor: 'rgba(0,229,160,0.07)', color: 'rgba(0,229,160,0.85)', border: '1px solid rgba(0,229,160,0.3)' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => setAll(true)}
