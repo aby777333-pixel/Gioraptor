@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Target, HeartPulse, ClipboardList, X } from 'lucide-react';
+import HeaderPortal from '@/components/trading/chart/HeaderPortal';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { loadProtectionSettings } from '@/lib/trading/protection';
@@ -203,17 +204,21 @@ export default function TopBarCockpit() {
         </button>
       )}
 
-      {/* Shared popover */}
-      {popover && (
-        <div className="absolute left-0 top-full z-[9999] mt-1 w-[300px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.12)' }}>
-          <div className="mb-1.5 text-[12px] font-bold text-white">{popover.title}</div>
-          {popover.lines.map((l, i) => <p key={i} className="mb-1 text-[10px] leading-relaxed text-white/60 last:mb-0">{l}</p>)}
-        </div>
-      )}
+      {/* Shared popover — portaled to <body>: the strip scrolls horizontally,
+          so an absolutely-positioned child here would be clipped invisible
+          (same fix as the shared-header pop-downs). */}
+      <HeaderPortal open={!!popover} anchorRef={wrapRef}>
+        {popover && (
+          <div className="w-[300px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,255,255,0.12)' }}>
+            <div className="mb-1.5 text-[12px] font-bold text-white">{popover.title}</div>
+            {popover.lines.map((l, i) => <p key={i} className="mb-1 text-[10px] leading-relaxed text-white/60 last:mb-0">{l}</p>)}
+          </div>
+        )}
+      </HeaderPortal>
 
-      {/* Game plan editor */}
-      {planOpen && (
-        <div className="absolute left-0 top-full z-[9999] mt-1 w-[320px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(0,229,160,0.3)' }}>
+      {/* Game plan editor — portaled for the same reason */}
+      <HeaderPortal open={planOpen} anchorRef={wrapRef}>
+        <div className="w-[320px] rounded-lg border p-3 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(0,229,160,0.3)' }}>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[12px] font-bold text-white">📋 Today&apos;s Game Plan</span>
             <button onClick={() => setPlanOpen(false)} className="text-white/40 hover:text-white"><X size={12} /></button>
@@ -261,7 +266,7 @@ export default function TopBarCockpit() {
             </button>
           </div>
         </div>
-      )}
+      </HeaderPortal>
     </div>
   );
 }
