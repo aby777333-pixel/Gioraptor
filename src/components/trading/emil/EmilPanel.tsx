@@ -32,6 +32,7 @@ import { getPipSize, calcPipValue } from '@/lib/trading/ticket-math';
 import EmilGovernance from '@/components/trading/emil/EmilGovernance';
 import EmilLanguagePanel from '@/components/trading/emil/EmilLanguagePanel';
 import EmilKnowledge from '@/components/trading/emil/EmilKnowledge';
+import { loadArmedContext, clearArmedContext, issueToken, validateToken, consumeToken, type ArmedContext, type PermissionToken } from '@/lib/trading/emil-arm';
 import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
@@ -128,6 +129,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const voiceCapRef = useRef<VoiceCapture | null>(null);
+  const [armed, setArmed] = useState<ArmedContext | null>(null);
+  const [armedConfirm, setArmedConfirm] = useState(false);
+  const armedTokenRef = useRef<PermissionToken | null>(null);
+  const [armedBusy, setArmedBusy] = useState(false);
+  const [armedTick, setArmedTick] = useState(0);
   const givebackDayRef = useRef<string>('');
   const streakDayRef = useRef<string>('');
   const [sleepNoNew, setSleepNoNew] = useState(false);
@@ -150,6 +156,53 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
 
   useEffect(() => { setOnboarded(isEmilOnboarded()); }, []);
   useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
+
+  // Armed proposal from Scanner / Hedge Engine — refresh + countdown.
+  useEffect(() => {
+    const load = () => { setArmed(loadArmedContext()); setArmedTick((t) => t + 1); };
+    load();
+    const id = setInterval(load, 5_000);
+    window.addEventListener('focus', load);
+    return () => { clearInterval(id); window.removeEventListener('focus', load); };
+  }, []);
+
+  // §12/§16: execute ONLY through a freshly validated single-use token.
+  const executeArmed = useCallback(async () => {
+    const ctx = loadArmedContext();
+    const token = armedTokenRef.current;
+    if (!ctx || !token) { emilLog('blocked', 'armed proposal expired before execution — nothing done; re-arm from the source engine.'); setArmedConfirm(false); setArmed(null); setLogTick((t) => t + 1); return; }
+    if (!activeAccountId) { emilLog('blocked', 'no trading account selected — armed proposal not executed.'); setLogTick((t) => t + 1); return; }
+    const t = useTradingStore.getState().prices[ctx.symbol];
+    if (t?.bid == null || t?.ask == null) { emilLog('blocked', `${ctx.symbol}: no live quote — refusing to execute the armed proposal on stale data.`); setLogTick((x) => x + 1); return; }
+    const mid = (t.bid + t.ask) / 2;
+    const v = validateToken(token, ctx, mid);
+    if (!v.ok) {
+      emilLog('blocked', `armed ${ctx.kind} NOT executed: ${v.reason}.`);
+      setArmedConfirm(false); armedTokenRef.current = null; setLogTick((x) => x + 1);
+      return;
+    }
+    setArmedBusy(true);
+    try {
+      const fill = ctx.direction === 'BUY' ? t.ask : t.bid;
+      const comment = ctx.kind === 'hedge' ? `EMIL:HEDGE:${ctx.primary ?? 'ARMED'}` : `EMIL:CONF:${ctx.tf ?? 'ARM'}`;
+      await orderService.placeMarketOrder({
+        accountId: activeAccountId, symbol: ctx.symbol, direction: ctx.direction,
+        size: Math.min(ctx.lots, token.maxLots),
+        sl: ctx.stop ?? undefined, tp: ctx.target ?? undefined,
+        fillPrice: Number(fill), comment,
+      });
+      consumeToken();
+      emilLog('entry', `AUTHORIZED ${ctx.kind.toUpperCase()} executed on your single-use token: ${ctx.direction} ${Math.min(ctx.lots, token.maxLots)} ${ctx.symbol} @ ${fill}${ctx.stop ? ` · SL ${ctx.stop}` : ''}${ctx.target ? ` · TP ${ctx.target}` : ''} · source ${ctx.source} · token consumed, authority ends here.`);
+      clearArmedContext();
+      setArmed(null); setArmedConfirm(false);
+    } catch (err) {
+      emilLog('blocked', `armed ${ctx.kind} rejected by the order path: ${err instanceof Error ? err.message.slice(0, 140) : 'error'} — Shield/Guardian rules outrank every authorization.`);
+    } finally {
+      armedTokenRef.current = null;
+      setArmedBusy(false);
+      setLogTick((x) => x + 1);
+    }
+  }, [activeAccountId]);
   useEffect(() => { getInstrumentSpecs().then(setSpecs).catch(() => {}); }, []);
   useEffect(() => { getCalendar().then(setCalendar); }, []);
   useEffect(() => {
@@ -933,6 +986,61 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
               {showWhy && council && (
                 <div className="mb-3 rounded-lg border p-3 text-[11px] leading-relaxed text-white/65" style={{ borderColor: 'rgba(255,213,79,0.2)' }}>
                   {council.explanation.map((l, i) => <p key={i} className="mb-1.5 last:mb-0">{l}</p>)}
+                </div>
+              )}
+
+              {/* ── 🎯 ARMED PROPOSAL from Scanner / Hedge Engine ──
+                     Central rule: opening/arming grants NO trading authority. */}
+              {armed && (
+                <div className="mt-3 rounded-lg border p-3" data-armedtick={armedTick} style={{ borderColor: 'rgba(255,213,79,0.5)', backgroundColor: 'rgba(255,213,79,0.05)' }}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold" style={{ color: '#FFD54F' }}>
+                      🎯 Armed {armed.kind === 'hedge' ? 'HEDGE' : 'SCANNER'} proposal — from the {armed.source}
+                    </span>
+                    <span className="rounded px-2 py-0.5 font-mono text-[9px] font-bold" style={{ color: '#FFB300', border: '1px solid rgba(255,179,0,0.5)' }}>
+                      EMIL Status: PREPARE ONLY — arming granted analysis, not authority
+                    </span>
+                    <span className="ml-auto font-mono text-[9px] text-white/40">
+                      proposal expires in {Math.max(0, Math.round((armed.expiresAt - Date.now()) / 1000))}s
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 font-mono text-[10px] text-white/70 sm:grid-cols-4">
+                    <span>{armed.direction} {armed.lots} {armed.symbol}</span>
+                    <span>Ref price {armed.entryRef}</span>
+                    <span>{armed.stop != null ? `SL ${armed.stop}` : 'no SL (hedge leg)'} · {armed.target != null ? `TP ${armed.target}` : 'managed exit'}</span>
+                    <span>{armed.kind === 'hedge' ? `hedges ${armed.primary} · corr ${armed.corr?.toFixed(2) ?? '—'} · ~${armed.reductionPct?.toFixed(0) ?? '—'}% risk cut` : `${armed.tf ?? ''} · score ${armed.score ?? '—'}`}</span>
+                  </div>
+                  {armed.reasons?.length ? <p className="mt-1 text-[9px] text-white/45">Why: {armed.reasons.join(' · ')}</p> : null}
+                  {council && council.symbol === armed.symbol && (
+                    <p className="mt-1 text-[9px] text-white/45">EMIL read: council {council.stance}{council.stance.includes('LEAN') ? ` (${council.confidence}%)` : ''} on {armed.symbol}.</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={() => {
+                      const t = useTradingStore.getState().prices[armed.symbol];
+                      if (t?.bid == null || t?.ask == null) { emilLog('blocked', `${armed.symbol}: no live quote — cannot open authorization.`); setLogTick((x) => x + 1); return; }
+                      armedTokenRef.current = issueToken(armed, (t.bid + t.ask) / 2);
+                      setArmedConfirm(true);
+                    }}
+                      className="rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110"
+                      style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)', boxShadow: '0 0 10px rgba(255,213,79,0.4)' }}>
+                      Review &amp; Authorize THIS {armed.kind === 'hedge' ? 'hedge' : 'trade'}…
+                    </button>
+                    {armed.symbol !== activeSymbol && (
+                      <button onClick={() => setActiveSymbol(armed.symbol)}
+                        className="rounded px-2.5 py-1.5 text-[10px] font-bold transition-all hover:brightness-125" style={{ color: '#29ABE2', border: '1px solid rgba(41,171,226,0.4)' }}>
+                        Focus {armed.symbol} for full analysis
+                      </button>
+                    )}
+                    <button onClick={() => { clearArmedContext(); setArmed(null); emilLog('mode', `armed ${armed.kind} dismissed — analysed only, nothing executed.`); setLogTick((x) => x + 1); }}
+                      className="rounded px-2.5 py-1.5 text-[10px] font-bold text-white/50 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
+                      Dismiss (analyse only)
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[8px] text-white/30">
+                    Authorization mints a SINGLE-USE token: this instrument, this direction, max {armed.lots} lots, 90-second validity,
+                    bounded price drift — any material change voids it and requires fresh confirmation. Shield and the Guardian still
+                    gate the order like every other. Outside this token, EMIL trades only per its own console autonomy settings.
+                  </p>
                 </div>
               )}
 
@@ -1731,6 +1839,47 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
                   style={{ background: 'linear-gradient(180deg,#CE93D8,#AB47BC)', boxShadow: '0 0 14px rgba(171,71,188,0.5)' }}>
                   ARM AUTONOMOUS PILOT
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Armed-proposal authorization: one trade, one token ── */}
+        {armedConfirm && armed && (
+          <div className="fixed inset-0 z-[9600] flex items-center justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) { setArmedConfirm(false); armedTokenRef.current = null; } }}>
+            <div className="my-4 w-full max-w-[540px] rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,213,79,0.55)' }}>
+              <div className="mb-2 text-[15px] font-bold text-white">Authorize EMIL — this one {armed.kind === 'hedge' ? 'hedge' : 'trade'} only</div>
+              {(() => {
+                const t = prices[armed.symbol];
+                const spread = t?.bid != null && t?.ask != null ? ((t.ask - t.bid)).toFixed(armed.entryRef < 20 ? 5 : 2) : '—';
+                return (
+                  <div className="mb-2 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] text-white/75">
+                    <span>{armed.direction} {armed.lots} {armed.symbol}</span>
+                    <span>Live: {t?.bid ?? '—'} / {t?.ask ?? '—'}</span>
+                    <span>{armed.stop != null ? `Stop-loss ${armed.stop}` : 'No SL — hedge leg (managed by the hedge exit plan)'}</span>
+                    <span>{armed.target != null ? `Take-profit ${armed.target}` : 'Managed exit'}</span>
+                    <span>Spread now: {spread}</span>
+                    <span>Source: {armed.source}</span>
+                  </div>
+                );
+              })()}
+              <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
+                This confirmation mints a SINGLE-USE permission token: exactly this instrument, direction and size, valid 90 seconds,
+                voided by any material change (price drift beyond the bound, expiry, different proposal). The order still passes your
+                Shield rules and the independent Guardian — authorization never bypasses them. A generic “yes” elsewhere never
+                triggers this; only the button below does. Estimates are probabilities, never certainty; neither the broker nor the
+                Raptor platform is responsible for trading losses.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setArmedConfirm(false); armedTokenRef.current = null; emilLog('mode', `authorization cancelled for the armed ${armed.kind} — nothing executed.`); setLogTick((x) => x + 1); }}
+                  className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>
+                  Cancel
+                </button>
+                <button onClick={executeArmed} disabled={armedBusy}
+                  className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-40"
+                  style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)', boxShadow: '0 0 14px rgba(255,213,79,0.5)' }}>
+                  {armedBusy ? 'Executing…' : `CONFIRM — ${armed.direction} ${armed.lots} ${armed.symbol}`}
                 </button>
               </div>
             </div>

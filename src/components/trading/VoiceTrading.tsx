@@ -5,6 +5,7 @@ import { Mic, MicOff, X, Check, AlertCircle, Volume2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { cn } from '@/lib/utils/format';
+import { loadLangPrefs, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
 
 /* ── Global type augmentation for Web Speech API ── */
 declare global {
@@ -203,12 +204,20 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const confirmTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sarvamReady, setSarvamReady] = useState(false);
+  const sarvamCapRef = useRef<VoiceCapture | null>(null);
 
-  // Check support on mount
+  // Check support on mount. Sarvam (consented + configured) upgrades voice
+  // to MULTILINGUAL speech-to-text-translate; browser speech (English)
+  // remains the fallback. The confirmation step is mandatory either way.
   useEffect(() => {
     const SR = getSpeechRecognition();
     if (!SR) {
       setSupported(false);
+    }
+    const prefs = loadLangPrefs();
+    if (prefs.sarvamEnabled && prefs.consentAt) {
+      sarvamHealth().then((ok) => setSarvamReady(ok));
     }
   }, []);
 
@@ -397,7 +406,43 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     stopListening();
   }, [stopListening]);
 
+  // Sarvam multilingual capture: mic → 16kHz WAV → speech-to-text-translate
+  // → ENGLISH transcript → the SAME parser + mandatory confirmation.
+  const handleSarvamMic = useCallback(async () => {
+    if (sarvamCapRef.current) {
+      setState('processing');
+      try {
+        const cap = sarvamCapRef.current;
+        sarvamCapRef.current = null;
+        const { base64, seconds } = await cap.stop();
+        if (seconds < 1) { setState('error'); setErrorMsg('Recording too short — try again.'); return; }
+        const res = await sarvamSpeech(base64);
+        if (res.ok && res.transcript) {
+          setTranscript(res.transcript);
+          langAudit({ original: `[voice ${seconds}s]`, detected: res.language ?? 'unknown', engine: 'sarvam-stt-translate', translated: res.transcript.slice(0, 200), action: 'voice trading command' });
+          const cmd = parseCommand(res.transcript);
+          if (cmd) { setParsed(cmd); setState('confirming'); }
+          else { setState('error'); setErrorMsg(`Heard “${res.transcript.slice(0, 60)}” — not a recognised command. Try: “Buy 0.1 EURUSD”.`); }
+        } else {
+          setState('error');
+          setErrorMsg(`${res.error} — falling back to browser speech next time.`);
+        }
+      } catch {
+        setState('error'); setErrorMsg('Voice capture failed.');
+      }
+      return;
+    }
+    try {
+      setTranscript(''); setParsed(null); setErrorMsg(''); setFeedback('');
+      sarvamCapRef.current = await startVoiceCapture();
+      setState('listening');
+    } catch {
+      setState('error'); setErrorMsg('Microphone access denied.');
+    }
+  }, []);
+
   const handleMicClick = () => {
+    if (sarvamReady) { void handleSarvamMic(); return; }
     if (state === 'listening') {
       stopListening();
       setState('idle');
@@ -406,8 +451,8 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
     }
   };
 
-  // Not supported fallback
-  if (!supported) {
+  // Not supported fallback (Sarvam capture works in any browser with a mic)
+  if (!supported && !sarvamReady) {
     return (
       <div
         className="w-72 rounded-lg border shadow-2xl p-4"
@@ -448,6 +493,11 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
         <div className="flex items-center gap-1.5">
           <Volume2 size={13} style={{ color: '#0091D5' }} />
           <span className="text-[11px] font-bold">Voice Trading</span>
+          <span className="rounded px-1.5 py-0.5 font-mono text-[8px] font-bold"
+            title={sarvamReady ? 'Sarvam speech-to-text-translate: speak English or a supported Indian language — every command still needs your Confirm click' : 'Browser speech recognition (English). Enable Sarvam in EMIL’s Language & Voice panel for multilingual voice.'}
+            style={{ color: sarvamReady ? '#FF8A65' : 'rgba(255,255,255,0.35)', border: `1px solid ${sarvamReady ? 'rgba(255,138,101,0.5)' : 'rgba(255,255,255,0.15)'}` }}>
+            {sarvamReady ? 'SARVAM · multilingual' : 'browser · English'}
+          </span>
         </div>
         <button
           onClick={onClose}
@@ -626,6 +676,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
             '"Close all"',
             '"What is EURUSD"',
             '"Show my positions"',
+            ...(sarvamReady ? ['"गोल्ड 0.1 लॉट खरीदो" (any supported language)'] : []),
           ].map((cmd) => (
             <p key={cmd} className="text-[9px] opacity-30 font-mono">
               {cmd}
