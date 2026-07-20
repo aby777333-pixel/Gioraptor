@@ -15,6 +15,7 @@ export interface MissionParse {
   unknown: string[];
   patch: Partial<EmilAutoParams>;
   wakeMinConviction?: number;
+  wakeSessions?: { lon?: boolean; nyc?: boolean };
 }
 
 export function parseMission(text: string, universe: string[]): MissionParse {
@@ -22,6 +23,7 @@ export function parseMission(text: string, universe: string[]): MissionParse {
   const unknown: string[] = [];
   const patch: Partial<EmilAutoParams> = {};
   let wakeMinConviction: number | undefined;
+  let wakeSessions: { lon?: boolean; nyc?: boolean } | undefined;
 
   // Split on sentence ends — but never inside a decimal like "0.5".
   const clauses = text.split(/(?:[;\n]+|\.(?!\d))+/).map((c) => c.trim()).filter(Boolean);
@@ -86,8 +88,33 @@ export function parseMission(text: string, universe: string[]): MissionParse {
       }
     }
 
-    // Capital protection: "protect my capital above everything"
-    if (/protect (?:my )?capital/.test(c)) {
+    // Regional expressions (§9): common trader phrases map to precise rules.
+    if (/wake me (?:up )?for london|wake.*london (?:open|session)/.test(c)) {
+      wakeSessions = { ...wakeSessions, lon: true };
+      rules.push({ label: 'Wake for London', detail: 'session-open wake alert armed for London' });
+      matched = true;
+    }
+    if (/wake me (?:up )?for new york|wake.*new york (?:open|session)/.test(c)) {
+      wakeSessions = { ...wakeSessions, nyc: true };
+      rules.push({ label: 'Wake for New York', detail: 'session-open wake alert armed for New York' });
+      matched = true;
+    }
+    if (/take (?:a |only )?small trades?|small trades? only/.test(c)) {
+      patch.smallSteady = true;
+      rules.push({ label: 'Small trades', detail: 'Small & Steady ON — base lot only, quality bar +10' });
+      matched = true;
+    }
+    if (/do (?:not|n't) chase|no chasing/.test(c)) {
+      rules.push({ label: 'No chasing', detail: 'already enforced: stretched entries are skipped by the missed-entry discipline' });
+      matched = true;
+    }
+    if (/(?:book|cut|close|move).*(?:profit|trade|half|cost)/.test(c) && !matched) {
+      unknown.push(`"${clause}" — live-position actions (book profit / close half / move to cost) act through the positions panel or pilot management, not the mission envelope; EMIL will not guess which position you mean`);
+      matched = true;
+    }
+
+    // Capital protection: "protect my capital above everything" / "do not touch my capital"
+    if (/protect (?:my )?capital|do (?:not|n't) touch my capital/.test(c)) {
       patch.smallSteady = true;
       rules.push({ label: 'Capital first', detail: 'Small & Steady ON (base lot only, quality bar +10). Tip: also set Profit-Only with your protected-capital line in the gate.' });
       matched = true;
@@ -123,5 +150,5 @@ export function parseMission(text: string, universe: string[]): MissionParse {
     if (!matched) unknown.push(`"${clause}" — not understood; set it manually rather than letting EMIL guess`);
   }
 
-  return { rules, unknown, patch, wakeMinConviction };
+  return { rules, unknown, patch, wakeMinConviction, wakeSessions };
 }

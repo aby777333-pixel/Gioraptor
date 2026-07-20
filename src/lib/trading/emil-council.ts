@@ -202,6 +202,9 @@ export interface EmilAutoParams {
   setupChoice: 'mine' | 'emil' | 'hybrid';   // Use My Parameters / Let EMIL Handle All / Guide EMIL
   modeControl: 'trader' | 'shared' | 'emil'; // trader picks · EMIL picks from approved list · EMIL fully managed
   enabledModes: string[];                    // allowed style labels (matched to ScanTF.style)
+  // Governance layer: profit-decay protection + autonomous permission expiry.
+  maxGiveback: number;                       // $ of the day's peak EMIL P&L allowed to be given back (0 = off)
+  expiryMode: 'session' | 'day' | 'week' | 'manual'; // when autonomous permission lapses to Prepare
 }
 
 export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
@@ -223,7 +226,19 @@ export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
   setupChoice: 'emil',
   modeControl: 'emil',
   enabledModes: SCAN_TFS.map((t) => t.style),
+  maxGiveback: 0,
+  expiryMode: 'session',
 };
+
+/** When the current autonomous consent was recorded (null if never). */
+export function emilConsentAcceptedAt(): number | null {
+  try {
+    const raw = localStorage.getItem(EMIL_AUTO_CONSENT_KEY);
+    if (!raw) return null;
+    const t = new Date((JSON.parse(raw) as { acceptedAt?: string }).acceptedAt ?? '').getTime();
+    return Number.isFinite(t) ? t : null;
+  } catch { return null; }
+}
 
 const EMIL_PARAMS_KEY = 'raptor_emil_autoparams_v1';
 const EMIL_AUTO_CONSENT_KEY = 'raptor_emil_auto_consent_v1';

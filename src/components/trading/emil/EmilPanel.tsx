@@ -20,8 +20,17 @@ import {
   buildCouncil, isEmilOnboarded, recordEmilOnboarding, EMIL_DISCLAIMER,
   loadEmilAutoParams, saveEmilAutoParams, isEmilAutoConsented, recordEmilAutoConsent,
   emilLog, loadEmilLog, recordEmilOutcome, emilShouldAvoid, loadEmilLearning,
+  emilConsentAcceptedAt,
   type EmilConsensus, type CouncilStance, type EmilAutoParams,
 } from '@/lib/trading/emil-council';
+import {
+  objectiveEffects, loadObjectives, riskBudget, trackDayPeak,
+  recordShadow, recordReplay, decisionScores,
+} from '@/lib/trading/emil-governance';
+import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, langAudit } from '@/lib/trading/emil-language';
+import { getPipSize, calcPipValue } from '@/lib/trading/ticket-math';
+import EmilGovernance from '@/components/trading/emil/EmilGovernance';
+import EmilLanguagePanel from '@/components/trading/emil/EmilLanguagePanel';
 import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
@@ -70,7 +79,7 @@ function beep(times: number, freq: number): void {
   } catch { /* audio unavailable */ }
 }
 import { classifyMarketState } from '@/lib/nexus/market-state';
-import { highImpactWithin, fmtEta } from '@/lib/trading/news-guard';
+import { highImpactWithin, upcomingHighImpact, fmtEta } from '@/lib/trading/news-guard';
 
 type EmilMode = 'observe' | 'confirm' | 'auto';
 
@@ -114,6 +123,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [adaptPrefs, setAdaptPrefs] = useState<AdaptPrefs>(loadAdaptPrefs);
   const [adaptGate, setAdaptGate] = useState(false);
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
+  const [sarvamOk, setSarvamOk] = useState<boolean | null>(null);
+  const givebackDayRef = useRef<string>('');
+  const streakDayRef = useRef<string>('');
   const [sleepNoNew, setSleepNoNew] = useState(false);
   const sleepNoNewRef = useRef(false);
   sleepNoNewRef.current = sleepNoNew;
@@ -133,6 +145,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const lastEmilClosedRef = useRef<number | null>(null);    // learning: newest EMIL close seen
 
   useEffect(() => { setOnboarded(isEmilOnboarded()); }, []);
+  useEffect(() => { sarvamHealth().then(setSarvamOk); }, []);
   useEffect(() => { getInstrumentSpecs().then(setSpecs).catch(() => {}); }, []);
   useEffect(() => { getCalendar().then(setCalendar); }, []);
   useEffect(() => {
@@ -286,6 +299,15 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         const realized = closedToday.reduce((a, r) => a + Number(r.realized_pnl ?? 0), 0);
         let consec = 0;
         for (const r of emilRows) { if (Number(r.realized_pnl ?? 0) < 0) consec++; else break; }
+
+        // §26 Winning-streak control: streaks change NOTHING — say so once a day.
+        let consecW = 0;
+        for (const r of emilRows) { if (Number(r.realized_pnl ?? 0) > 0) consecW++; else break; }
+        if (consecW >= 3 && streakDayRef.current !== new Date().toDateString()) {
+          streakDayRef.current = new Date().toDateString();
+          emilLog('mode', `winning-streak control: ${consecW} wins in a row — size, frequency, leverage and quality bars stay exactly the same. Streaks never loosen discipline; controlled compounding is a separate trader decision.`);
+          setLogTick((x) => x + 1);
+        }
 
         // ── Learning never stops: absorb every newly-closed EMIL trade ──
         const emilClosed = emilRows.filter((r) => r.closed_at).sort((a, b) => new Date(b.closed_at!).getTime() - new Date(a.closed_at!).getTime());
@@ -457,13 +479,50 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         setRiskState(rs);
 
         if (m !== 'auto') { setEmilStatus('Managing'); return; }
+
+        // §19 Autonomous permission expiry — lapse to Prepare, keep managing.
+        if (p.expiryMode === 'day' || p.expiryMode === 'week') {
+          const t0 = emilConsentAcceptedAt();
+          const ttl = p.expiryMode === 'day' ? 86_400_000 : 7 * 86_400_000;
+          if (t0 && Date.now() - t0 > ttl) {
+            emilLog('lock', `autonomous permission expired (${p.expiryMode} limit) — dropped to Prepare level. Existing positions keep their approved management; renew autonomy via the gate.`);
+            wakeAlert('info', 'perm-expiry', 'EMIL autonomous permission expired — renew via the gate when ready.', 240);
+            setMode('confirm');
+            setLogTick((x) => x + 1);
+            return;
+          }
+        }
+
+        // §16 Profit-decay protection: day peak tracked, giveback bounded.
+        let openPnl = 0;
+        for (const pos of emilOpenPos) {
+          const dir = pos.direction === 'BUY' ? 1 : -1;
+          const tk = ticks[pos.symbol];
+          const cp = dir > 0 ? tk?.bid : tk?.ask;
+          if (cp != null) openPnl += (Number(cp) - Number(pos.open_price)) * dir / getPipSize(pos.symbol) * calcPipValue(pos.symbol, Number(pos.size));
+        }
+        const { peak, giveback } = trackDayPeak(realized + openPnl);
+        if (p.maxGiveback > 0 && peak > 0 && giveback >= p.maxGiveback) {
+          if (givebackDayRef.current !== new Date().toDateString()) {
+            givebackDayRef.current = new Date().toDateString();
+            emilLog('lock', `profit-decay protection: day peak +$${peak.toFixed(0)}, given back $${giveback.toFixed(0)} ≥ your $${p.maxGiveback} limit — Profit Protection Mode: no new entries today; existing positions still managed.`);
+            setLogTick((x) => x + 1);
+          }
+          setEmilStatus('Protecting');
+          return;
+        }
+
         if (consec >= p.stopAfterLosses) { emilLog('lock', `${consec} EMIL losses in a row — pilot paused per your rule`); stopEverything('consecutive losses'); return; }
+        // §2 Objective hierarchy: top-ranked objectives apply deterministic effects.
+        const objEff = objectiveEffects(loadObjectives());
+        const maxPerDayEff = objEff.maxPerDayCap != null ? Math.min(p.maxPerDay, objEff.maxPerDayCap) : p.maxPerDay;
         const entriesToday = loadEmilLog().filter((e) => e.kind === 'entry' && e.ts >= midnight.getTime()).length;
-        if (entriesToday >= p.maxPerDay) { setEmilStatus('Managing'); return; } // manage-only for the rest of the day
+        if (entriesToday >= maxPerDayEff) { setEmilStatus('Managing'); return; } // manage-only for the rest of the day
         if (rs === 'Defensive' || rs === 'Capital Lock') { setEmilStatus('Protecting'); return; } // no new risk while defensive
 
-        // Quality bar rises when cautious or in Small & Steady mode.
-        const minScoreEff = p.minScore + (rs === 'Cautious' ? 10 : 0) + (p.smallSteady ? 10 : 0);
+        // Quality bar rises when cautious, in Small & Steady mode, or when
+        // top-ranked objectives demand higher-confidence trades.
+        const minScoreEff = p.minScore + (rs === 'Cautious' ? 10 : 0) + (p.smallSteady ? 10 : 0) + objEff.minScoreBonus;
 
         // Profit-Only: capital is untouchable — new risk comes from the
         // realized profit cushion only, and only a slice of it per trade.
@@ -496,6 +555,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
             if (!opp || opp.score < minScoreEff) return;
             if (!allowedTFsNow.includes(opp.tfLabel)) return;                 // timeframe authority
             if (adapt.lockedMode && opp.style !== adapt.lockedMode) return;   // locked mode
+            // §17 Missed-entry discipline: stretched entries are never chased.
+            const entryComp = opp.components.find((x) => x.name === 'Entry quality');
+            if (entryComp && entryComp.score < 40) return;
+            // §14 Execution-cost forecast: spread must not eat the expected move.
+            if (opp.spreadPips != null && opp.expectedPips > 0 && opp.spreadPips > 0.25 * opp.expectedPips) return;
             if (emilShouldAvoid(symbol, opp.tfLabel)) return; // learned avoidance — losing buckets are benched
             const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
             if (!aligned) return;
@@ -537,7 +601,14 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         }
 
         // Sleep Mode: manage existing only — no new entries while it holds.
-        if (sleepNoNewRef.current) { setEmilStatus('Managing'); return; }
+        // §8 Setups skipped by sleep become shadow records against real bars.
+        if (sleepNoNewRef.current) {
+          if (candidates.length) {
+            const top = candidates.reduce((a, b) => (b.adj > a.adj ? b : a));
+            recordShadow({ ts: Date.now(), symbol: top.opp.symbol, direction: top.opp.direction, tf: top.opp.tfLabel, entry: top.opp.zone.preferred, stop: top.opp.zone.stop, target: top.opp.zone.target1, reason: 'no-new-entries sleep mode' });
+          }
+          setEmilStatus('Managing'); return;
+        }
 
         if (candidates.length) {
           setEmilStatus('Trading');
@@ -579,7 +650,40 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
             setLogTick((x) => x + 1);
           }
           setCurrentMode(chosenMode);
-          await placeEmilOrder(bestPick.opp, `EMIL:AUTO:${bestPick.opp.tfLabel}`);
+
+          // §6 Trade budget: reject entries beyond the remaining daily risk budget.
+          if (p.dailyLossStop > 0 && bestPick.opp.maxLossEstimate != null) {
+            const rb = riskBudget({ dailyLossStop: p.dailyLossStop, realizedToday: realized, openPositions: emilOpenPos, closedRows: [] });
+            if (bestPick.opp.maxLossEstimate > rb.remaining) {
+              emilLog('blocked', `${bestPick.opp.symbol}: entry risk $${bestPick.opp.maxLossEstimate.toFixed(0)} exceeds the remaining daily risk budget $${Number.isFinite(rb.remaining) ? rb.remaining.toFixed(0) : '∞'} (budget $${rb.budget}, loss used $${rb.realizedLoss.toFixed(0)}, open risk $${rb.openRisk.toFixed(0)}) — rejected.`);
+              setLogTick((x) => x + 1);
+              setEmilStatus('Watching');
+              return;
+            }
+          }
+
+          // §8 Shadow decisions: the best setup NOT taken is tracked against real bars.
+          const runnerUp = candidates.find((x) => x !== bestPick);
+          if (runnerUp) recordShadow({ ts: Date.now(), symbol: runnerUp.opp.symbol, direction: runnerUp.opp.direction, tf: runnerUp.opp.tfLabel, entry: runnerUp.opp.zone.preferred, stop: runnerUp.opp.zone.stop, target: runnerUp.opp.zone.target1, reason: 'ranked below the chosen entry' });
+
+          const placed = await placeEmilOrder(bestPick.opp, `EMIL:AUTO:${bestPick.opp.tfLabel}`);
+          if (placed) {
+            // §22 Decision replay — the flight recorder for this entry.
+            try {
+              const snap = sessionSnapshot();
+              const ev = upcomingHighImpact(symbolCurrencies(bestPick.opp.symbol), calendar, 24)[0] ?? null;
+              recordReplay({
+                ts: Date.now(), symbol: bestPick.opp.symbol, direction: bestPick.opp.direction,
+                price: bestPick.opp.zone.preferred, tf: bestPick.opp.tfLabel, mode: chosenMode,
+                sessionOpen: snap.sessions.filter((s) => s.open).map((s) => s.id),
+                nextNews: ev ? `${ev.currency} ${ev.title} ${fmtEta(ev.timeMs)}` : null,
+                votes: bestPick.c.votes.map((v) => ({ agent: v.agent, stance: v.stance, confidence: v.confidence })),
+                scores: decisionScores({ builder, symbol: bestPick.opp.symbol, tick: ticks[bestPick.opp.symbol], calendar, council: bestPick.c }),
+                riskChecks: ['envelope pass', 'Shield gate', 'Guardian watchdogs', 'news buffer clear', 'uncertainty gate pass', 'risk budget pass'],
+                alternatives: candidates.filter((x) => x !== bestPick).slice(0, 3).map((x) => `${x.opp.symbol} ${x.opp.tfLabel} adj ${Math.round(x.adj)}`),
+              });
+            } catch { /* the flight recorder must never break the pilot */ }
+          }
         } else {
           if (lastModeRef.current !== 'No-Trade') {
             emilLog('mode', `mode switch: ${lastModeRef.current} → No-Trade — no setup clears the quality/uncertainty/news bars. EMIL is protecting capital; staying flat is a successful decision.`);
@@ -769,7 +873,31 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   <input value={missionText} onChange={(e) => setMissionText(e.target.value)}
                     placeholder='e.g. "Only trade gold and EURUSD. Risk no more than 0.5 percent. Stop after two losses. Lock the day at a $300 target."'
                     className="min-w-0 flex-1 rounded bg-white/[0.06] px-2 py-1.5 text-[11px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
-                  <button onClick={() => setMissionParse(parseMission(missionText, Object.keys(prices).filter((s) => prices[s]?.bid != null)))}
+                  <button onClick={async () => {
+                    // §Language routing: English → rule parser directly; Indian/mixed
+                    // text → Sarvam translate (consented + configured) → the SAME
+                    // rule parser + read-back + Apply pipeline. Never guessed.
+                    const universe = Object.keys(prices).filter((s) => prices[s]?.bid != null);
+                    const route = routeCommand(missionText, loadLangPrefs(), sarvamOk === true);
+                    let textToParse = missionText;
+                    const preRules: { label: string; detail: string }[] = [];
+                    if (route.engine === 'sarvam+rules') {
+                      const tr = await sarvamTranslate(missionText);
+                      if (tr.ok && tr.translated) {
+                        textToParse = tr.translated;
+                        preRules.push({ label: 'Sarvam translation', detail: `“${tr.translated}” — review the read-back below before applying` });
+                        langAudit({ original: missionText.slice(0, 200), detected: route.detect.label, engine: 'sarvam+rules', translated: tr.translated.slice(0, 200), action: 'mission parsed' });
+                      } else {
+                        preRules.push({ label: 'Language service', detail: `${tr.error} — parsed with the English rule engine instead` });
+                        langAudit({ original: missionText.slice(0, 200), detected: route.detect.label, engine: 'rules(fallback)', translated: null, action: 'sarvam unavailable' });
+                      }
+                    } else if (route.detect.lang !== 'en' || route.detect.mixed) {
+                      preRules.push({ label: 'Language routing', detail: route.reason });
+                    }
+                    const parsed = parseMission(textToParse, universe);
+                    parsed.rules.unshift(...preRules);
+                    setMissionParse(parsed);
+                  }}
                     disabled={!missionText.trim()}
                     className="shrink-0 rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-30"
                     style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)' }}>
@@ -783,8 +911,13 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     {missionParse.rules.length > 0 && (
                       <button onClick={() => {
                         setAutoParams((p) => { const next = { ...p, ...missionParse.patch }; saveEmilAutoParams(next); return next; });
-                        if (missionParse.wakeMinConviction) {
-                          const w = { ...loadWake(), minConviction: missionParse.wakeMinConviction };
+                        if (missionParse.wakeMinConviction || missionParse.wakeSessions) {
+                          const cur = loadWake();
+                          const w = {
+                            ...cur,
+                            ...(missionParse.wakeMinConviction ? { minConviction: missionParse.wakeMinConviction } : {}),
+                            ...(missionParse.wakeSessions ? { enabled: true, sessionLON: missionParse.wakeSessions.lon ?? cur.sessionLON, sessionNYC: missionParse.wakeSessions.nyc ?? cur.sessionNYC } : {}),
+                          };
                           setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ }
                         }
                         emilLog('mode', `MISSION accepted: ${missionParse.rules.map((r) => `${r.label} → ${r.detail}`).join(' · ')}. Read-back confirmed; arm the pilot to run it.`);
@@ -1272,6 +1405,26 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 })()}
               </div>
 
+              {/* ── Governance layer: Constitution, objectives, decision safety,
+                     budgets, trust ladder, scorecard, shadow, health, replay ── */}
+              <EmilGovernance
+                builder={builderRef.current}
+                council={council}
+                prices={prices}
+                calendar={calendar}
+                autoParams={autoParams}
+                mode={mode}
+                sleepNoNew={sleepNoNew}
+                adaptEmil={adaptPrefs.control === 'emil'}
+                closedRows={history as unknown as Array<{ realized_pnl: number | null; closed_at: string | null; comment?: string | null }>}
+                openPositions={positions as unknown as Array<{ symbol: string; direction: string; size: number; open_price: number; sl: number | null; comment?: string | null }>}
+                logTick={logTick}
+                onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }}
+              />
+
+              {/* ── Language & Voice: Sarvam multilingual layer (additive) ── */}
+              <EmilLanguagePanel onLog={(t) => { emilLog('mode', t); setLogTick((x) => x + 1); }} />
+
               {/* EMIL activity feed */}
               {(mode !== 'observe' || loadEmilLog().length > 0) && (
                 <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }} data-logtick={logTick}>
@@ -1467,6 +1620,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   ['Stop after losses', 'stopAfterLosses', 1, 10, 1],
                   ['Daily loss stop $', 'dailyLossStop', 0, 100000, 50],
                   ['Daily profit lock $ (0=off)', 'dailyProfitLock', 0, 100000, 50],
+                  ['Max profit giveback $ (0=off)', 'maxGiveback', 0, 100000, 25],
                 ] as const).map(([label, key, min, max, step]) => (
                   <label key={key} className="text-[9px] text-white/45">{label}
                     <input type="number" min={min} max={max} step={step} value={autoParams[key] as number}
@@ -1475,6 +1629,17 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   </label>
                 ))}
               </div>
+              <label className="mb-2 flex items-center gap-2 text-[9px] text-white/45">
+                Autonomous permission expiry (§19 — autonomy is granted for a period, not forever)
+                <select value={autoParams.expiryMode}
+                  onChange={(e) => setAutoParams((p) => ({ ...p, expiryMode: e.target.value as EmilAutoParams['expiryMode'] }))}
+                  className="rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[9px] text-white outline-none" style={{ border: '1px solid rgba(206,147,216,0.3)' }}>
+                  <option value="session" style={{ backgroundColor: '#0A0F1A' }}>This session (default — resets when the console closes)</option>
+                  <option value="day" style={{ backgroundColor: '#0A0F1A' }}>One day, then drop to Prepare</option>
+                  <option value="week" style={{ backgroundColor: '#0A0F1A' }}>One week, then drop to Prepare</option>
+                  <option value="manual" style={{ backgroundColor: '#0A0F1A' }}>Until I turn it off (explicit choice)</option>
+                </select>
+              </label>
               <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
                 {EMIL_DISCLAIMER}
               </p>
