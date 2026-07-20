@@ -280,6 +280,17 @@ export function recordShadow(rec: Omit<ShadowRecord, 'status'>): void {
   saveShadow(list);
 }
 
+/** Regret-weighted learning: when setups EMIL rejected/skipped in a bucket
+ *  kept WINNING in shadow tracking (real bars decided), the ranking penalty
+ *  eases slightly. Risk-aware by design: +3 ranking points only — it never
+ *  touches sizing, never bypasses Shield/Guardian, and needs ≥3 resolved
+ *  shadow wins with wins > losses before it does anything. */
+export function shadowRegretBonus(symbol: string, tf: string): number {
+  const rel = loadShadow().filter((s) => s.symbol === symbol && s.tf === tf && (s.status === 'win' || s.status === 'loss'));
+  const w = rel.filter((s) => s.status === 'win').length;
+  return w >= 3 && w > rel.length - w ? 3 : 0;
+}
+
 /** Walk real bars since each open shadow's timestamp: stop touched first =
  *  loss, target first = win; both inside one bar counts as a loss
  *  (conservative); unresolved after 48h expires. */

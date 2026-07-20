@@ -25,8 +25,9 @@ import {
 } from '@/lib/trading/emil-council';
 import {
   objectiveEffects, loadObjectives, riskBudget, trackDayPeak,
-  recordShadow, recordReplay, decisionScores,
+  recordShadow, recordReplay, decisionScores, shadowRegretBonus,
 } from '@/lib/trading/emil-governance';
+import { simulateTwin, type TwinResult } from '@/lib/trading/world-command';
 import { loadLangPrefs, routeCommand, sarvamTranslate, sarvamHealth, sarvamSpeech, startVoiceCapture, langAudit, type VoiceCapture } from '@/lib/trading/emil-language';
 import { getPipSize, calcPipValue } from '@/lib/trading/ticket-math';
 import EmilGovernance from '@/components/trading/emil/EmilGovernance';
@@ -689,7 +690,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
             if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) return; // slice of profits only
             // Trade Mode controller: only allowed modes may trade (trader/shared control).
             if (p.modeControl !== 'emil' && !p.enabledModes.includes(opp.style)) return;
-            candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) });
+            // Ranking = score + learned bonus − uncertainty discount + regret
+            // easing (shadow-verified only; ranking-only, never sizing).
+            candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) + shadowRegretBonus(symbol, opp.tfLabel) });
           };
           consider(c.bestOpp);
           // Universal timeframe ladder (§2): extended TFs beyond the scanner's
@@ -822,6 +825,23 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboarded, activeAccountId, calendar.length, specs]);
+
+  // 🔮 Digital-Twin rehearsals: 300 bootstrap futures for the prepared ticket
+  // and the armed proposal — measured behaviour shown BEFORE capital commits.
+  const ticketTwin: TwinResult | null = useMemo(() => {
+    const b = builderRef.current;
+    const opp = council?.bestOpp;
+    if (!b || !opp || mode !== 'confirm') return null;
+    try { return simulateTwin({ builder: b, symbol: opp.symbol, direction: opp.direction, entry: opp.zone.preferred, stop: opp.zone.stop, target: opp.zone.target1 }); } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [council?.bestOpp?.id, mode]);
+
+  const armedTwin: TwinResult | null = useMemo(() => {
+    const b = builderRef.current;
+    if (!b || !armed || !armedConfirm || armed.stop == null || armed.target == null) return null;
+    try { return simulateTwin({ builder: b, symbol: armed.symbol, direction: armed.direction, entry: armed.entryRef, stop: armed.stop, target: armed.target }); } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed?.id, armedConfirm]);
 
   const orbState = !onboarded ? 'inactive'
     : council?.protectionState === 'LOCKED' ? 'locked'
@@ -1517,6 +1537,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   <p className="mt-1 text-[9px] text-white/40">
                     Reason: {council.bestOpp.reasonsFor[0]}. Invalidation: {council.bestOpp.invalidation} Shield rules apply; tagged EMIL:CONF.
                   </p>
+                  {ticketTwin && (
+                    <p className="mt-1 text-[9px]" style={{ color: '#B388FF' }}>
+                      🔮 Twin rehearsal ({ticketTwin.nPaths} bootstrap futures): target-first <b style={{ color: '#00C27A' }}>{ticketTwin.pTarget}%</b> · stop-first <b style={{ color: '#FF5252' }}>{ticketTwin.pStop}%</b> · unresolved {ticketTwin.pNeither}% · median worst excursion {ticketTwin.medianMaxAdverseR}R — measured behaviour, never a prediction.
+                    </p>
+                  )}
                   <button
                     onClick={async () => { setPlacing(true); try { await placeEmilOrder(council.bestOpp!, `EMIL:CONF:${council.bestOpp!.tfLabel}`); } finally { setPlacing(false); } }}
                     disabled={placing}
@@ -1864,6 +1889,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   </div>
                 );
               })()}
+              {armedTwin && (
+                <p className="mb-2 text-[10px]" style={{ color: '#B388FF' }}>
+                  🔮 Twin rehearsal ({armedTwin.nPaths} bootstrap futures): target-first <b style={{ color: '#00C27A' }}>{armedTwin.pTarget}%</b> · stop-first <b style={{ color: '#FF5252' }}>{armedTwin.pStop}%</b> · unresolved {armedTwin.pNeither}% · median worst excursion {armedTwin.medianMaxAdverseR}R — measured behaviour, never a prediction.
+                </p>
+              )}
               <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
                 This confirmation mints a SINGLE-USE permission token: exactly this instrument, direction and size, valid 90 seconds,
                 voided by any material change (price drift beyond the bound, expiry, different proposal). The order still passes your

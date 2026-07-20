@@ -1097,6 +1097,14 @@ export default function ChartSourceSwitcher({
               🧠 EMIL
             </button>
           )}
+          <button
+            onClick={() => window.open('/terminal/abin', '_blank')}
+            title="ABIN — Advanced Brokerage Intelligence Network: universal search, security masters, Calendar Pro, central-bank intelligence, entitlements (opens in a new tab)"
+            className="flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            style={{ color: '#29ABE2', border: '1px solid rgba(41,171,226,0.5)', backgroundColor: 'rgba(41,171,226,0.08)' }}
+          >
+            🛰 ABIN
+          </button>
         </>}
         trailing={<>
           {/* TrendSignal leads the trailing cluster so the BUY/SELL beacon

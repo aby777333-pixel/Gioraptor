@@ -52,6 +52,7 @@ const menuCategories: MenuCategory[] = [
     items: [
       { href: '/terminal', icon: <LineChart size={14} />, label: 'Terminal', desc: 'Full trading terminal' },
       { href: '/terminal/abin', icon: <Brain size={14} />, label: 'ABIN', desc: 'Advanced Brokerage Intelligence Network' },
+      { href: '/terminal/emil', icon: <Bot size={14} />, label: 'EMIL', desc: 'AI trading intelligence console' },
       { href: '/dashboard/markets', icon: <BarChart3 size={14} />, label: 'Markets', desc: 'Market watch' },
       { href: '/dashboard/orders', icon: <Activity size={14} />, label: 'Orders', desc: 'Order management' },
       { href: '/dashboard/positions', icon: <TrendingUp size={14} />, label: 'Positions', desc: 'Open positions' },
