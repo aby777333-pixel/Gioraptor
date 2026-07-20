@@ -17,22 +17,32 @@ export default function RightPanel() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--bg-surface)' }}>
-      {/* Tab bar */}
+      {/* Tab bar — each tab has its own hue: dull at rest, glowing when active */}
       <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-        {(['order', 'account', 'tools'] as RightTab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-all"
-            style={{
-              backgroundColor: activeTab === tab ? 'var(--bg-elevated)' : 'transparent',
-              color: activeTab === tab ? '#0091D5' : 'rgba(255,255,255,0.45)',
-              borderBottom: activeTab === tab ? '2px solid #0091D5' : '2px solid transparent',
-            }}
-          >
-            {tab === 'order' ? 'Order' : tab === 'account' ? 'Account' : 'Tools'}
-          </button>
-        ))}
+        {([
+          { id: 'order' as RightTab, label: 'Order', hex: '#0091D5', rgb: '0,145,213' },
+          { id: 'account' as RightTab, label: 'Account', hex: '#00C27A', rgb: '0,194,122' },
+          { id: 'tools' as RightTab, label: 'Tools', hex: '#AB47BC', rgb: '171,71,188' },
+        ]).map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-all"
+              style={{
+                background: active
+                  ? `linear-gradient(180deg, rgba(${tab.rgb},0.22) 0%, rgba(${tab.rgb},0.05) 100%)`
+                  : `rgba(${tab.rgb},0.04)`,
+                color: active ? tab.hex : `rgba(${tab.rgb},0.55)`,
+                borderBottom: active ? `2px solid ${tab.hex}` : '2px solid transparent',
+                textShadow: active ? `0 0 8px rgba(${tab.rgb},0.8)` : 'none',
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab content */}

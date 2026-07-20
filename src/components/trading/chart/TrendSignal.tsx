@@ -46,12 +46,32 @@ function isZone(z: EntryZoneAssessment | NoSetupAssessment | null): z is EntryZo
   return !!z && 'direction' in z;
 }
 
+// Regime category for the transition-warning system.
+type RegimeCat = 'up' | 'down' | 'chop';
+function regimeCat(state: string): RegimeCat {
+  if (state.includes('Uptrend')) return 'up';
+  if (state.includes('Downtrend')) return 'down';
+  return 'chop';
+}
+
+// Big colored warning toast for regime transitions (reversal / chop / new trend).
+function showRegimeWarning(text: string, color: string, rgb: string): void {
+  const div = document.createElement('div');
+  div.className = 'fixed left-1/2 top-16 z-[9999] -translate-x-1/2 rounded-lg px-5 py-3 text-[13px] font-bold animate-pulse';
+  div.style.cssText = `background:#0A0F1A;color:${color};border:1px solid rgba(${rgb},0.7);box-shadow:0 0 24px rgba(${rgb},0.55), inset 0 1px 0 rgba(255,255,255,0.15);text-shadow:0 0 8px rgba(${rgb},0.8);max-width:90vw;text-align:center;`;
+  div.textContent = text;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 8000);
+}
+
 export default function TrendSignal({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder | null }) {
   const activeSymbol = useTradingStore((s) => s.activeSymbol);
   const activeTimeframe = useTradingStore((s) => s.activeTimeframe);
   const [read, setRead] = useState<SignalRead>({ kind: 'NONE', state: null, zone: null, warnings: [], tfLabel: 'H1', symbol: '' });
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
+  // Last regime category per `symbol|tf` — powers the transition warnings.
+  const lastCatRef = useRef<Record<string, RegimeCat>>({});
 
   const builderRef = useRef(ohlcvBuilder);
   builderRef.current = ohlcvBuilder;
@@ -75,6 +95,29 @@ export default function TrendSignal({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuild
       }
       const price = bars[bars.length - 1].close;
       const trending = state.state.includes('Uptrend') || state.state.includes('Downtrend');
+
+      // ── Regime-transition warning system ──
+      // Fires only when the regime CATEGORY flips for the SAME symbol+TF the
+      // trader is watching (never on symbol/TF switches).
+      const key = `${activeSymbol}|${tfLabel}`;
+      const cat = regimeCat(state.state);
+      const prev = lastCatRef.current[key];
+      lastCatRef.current[key] = cat;
+      if (prev && prev !== cat) {
+        if ((prev === 'up' && cat === 'down') || (prev === 'down' && cat === 'up')) {
+          showRegimeWarning(
+            `⚠ TREND REVERSAL — ${activeSymbol} ${tfLabel} flipped ${prev === 'up' ? 'UP → DOWN' : 'DOWN → UP'} (${state.state}, ${state.confidence}%). Positions riding the old trend deserve a hard look.`,
+            '#FF5252', '255,82,82');
+        } else if (cat === 'chop') {
+          showRegimeWarning(
+            `⚠ CHOP AHEAD — ${activeSymbol} ${tfLabel} left its ${prev === 'up' ? 'uptrend' : 'downtrend'} and is going range-bound. Trend entries here get whipsawed; standing aside is the play.`,
+            '#FFB300', '255,179,0');
+        } else {
+          showRegimeWarning(
+            `📈 NEW TREND — ${activeSymbol} ${tfLabel} is breaking out of the range into a ${cat === 'up' ? 'up' : 'down'}trend (${state.confidence}%). Early trends offer the best entries — plan, don't chase.`,
+            '#00C27A', '0,194,122');
+        }
+      }
       if (!trending) {
         setRead({
           kind: 'WAIT', state, zone: computeEntryZone(activeSymbol, bars, state, price),

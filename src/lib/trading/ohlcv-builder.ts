@@ -12,7 +12,7 @@ export type Resolution =
   | '60' | '120' | '180' | '240' | '360' | '480' | '720'
   | '1D' | '1W' | '1MN';
 
-const RESOLUTION_MS: Record<Resolution, number> = {
+export const RESOLUTION_MS: Record<Resolution, number> = {
   '5S': 5_000,
   '10S': 10_000,
   '15S': 15_000,

@@ -161,7 +161,7 @@ export default function TerminalPage() {
         style={{
           display: 'grid',
           gridTemplateRows: `1fr auto ${panelHeight}px 30px`,
-          gridTemplateColumns: chartSource === 'tradingview' || rightHidden ? '240px 1fr' : '240px 1fr 280px',
+          gridTemplateColumns: '240px 1fr',
         }}
       >
         {/* Watchlist - left sidebar (hidden on mobile) */}
@@ -169,37 +169,41 @@ export default function TerminalPage() {
           <Watchlist />
         </div>
 
-        {/* ChartPanel - center */}
+        {/* ChartPanel - center. The Order/Account/Tools panel rides INSIDE the
+            switcher (beside the chart, BELOW the shared header + timeframe
+            rows) so the header buttons — DOM, Script, EAs — are never masked
+            when the panel is expanded. Collapsible — the red handle hides it;
+            the pulsing red light restores it. */}
         <div className="overflow-hidden" style={{ gridColumn: 'span 1' }}>
-          <ChartSourceSwitcher ohlcvBuilder={ohlcvBuilder} isLiveData={isLiveData} onSourceChange={setChartSource} />
+          <ChartSourceSwitcher
+            ohlcvBuilder={ohlcvBuilder}
+            isLiveData={isLiveData}
+            onSourceChange={setChartSource}
+            sidePanel={chartSource !== 'tradingview' && !rightHidden ? (
+              <div className="relative shrink-0 border-l border-[var(--border)] hidden xl:block" style={{ width: 280 }}>
+                {/* Collapse handle — hangs OVER the chart edge (left of the
+                    panel border) so it never covers the ticket's controls. */}
+                <button
+                  onClick={() => toggleRightPanel(true)}
+                  title="Hide panel — the pulsing red light at the right edge brings it back"
+                  className="absolute top-1/2 z-40 flex -translate-y-1/2 items-center justify-center rounded-l-lg transition-all hover:brightness-125"
+                  style={{
+                    left: -26, width: 26, height: 96,
+                    background: 'linear-gradient(180deg, rgba(255,82,82,0.4) 0%, rgba(255,82,82,0.15) 100%)',
+                    border: '1px solid rgba(255,82,82,0.7)', borderRight: 'none',
+                    color: '#FF5252', fontSize: 18, fontWeight: 700,
+                    boxShadow: '0 0 16px rgba(255,82,82,0.55), inset 0 1px 0 rgba(255,255,255,0.2)',
+                    textShadow: '0 0 8px rgba(255,82,82,0.9)',
+                  }}
+                >
+                  <span className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 animate-ping rounded-full" style={{ backgroundColor: '#FF5252' }} />
+                  <span className="animate-pulse">›</span>
+                </button>
+                <RightPanel />
+              </div>
+            ) : null}
+          />
         </div>
-
-        {/* Right Panel (hidden on mobile; hidden entirely on the TradingView tab
-            because its quotes come from the RAPTOR feed). Collapsible — the
-            handle on its left edge hides it; a pulsing light restores it. */}
-        {chartSource !== 'tradingview' && !rightHidden && (
-          <div className="relative border-l border-[var(--border)] hidden xl:block">
-            {/* Collapse handle — hangs OVER the chart edge (left of the panel
-                border) so it never covers the Order ticket's own controls. */}
-            <button
-              onClick={() => toggleRightPanel(true)}
-              title="Hide panel — the pulsing red light at the right edge brings it back"
-              className="absolute top-1/2 z-40 flex -translate-y-1/2 items-center justify-center rounded-l-lg transition-all hover:brightness-125"
-              style={{
-                left: -26, width: 26, height: 96,
-                background: 'linear-gradient(180deg, rgba(255,82,82,0.4) 0%, rgba(255,82,82,0.15) 100%)',
-                border: '1px solid rgba(255,82,82,0.7)', borderRight: 'none',
-                color: '#FF5252', fontSize: 18, fontWeight: 700,
-                boxShadow: '0 0 16px rgba(255,82,82,0.55), inset 0 1px 0 rgba(255,255,255,0.2)',
-                textShadow: '0 0 8px rgba(255,82,82,0.9)',
-              }}
-            >
-              <span className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 animate-ping rounded-full" style={{ backgroundColor: '#FF5252' }} />
-              <span className="animate-pulse">›</span>
-            </button>
-            <RightPanel />
-          </div>
-        )}
 
         {/* ── Drag handle ── */}
         <div

@@ -41,6 +41,7 @@ import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
 import TrendSignal from './TrendSignal';
+import TraderChips from './TraderChips';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
 import { effectiveEngineParams, builtinInputsFor } from '@/lib/trading/ea-params';
@@ -65,10 +66,14 @@ export default function ChartSourceSwitcher({
   ohlcvBuilder,
   isLiveData = false,
   onSourceChange,
+  sidePanel = null,
 }: {
   ohlcvBuilder: OHLCVBuilder | null;
   isLiveData?: boolean;
   onSourceChange?: (source: 'tradingview' | 'raptor') => void;
+  // Order/Account/Tools panel — rendered beside the chart, BELOW the shared
+  // header + timeframe rows, so header buttons are never masked by it.
+  sidePanel?: React.ReactNode;
 }) {
   const [source, setSource] = useState<ChartSource>('tradingview');
   const { activeSymbol, prices, activeAccountId, accountSummary, triggerRefresh, setActiveSymbol, oneClickTrading, setOneClickTrading } = useTradingStore();
@@ -1065,11 +1070,18 @@ export default function ChartSourceSwitcher({
       </div>
 
       {/* Shared Timeframe bar (§7) — drives both TradingView and RAPTOR charts.
-          The free space on the right hosts the live trend signal beacon. */}
-      <TimeframeBar trailing={<TrendSignal ohlcvBuilder={ohlcvBuilder} />} />
+          The free space hosts the trader chips + the live trend signal beacon. */}
+      <TimeframeBar trailing={<>
+        <TraderChips ohlcvBuilder={ohlcvBuilder} />
+        <TrendSignal ohlcvBuilder={ohlcvBuilder} />
+      </>} />
 
-      {/* Active chart + shared EA overlays */}
-      <div className="relative min-h-0 flex-1">
+      {/* Chart row: the active chart and the optional Order/Account/Tools
+          side panel share this row — both sit BELOW the header + TF bars. */}
+      <div className="flex min-h-0 flex-1">
+
+      {/* Active chart + shared EA overlays (min-w-0: shrink for the side panel) */}
+      <div className="relative min-h-0 min-w-0 flex-1">
         {source === 'tradingview' ? (
           <TradingViewPanel />
         ) : (
@@ -1215,6 +1227,10 @@ export default function ChartSourceSwitcher({
             )}
           </div>
         )}
+      </div>
+
+      {/* Side panel (Order/Account/Tools) — below the header rows */}
+      {sidePanel}
       </div>
 
       {/* EA Properties modal (§1) */}
