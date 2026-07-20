@@ -45,6 +45,7 @@ import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
 import TrendSignal from './TrendSignal';
 import WorkspaceChip from './WorkspaceChip';
+import FlightCheck from './FlightCheck';
 import TraderChips from './TraderChips';
 import EdgeChips from './EdgeChips';
 import CustomEAInfoModal from './CustomEAInfoModal';
@@ -1106,6 +1107,7 @@ export default function ChartSourceSwitcher({
           >
             🛰 ABIN
           </button>
+          <FlightCheck />
         </>}
         trailing={<>
           {/* TrendSignal leads the trailing cluster so the BUY/SELL beacon

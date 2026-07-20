@@ -505,7 +505,7 @@ export default function VoiceTrading({ onClose }: VoiceTradingProps) {
           <span className="rounded px-1.5 py-0.5 font-mono text-[8px] font-bold"
             title={sarvamReady ? 'Lara speech-to-text-translate: speak English or a supported Indian language — every command still needs your Confirm click' : 'Browser speech recognition (English). Enable Lara in EMIL’s Language & Voice panel for multilingual voice.'}
             style={{ color: sarvamReady ? '#FF8A65' : 'rgba(255,255,255,0.35)', border: `1px solid ${sarvamReady ? 'rgba(255,138,101,0.5)' : 'rgba(255,255,255,0.15)'}` }}>
-            {sarvamReady ? 'SARVAM · multilingual' : 'browser · English'}
+            {sarvamReady ? 'LARA · multilingual' : 'browser · English'}
           </span>
         </div>
         <button
