@@ -90,6 +90,28 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
 
   const exposure = useMemo(() => (specs ? currencyExposureMap(positions, specs) : []), [positions, specs]);
 
+  // The matrix auto-computes when the panel opens (it also powers the
+  // opportunity scanner); Recompute refreshes it on demand.
+  useEffect(() => {
+    const builder = builderRef.current;
+    if (!builder || !specs || matrix) return;
+    if (universe.length >= 4) setMatrix(correlationMatrix(builder, universe));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specs, universe.length]);
+
+  // Best hedge opportunities across the whole market, from the live matrix.
+  const opportunities = useMemo(() => {
+    if (!matrix) return [];
+    const out: { a: string; b: string; corr: number }[] = [];
+    for (let i = 0; i < matrix.symbols.length; i++) {
+      for (let j = i + 1; j < matrix.symbols.length; j++) {
+        const v = matrix.cells[i][j];
+        if (v != null && Math.abs(v) >= 0.6) out.push({ a: matrix.symbols[i], b: matrix.symbols[j], corr: v });
+      }
+    }
+    return out.sort((x, y) => Math.abs(y.corr) - Math.abs(x.corr)).slice(0, 10);
+  }, [matrix]);
+
   // Stress Lab runs automatically when a hedge preview opens.
   useEffect(() => {
     const builder = builderRef.current;
@@ -196,7 +218,7 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
 
   return (
     <div className="fixed inset-0 z-[9500] flex items-start justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)', backdropFilter: 'blur(3px)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="my-4 w-full max-w-[860px] rounded-xl border shadow-2xl" style={{ backgroundColor: '#080D16', borderColor: 'rgba(171,71,188,0.35)' }}>
+      <div className="my-4 w-full max-w-[1150px] rounded-xl border shadow-2xl" style={{ backgroundColor: '#080D16', borderColor: 'rgba(171,71,188,0.35)' }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div>
@@ -318,20 +340,55 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
             );
           })}
 
-          {/* ── Correlation matrix (on demand — 20×20 live H1 grid) ── */}
+          {/* ── Best hedge opportunities scanner (from the live matrix) ── */}
+          {opportunities.length > 0 && (
+            <div className="mb-3 rounded-lg border p-3" style={{ borderColor: 'rgba(0,180,216,0.3)' }}>
+              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: '#00B4D8' }}>
+                Best hedge opportunities right now — strongest live relationships
+              </div>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {opportunities.map((o) => (
+                  <div key={`${o.a}-${o.b}`} className="flex items-center gap-2 rounded border px-2.5 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                    <span className="font-mono text-[11px] font-bold text-white">{o.a} ⇄ {o.b}</span>
+                    <span className="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold"
+                      style={{
+                        backgroundColor: o.corr >= 0 ? 'rgba(0,194,122,0.15)' : 'rgba(255,82,82,0.15)',
+                        color: o.corr >= 0 ? '#00C27A' : '#FF5252',
+                        border: `1px solid ${o.corr >= 0 ? 'rgba(0,194,122,0.4)' : 'rgba(255,82,82,0.4)'}`,
+                      }}>
+                      {o.corr.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-white/35">{Math.abs(o.corr) >= 0.8 ? 'strong' : 'moderate'} {o.corr >= 0 ? 'positive' : 'negative'}</span>
+                    <button
+                      onClick={() => { setPrimary(o.a); window.scrollTo?.(0, 0); }}
+                      className="ml-auto rounded px-2.5 py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                      style={{ backgroundColor: 'rgba(171,71,188,0.15)', color: '#CE93D8', border: '1px solid rgba(171,71,188,0.4)' }}>
+                      Hedge this →
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[9px] text-white/30">
+                Ranked by live |correlation| (H1). Click "Hedge this" to load the pair into the finder above — full
+                stability, cost and sizing checks still decide whether it is actually viable.
+              </p>
+            </div>
+          )}
+
+          {/* ── Correlation matrix (auto-computed — 20×20 live H1 grid) ── */}
           <div className="mb-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
             <div className="flex items-center justify-between">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-white/50">Live correlation matrix (H1)</div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-white/50">Live correlation matrix (H1)</div>
               <button
                 onClick={() => { const b = builderRef.current; if (b) setMatrix(correlationMatrix(b, universe)); }}
-                className="rounded px-2.5 py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                className="rounded px-2.5 py-1 text-[10px] font-bold transition-all hover:brightness-125"
                 style={{ backgroundColor: 'rgba(0,180,216,0.12)', color: '#00B4D8', border: '1px solid rgba(0,180,216,0.35)' }}>
                 {matrix ? 'Recompute' : 'Compute matrix'}
               </button>
             </div>
             {matrix && (
               <div className="mt-2 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
-                <table className="border-collapse font-mono text-[8px]">
+                <table className="w-full border-collapse font-mono text-[10px]">
                   <thead>
                     <tr>
                       <th />
@@ -341,17 +398,19 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                   <tbody>
                     {matrix.symbols.map((row, i) => (
                       <tr key={row}>
-                        <td className="pr-1 text-white/40">{row}</td>
+                        <td className="pr-1.5 text-white/45">{row}</td>
                         {matrix.symbols.map((col, j) => {
                           const v = matrix.cells[i][j];
                           const bg = v == null ? 'rgba(255,255,255,0.03)'
                             : v >= 0 ? `rgba(0,194,122,${Math.min(0.85, Math.abs(v)) * 0.8})`
                             : `rgba(255,82,82,${Math.min(0.85, Math.abs(v)) * 0.8})`;
                           return (
-                            <td key={col} title={`${row} vs ${col}: ${v != null ? v.toFixed(2) : 'insufficient data'}`}
-                              className="h-4 w-6 cursor-default text-center"
-                              style={{ backgroundColor: bg, color: i === j ? 'transparent' : 'rgba(255,255,255,0.75)' }}>
-                              {i === j ? '' : v != null ? Math.round(v * 100) / 100 === 0 ? '0' : (v).toFixed(1) : '·'}
+                            <td key={col}
+                              title={i === j ? row : `${row} vs ${col}: ${v != null ? v.toFixed(2) : 'insufficient data'} — click to hedge ${row}`}
+                              onClick={() => { if (i !== j) setPrimary(row); }}
+                              className="h-6 min-w-[34px] text-center transition-all"
+                              style={{ backgroundColor: bg, color: i === j ? 'transparent' : 'rgba(255,255,255,0.8)', cursor: i === j ? 'default' : 'pointer' }}>
+                              {i === j ? '' : v != null ? v.toFixed(1) : '·'}
                             </td>
                           );
                         })}
@@ -359,7 +418,7 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[9px] text-white/30">Green = positive, red = negative, intensity = strength. Live H1 returns — the grid changes as the market does.</p>
+                <p className="mt-1 text-[10px] text-white/30">Green = positive, red = negative, intensity = strength. Live H1 returns — click any cell to load that row&apos;s instrument into the finder.</p>
               </div>
             )}
           </div>
@@ -444,9 +503,9 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
         {/* ── Preview + confirm modal ── */}
         {preview && (
           <div className="fixed inset-0 z-[9600] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(3,7,12,0.8)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) setPreview(null); }}>
-            <div className="w-full max-w-[460px] rounded-xl border p-4 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(171,71,188,0.5)' }}>
-              <div className="mb-2 text-[13px] font-bold text-white">Confirm hedge — {preview.hedgeDirection} {preview.suggestedLots} {preview.symbol}</div>
-              <p className="mb-2 text-[10px] leading-relaxed text-white/60">
+            <div className="max-h-[92vh] w-full max-w-[600px] overflow-y-auto rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(171,71,188,0.5)', scrollbarWidth: 'thin' }}>
+              <div className="mb-2 text-[15px] font-bold text-white">Confirm hedge — {preview.hedgeDirection} {preview.suggestedLots} {preview.symbol}</div>
+              <p className="mb-2 text-[11px] leading-relaxed text-white/65">
                 You are {direction === 'BUY' ? 'long' : 'short'} {inputs.lots} {primary}. {preview.symbol} currently shows{' '}
                 {preview.corr.label.toLowerCase()} (avg {preview.corr.avg!.toFixed(2)}, stability {(preview.corr.stability * 100).toFixed(0)}%).
                 A {preview.suggestedLots}-lot {preview.hedgeDirection.toLowerCase()} may offset ~{preview.reductionPct.toFixed(0)}% of the
@@ -456,7 +515,7 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                 plus ~${preview.marginEstimate.toFixed(0)} margin and overnight swap.
               </p>
               {(() => { const n = newsFor([primary, preview.symbol]); return n ? (
-                <p className="mb-2 text-[10px]" style={{ color: '#FFB300' }}>⚠ {n.currency} “{n.title}” in {fmtEta(n.timeMs)} — relationships often destabilise through news.</p>
+                <p className="mb-2 text-[11px]" style={{ color: '#FFB300' }}>⚠ {n.currency} “{n.title}” in {fmtEta(n.timeMs)} — relationships often destabilise through news.</p>
               ) : null; })()}
               {/* Stress Lab — real-history replay of this exact hedge */}
               {stress && (
@@ -487,7 +546,7 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                   </p>
                 ) : null;
               })()}
-              <p className="mb-3 text-[9px] text-white/35">
+              <p className="mb-3 text-[10px] text-white/40">
                 Exit plan: remove the hedge when the primary hits its stop/target, the correlation drops or reverses, or the
                 protection no longer justifies its cost. Shield rules apply to this order like any other. Estimates, not guarantees.
               </p>

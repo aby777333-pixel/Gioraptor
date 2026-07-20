@@ -165,9 +165,19 @@ export function assessCandidate(
   const corr = correlationRead(builder, inputs.primary, candidate);
   if (corr.avg == null) return null;
 
+  // Hedge horizon correlation: hedges are typically held hours-to-days, so
+  // sizing and viability weight the H1/H4/D1 windows; M5/M15 stay
+  // informational (they mostly carry noise for this purpose).
+  const horizonW = corr.perWindow.filter((w) => ['H1', 'H4', 'D1'].includes(w.label) && w.corr != null) as { label: string; corr: number }[];
+  const horizonAvg = horizonW.length ? horizonW.reduce((a, w) => a + w.corr, 0) / horizonW.length : corr.avg;
+  const horizonSpread = horizonW.length >= 2
+    ? Math.sqrt(horizonW.reduce((a, w) => a + (w.corr - horizonAvg) ** 2, 0) / horizonW.length)
+    : 1;
+  const horizonStability = Math.max(0, 1 - horizonSpread / 0.5);
+
   // Offset direction: positive correlation → trade the candidate opposite
   // the primary; negative correlation → trade it the same way.
-  const hedgeDirection: 'BUY' | 'SELL' = corr.avg >= 0
+  const hedgeDirection: 'BUY' | 'SELL' = horizonAvg >= 0
     ? (inputs.direction === 'BUY' ? 'SELL' : 'BUY')
     : inputs.direction;
 
@@ -179,14 +189,14 @@ export function assessCandidate(
   const primaryAtrDollar = atrDollarPerLotP * inputs.lots;
   const rawRatio = (volP.price * specP.contractSize) > 0 ? (volH.price * specH.contractSize) / (volP.price * specP.contractSize) : 0;
   const volAdjRatio = atrDollarPerLotP / atrDollarPerLotH;
-  const finalRatio = volAdjRatio * Math.abs(corr.avg);
+  const finalRatio = volAdjRatio * Math.abs(horizonAvg);
   const suggestedLots = Math.max(0.01, Math.round(inputs.lots * inputs.hedgePct * finalRatio * 100) / 100);
 
   const hedgeAtrDollar = atrDollarPerLotH * suggestedLots;
   // Combined 1×ATR risk with the offsetting direction: cross term reduces it
   // by |ρ| — an estimate that DEGRADES if the correlation weakens.
   const riskAfter = Math.sqrt(Math.max(0,
-    primaryAtrDollar ** 2 + hedgeAtrDollar ** 2 - 2 * Math.abs(corr.avg) * primaryAtrDollar * hedgeAtrDollar));
+    primaryAtrDollar ** 2 + hedgeAtrDollar ** 2 - 2 * Math.abs(horizonAvg) * primaryAtrDollar * hedgeAtrDollar));
   const reductionPct = primaryAtrDollar > 0 ? Math.max(0, (1 - riskAfter / primaryAtrDollar) * 100) : 0;
 
   const t = ticks[candidate];
@@ -197,12 +207,14 @@ export function assessCandidate(
   const sharedCurrencies = symbolCurrencies(candidate).filter((c) => ccyP.includes(c));
 
   const reasons: string[] = [];
-  const viable = Math.abs(corr.avg) >= 0.5 && corr.stability >= 0.35 && !corr.breaking;
-  if (Math.abs(corr.avg) < 0.5) reasons.push('correlation too weak to hedge reliably');
-  if (corr.stability < 0.35) reasons.push('correlation unstable across timeframes');
+  // Viability judged on the hedge horizon (H1/H4/D1) — where hedges live.
+  const viable = Math.abs(horizonAvg) >= 0.55 && horizonStability >= 0.35 && !corr.breaking && horizonW.length >= 2;
+  if (horizonW.length < 2) reasons.push('not enough H1/H4/D1 history to judge the hedge horizon');
+  else if (Math.abs(horizonAvg) < 0.55) reasons.push('correlation too weak on the hedge horizon (H1/H4/D1)');
+  if (horizonW.length >= 2 && horizonStability < 0.35) reasons.push('correlation unstable across the hedge horizon');
   if (corr.breaking) reasons.push('relationship is breaking/reversing right now');
   if (viable) {
-    reasons.push(`${corr.label.toLowerCase()} (avg ${corr.avg.toFixed(2)}, stability ${(corr.stability * 100).toFixed(0)}%)`);
+    reasons.push(`hedge-horizon correlation ${horizonAvg.toFixed(2)} (H1/H4/D1, stability ${(horizonStability * 100).toFixed(0)}%)`);
     if (sharedCurrencies.length) reasons.push(`shares ${sharedCurrencies.join('/')} exposure with ${inputs.primary}`);
     reasons.push('fails if the correlation weakens, reverses or gaps through news');
   }
