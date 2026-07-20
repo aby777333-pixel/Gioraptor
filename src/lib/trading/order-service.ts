@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import { protectionCheck, invalidateDayStats } from '@/lib/trading/protection';
+import { guardianCheck } from '@/lib/trading/emil-guardian';
 
 // Notify cockpit features (Session Game Plan, calibration) that an order was
 // accepted. Fire-and-forget; never affects the order path.
@@ -28,6 +29,9 @@ export const orderService = {
       accountId: params.accountId, symbol: params.symbol, direction: params.direction,
       size: params.size, sl: params.sl ?? null, entryPrice: params.fillPrice,
     });
+    // EMIL GUARDIAN: independent veto layer for EMIL-tagged orders — lives
+    // here, outside EMIL's brain, and cannot be disabled by it.
+    await guardianCheck({ symbol: params.symbol, direction: params.direction, size: params.size, sl: params.sl ?? null, comment: params.comment });
     const supabase = createClient();
     const { data, error } = await supabase.rpc('place_market_order', {
       p_account_id: params.accountId,
@@ -96,6 +100,7 @@ export const orderService = {
       accountId: params.accountId, symbol: params.symbol, direction: params.direction,
       size: params.size, sl: params.sl ?? null, entryPrice: params.price,
     });
+    await guardianCheck({ symbol: params.symbol, direction: params.direction, size: params.size, sl: params.sl ?? null, comment: params.comment });
     const supabase = createClient();
     const { data, error } = await supabase.rpc('place_pending_order', {
       p_account_id: params.accountId,

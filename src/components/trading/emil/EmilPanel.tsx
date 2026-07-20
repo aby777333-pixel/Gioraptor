@@ -27,6 +27,39 @@ import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
 import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, type RiskMood, type ForecastRead, type EventGuidance } from '@/lib/trading/emil-macro';
 import { SCAN_TFS } from '@/lib/trading/scanner-engine';
+import { sessionSnapshot, fmtMins, type SessionSnapshot } from '@/lib/trading/emil-sessions';
+
+// ── Wake Me for Markets (browser-honest: notifications + beeps; SMS/calls/
+// watch are future integrations and never claimed) ──
+interface WakeSettings {
+  enabled: boolean; minConviction: number; capitalRisk: boolean;
+  sessionLON: boolean; sessionNYC: boolean;
+  quietEnabled: boolean; quietFrom: string; quietTo: string;
+}
+const WAKE_KEY = 'raptor_emil_wake_v1';
+const DEFAULT_WAKE: WakeSettings = { enabled: false, minConviction: 85, capitalRisk: true, sessionLON: false, sessionNYC: false, quietEnabled: false, quietFrom: '23:00', quietTo: '07:00' };
+function loadWake(): WakeSettings { try { return { ...DEFAULT_WAKE, ...(JSON.parse(localStorage.getItem(WAKE_KEY) || '{}')) }; } catch { return { ...DEFAULT_WAKE }; } }
+
+function inQuietHours(w: WakeSettings): boolean {
+  if (!w.quietEnabled) return false;
+  const now = new Date().toTimeString().slice(0, 5);
+  return w.quietFrom <= w.quietTo ? (now >= w.quietFrom && now < w.quietTo) : (now >= w.quietFrom || now < w.quietTo);
+}
+
+function beep(times: number, freq: number): void {
+  try {
+    const Ctor = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    for (let i = 0; i < times; i++) {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; gain.gain.value = 0.08;
+      osc.start(ctx.currentTime + i * 0.5); osc.stop(ctx.currentTime + i * 0.5 + 0.28);
+    }
+    setTimeout(() => ctx.close(), times * 600 + 500);
+  } catch { /* audio unavailable */ }
+}
 import { classifyMarketState } from '@/lib/nexus/market-state';
 import { highImpactWithin, fmtEta } from '@/lib/trading/news-guard';
 
@@ -63,6 +96,13 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [riskState, setRiskState] = useState('Normal');
   const [macro, setMacro] = useState<{ mood: RiskMood; forecast: ForecastRead | null; events: EventGuidance[] } | null>(null);
   const [modeBoard, setModeBoard] = useState<{ mode: string; conf: number }[]>([]);
+  const [wake, setWake] = useState<WakeSettings>(loadWake);
+  const [sessions, setSessions] = useState<SessionSnapshot | null>(null);
+  const [sleepNoNew, setSleepNoNew] = useState(false);
+  const sleepNoNewRef = useRef(false);
+  sleepNoNewRef.current = sleepNoNew;
+  const wakeThrottleRef = useRef<Map<string, number>>(new Map());
+  const prevOpenRef = useRef<Record<string, boolean>>({});
   const [currentMode, setCurrentMode] = useState('No-Trade');
   const lastModeRef = useRef<string>('No-Trade');
   const prevModeRef = useRef<string>('—');
@@ -121,6 +161,45 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   }, [activeSymbol, council, standalone]);
 
   // ── EMIL automation core (Confirm-to-Trade + Autonomous Pilot) ──
+
+  // Wake alert dispatcher: quiet hours suppress everything except critical.
+  const wakeAlert = useCallback((level: 'info' | 'opportunity' | 'critical', key: string, text: string, throttleMin = 30) => {
+    const w = loadWake();
+    if (!w.enabled) return;
+    if (level !== 'critical' && inQuietHours(w)) { emilLog('mode', `wake suppressed (quiet hours): ${text}`); return; }
+    const last = wakeThrottleRef.current.get(key) ?? 0;
+    if (Date.now() - last < throttleMin * 60_000) return;
+    wakeThrottleRef.current.set(key, Date.now());
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(level === 'critical' ? '🚨 EMIL — CAPITAL AT RISK' : level === 'opportunity' ? '⏰ EMIL — opportunity' : '🌍 EMIL — session', { body: text });
+      }
+    } catch { /* notifications unavailable */ }
+    beep(level === 'critical' ? 6 : 3, level === 'critical' ? 880 : 620);
+    emilLog('mode', `WAKE (${level.toUpperCase()}): ${text}`);
+    setLogTick((t) => t + 1);
+  }, []);
+
+  // Session clock (30s) + session-open wakes.
+  useEffect(() => {
+    const tick = () => {
+      const snap = sessionSnapshot();
+      setSessions(snap);
+      const w = loadWake();
+      for (const s of snap.sessions) {
+        const was = prevOpenRef.current[s.id];
+        if (was === false && s.open) {
+          if ((s.id === 'LON' && w.sessionLON) || (s.id === 'NYC' && w.sessionNYC)) {
+            wakeAlert('info', `session-${s.id}`, `${s.label} session just opened — liquidity transition in progress.`, 120);
+          }
+        }
+        prevOpenRef.current[s.id] = s.open;
+      }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, [wakeAlert]);
 
   const stopEverything = useCallback((reason: string) => {
     setMode('observe');
@@ -277,6 +356,12 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         }
 
         // ── Envelope checks + profit lock / loss stop ──
+        // Capital-at-risk wake: approaching the daily loss stop or thin margin.
+        const marginLvl = Number(useTradingStore.getState().accountSummary?.margin_level_pct ?? 0);
+        if ((p.dailyLossStop > 0 && realized <= -0.8 * Math.abs(p.dailyLossStop)) || (marginLvl > 0 && marginLvl < 150)) {
+          wakeAlert('critical', 'capital-risk', `Capital at risk: EMIL day P&L ${realized >= 0 ? '+' : ''}$${realized.toFixed(0)}${p.dailyLossStop > 0 ? ` (loss stop $${p.dailyLossStop})` : ''}${marginLvl > 0 && marginLvl < 150 ? ` · margin level ${marginLvl.toFixed(0)}%` : ''}. Review the account.`, 15);
+        }
+
         if (p.dailyLossStop > 0 && realized <= -Math.abs(p.dailyLossStop)) {
           if (m === 'auto') { emilLog('lock', `daily EMIL loss stop hit (${realized.toFixed(0)}$) — automation paused for today`); stopEverything('daily loss stop'); }
           return;
@@ -355,6 +440,18 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         board.push({ mode: 'No-Trade', conf: candidates.length ? Math.max(20, 95 - topAdj) : 95 });
         board.sort((a, b) => b.conf - a.conf);
         setModeBoard(board);
+
+        // Opportunity wake: an exceptional setup clears the trader's wake bar.
+        if (candidates.length) {
+          const top = candidates.reduce((a, b) => (b.adj > a.adj ? b : a));
+          const conviction = Math.round(0.6 * top.opp.score + 0.4 * top.c.confidence);
+          if (conviction >= loadWake().minConviction) {
+            wakeAlert('opportunity', `opp-${top.opp.symbol}`, `${top.opp.symbol} ${top.opp.direction} — conviction ${conviction} (${top.opp.style} ${top.opp.tfLabel}, score ${top.opp.score}, council ${top.c.confidence}%).`, 30);
+          }
+        }
+
+        // Sleep Mode: manage existing only — no new entries while it holds.
+        if (sleepNoNewRef.current) { setEmilStatus('Managing'); return; }
 
         if (candidates.length) {
           setEmilStatus('Trading');
@@ -587,6 +684,73 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 </div>
               )}
 
+              {/* ── Global Session Map + Wake & Sleep ── */}
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                  <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">
+                    🌍 Global session map · local {sessions?.local ?? '—'} · {sessions?.utc ?? '—'}
+                  </div>
+                  {sessions?.sessions.map((s) => (
+                    <div key={s.id} className="mb-1 flex items-center gap-2 text-[10px]">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.open ? '#00C27A' : 'rgba(255,255,255,0.2)', boxShadow: s.open ? '0 0 5px #00C27A' : 'none' }} />
+                      <span className="w-20 font-bold text-white/70">{s.label}</span>
+                      <span className="font-mono text-white/40">{s.localTime} local</span>
+                      <span className="ml-auto font-mono" style={{ color: s.open ? '#00C27A' : 'rgba(255,255,255,0.4)' }}>
+                        {s.open ? 'OPEN' : 'closed'} · {s.changeType} in {fmtMins(s.minsToChange)}
+                      </span>
+                    </div>
+                  ))}
+                  {sessions && sessions.overlaps.length > 0 && sessions.overlaps.map((o, i) => (
+                    <p key={i} className="mt-0.5 text-[9px]" style={{ color: '#FFB300' }}>⚡ {o}</p>
+                  ))}
+                  <p className="mt-1 text-[8px] text-white/25">{sessions?.note}</p>
+                </div>
+
+                <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,213,79,0.25)' }}>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>⏰ Wake me for markets</span>
+                    <button onClick={() => {
+                      try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch { /* ok */ }
+                      beep(3, 620);
+                      emilLog('mode', 'alarm test fired'); setLogTick((t) => t + 1);
+                    }} className="rounded px-2 py-0.5 text-[8px] font-bold text-white/50 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
+                      Test alarm
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[9px] text-white/55">
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={wake.enabled} onChange={(e) => { const w = { ...wake, enabled: e.target.checked }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); if (w.enabled && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch { /* ok */ } }} className="accent-[#FFD54F]" /> Wake alerts</label>
+                    <label className="flex items-center gap-1.5">Min conviction <input type="number" min={50} max={100} value={wake.minConviction} onChange={(e) => { const w = { ...wake, minConviction: Math.max(50, Math.min(100, Number(e.target.value) || 85)) }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="w-[46px] rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-white outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} /></label>
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={wake.capitalRisk} onChange={(e) => { const w = { ...wake, capitalRisk: e.target.checked }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="accent-[#FF5252]" /> Capital-at-risk (critical, overrides quiet hours)</label>
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={wake.sessionLON} onChange={(e) => { const w = { ...wake, sessionLON: e.target.checked }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="accent-[#FFD54F]" /> London open</label>
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={wake.sessionNYC} onChange={(e) => { const w = { ...wake, sessionNYC: e.target.checked }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="accent-[#FFD54F]" /> New York open</label>
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={wake.quietEnabled} onChange={(e) => { const w = { ...wake, quietEnabled: e.target.checked }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="accent-[#FFD54F]" /> Quiet hours
+                      <input type="time" value={wake.quietFrom} onChange={(e) => { const w = { ...wake, quietFrom: e.target.value }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-white outline-none" />–
+                      <input type="time" value={wake.quietTo} onChange={(e) => { const w = { ...wake, quietTo: e.target.value }; setWake(w); try { localStorage.setItem(WAKE_KEY, JSON.stringify(w)); } catch { /* ok */ } }} className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-white outline-none" />
+                    </label>
+                  </div>
+                  <div className="mt-2 border-t pt-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-white/40">😴 Sleep mode · </span>
+                    {([
+                      ['Observe only', () => { setSleepNoNew(false); setMode('observe'); emilLog('mode', 'SLEEP: Observe Only — EMIL watches, trades nothing. Read-back confirmed.'); setLogTick((t) => t + 1); }],
+                      ['Manage existing only', () => { setSleepNoNew(true); emilLog('mode', 'SLEEP: Manage Existing Only — no new entries; EMIL keeps managing open EMIL trades (stops, exits) while the pilot is armed. Read-back confirmed.'); setLogTick((t) => t + 1); }],
+                      ['Confirm before trading', () => { setSleepNoNew(false); setMode('confirm'); emilLog('mode', 'SLEEP: Confirm Before Trading — EMIL prepares, you confirm. Read-back confirmed.'); setLogTick((t) => t + 1); }],
+                      ['Autonomous within limits', () => { setSleepNoNew(false); setGateOpen(true); }],
+                    ] as const).map(([label, fn]) => (
+                      <button key={label} onClick={fn}
+                        className="mb-1 mr-1.5 rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125"
+                        style={{ backgroundColor: 'rgba(255,213,79,0.08)', color: 'rgba(255,213,79,0.8)', border: '1px solid rgba(255,213,79,0.3)' }}>
+                        {label}
+                      </button>
+                    ))}
+                    {sleepNoNew && <span className="text-[9px]" style={{ color: '#FFB300' }}>· no-new-entries active</span>}
+                    <p className="mt-0.5 text-[8px] text-white/25">
+                      Alerts are browser notifications + tones on this device; delivery is never guaranteed (device settings, connectivity). EMIL
+                      never invents permissions because you didn&apos;t answer — unanswered alerts fall back to your approved rules only.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* ── Global Macro Intelligence (real data only) ── */}
               {macro && (
                 <div className="mt-3 grid gap-2 lg:grid-cols-2">
@@ -656,6 +820,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                     <span>Entry: market (~{council.bestOpp.zone.aggressive})</span>
                     <span>SL {council.bestOpp.zone.stop} · TP {council.bestOpp.zone.target1}</span>
                     <span>{council.bestOpp.zone.riskReward1}R · score {council.bestOpp.score}</span>
+                    <span style={{ color: '#FFD54F' }}>Conviction {Math.round(0.6 * council.bestOpp.score + 0.4 * council.confidence)}</span>
                     <span>Council {council.stance} {council.confidence}%</span>
                     <span>{council.bestOpp.style} · {council.bestOpp.tfLabel}</span>
                   </div>
