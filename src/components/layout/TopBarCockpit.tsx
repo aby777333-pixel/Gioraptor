@@ -128,6 +128,8 @@ export default function TopBarCockpit() {
   })();
 
   const chip = 'flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[10px] cursor-pointer transition-all hover:brightness-125';
+  // Hidden per owner request (2026-07-20) — flip to true to restore the chip.
+  const SHOW_HEARTBEAT: boolean = false;
 
   return (
     <div className="relative hidden min-w-0 items-center gap-1.5 overflow-x-auto px-2 lg:flex" ref={wrapRef} style={{ scrollbarWidth: 'none' }}>
@@ -146,8 +148,9 @@ export default function TopBarCockpit() {
         </button>
       )}
 
-      {/* 💓 P&L Heartbeat */}
-      {(spark || realizedToday != null) && (
+      {/* 💓 P&L Heartbeat — hidden per owner request (2026-07-20); flip
+          SHOW_HEARTBEAT to re-enable. All sampling logic stays intact. */}
+      {SHOW_HEARTBEAT && (spark || realizedToday != null) && (
         <button className={chip} style={{ backgroundColor: 'rgba(41,171,226,0.06)', border: '1px solid rgba(41,171,226,0.2)' }}
           onClick={() => setPopover({ title: '💓 P&L Heartbeat', lines: [
             realizedToday != null ? `Realized today: ${realizedToday >= 0 ? '+' : ''}$${realizedToday.toFixed(2)}.` : 'No closed trades yet today.',
