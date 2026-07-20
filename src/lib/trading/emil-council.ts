@@ -43,6 +43,7 @@ export interface EmilConsensus {
   protectionState: 'NORMAL' | 'LOCKED';
   headline: string;       // one-line read for the Scan/Hedge strips
   explanation: string[];  // plain language, why + what could go wrong
+  bestOpp: ReturnType<typeof assessOpportunity>; // scanner's best setup (null when none)
   computedAt: number;
 }
 
@@ -176,7 +177,69 @@ export function buildCouncil(params: {
     'What could go wrong: the regime can flip on one candle, news can gap through stops, correlations can break, and every engine here is an estimate computed from ' + (isLiveData ? 'live' : 'simulated platform') + ' data. Capital first, always.',
   ];
 
-  return { symbol, votes, bulls, bears, neutrals, stance, confidence, protectionState, headline, explanation, computedAt: Date.now() };
+  return { symbol, votes, bulls, bears, neutrals, stance, confidence, protectionState, headline, explanation, bestOpp: best, computedAt: Date.now() };
+}
+
+// ── EMIL automation envelope (Confirm / Autonomous Pilot) ───────
+
+export interface EmilAutoParams {
+  symbols: string[];        // instrument whitelist
+  minScore: number;         // scanner score floor
+  minCouncilConf: number;   // council confidence floor
+  maxPerDay: number;        // max EMIL entries per day
+  stopAfterLosses: number;  // consecutive EMIL losses → pause
+  dailyLossStop: number;    // $ realized EMIL loss → pause for the day
+  dailyProfitLock: number;  // $ realized EMIL profit → bank & pause (0 = off)
+  riskPct: number;          // % balance risked per entry (sizing)
+}
+
+export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
+  symbols: ['EURUSD', 'GBPUSD', 'XAUUSD'],
+  minScore: 70,
+  minCouncilConf: 55,
+  maxPerDay: 6,
+  stopAfterLosses: 2,
+  dailyLossStop: 300,
+  dailyProfitLock: 0,
+  riskPct: 1,
+};
+
+const EMIL_PARAMS_KEY = 'raptor_emil_autoparams_v1';
+const EMIL_AUTO_CONSENT_KEY = 'raptor_emil_auto_consent_v1';
+const EMIL_LOG_KEY = 'raptor_emil_log_v1';
+
+export function loadEmilAutoParams(): EmilAutoParams {
+  try { return { ...DEFAULT_EMIL_AUTOPARAMS, ...(JSON.parse(localStorage.getItem(EMIL_PARAMS_KEY) || '{}')) }; } catch { return { ...DEFAULT_EMIL_AUTOPARAMS }; }
+}
+
+export function saveEmilAutoParams(p: EmilAutoParams): void {
+  try { localStorage.setItem(EMIL_PARAMS_KEY, JSON.stringify(p)); } catch { /* ignore */ }
+}
+
+export function isEmilAutoConsented(): boolean {
+  try { return !!localStorage.getItem(EMIL_AUTO_CONSENT_KEY); } catch { return false; }
+}
+
+export function recordEmilAutoConsent(typed: string, params: EmilAutoParams): void {
+  try {
+    localStorage.setItem(EMIL_AUTO_CONSENT_KEY, JSON.stringify({
+      version: 1, typed, params, acceptedAt: new Date().toISOString(),
+    }));
+  } catch { /* ignore */ }
+}
+
+export interface EmilLogEntry { ts: number; kind: 'entry' | 'exit' | 'breakeven' | 'blocked' | 'mode' | 'lock'; text: string }
+
+export function emilLog(kind: EmilLogEntry['kind'], text: string): void {
+  try {
+    const log = JSON.parse(localStorage.getItem(EMIL_LOG_KEY) || '[]') as EmilLogEntry[];
+    log.push({ ts: Date.now(), kind, text });
+    localStorage.setItem(EMIL_LOG_KEY, JSON.stringify(log.slice(-300)));
+  } catch { /* ignore */ }
+}
+
+export function loadEmilLog(): EmilLogEntry[] {
+  try { return JSON.parse(localStorage.getItem(EMIL_LOG_KEY) || '[]'); } catch { return []; }
 }
 
 // ── EMIL onboarding / consent (v1: observe-only) ────────────────
