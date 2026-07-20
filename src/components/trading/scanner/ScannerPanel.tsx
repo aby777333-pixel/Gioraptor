@@ -34,9 +34,21 @@ const MODE_META: Record<AutoMode, { label: string; color: string; desc: string }
 };
 
 const CONSENT_KEY = 'raptor_scanner_consent_v1';
+const AUTOPARAMS_KEY = 'raptor_scanner_autoparams_v1';
 
-export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
-  ohlcvBuilder: OHLCVBuilder | null; isLiveData: boolean; onClose: () => void;
+// §1 — the one-line exoneration shown in the window, the settings and the consent.
+export const SCANNER_EXONERATION =
+  'All signals, hedge suggestions and automated trades are used entirely at the trader’s own risk; neither the broker nor the Raptor platform is responsible for trading losses, missed opportunities, execution delays or market outcomes.';
+
+interface AutoParams { maxPerDay: number; minScore: number; minGapMin: number }
+const DEFAULT_AUTOPARAMS: AutoParams = { maxPerDay: 10, minScore: 60, minGapMin: 5 };
+
+function loadAutoParams(): AutoParams {
+  try { return { ...DEFAULT_AUTOPARAMS, ...(JSON.parse(localStorage.getItem(AUTOPARAMS_KEY) || '{}')) }; } catch { return { ...DEFAULT_AUTOPARAMS }; }
+}
+
+export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standalone = false }: {
+  ohlcvBuilder: OHLCVBuilder | null; isLiveData: boolean; onClose: () => void; standalone?: boolean;
 }) {
   const { prices, positions, activeAccountId, accountSummary, triggerRefresh, setActiveSymbol } = useTradingStore();
   const [mode, setMode] = useState<AutoMode>('signal');
@@ -50,6 +62,8 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
   const [toast, setToast] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
   const [consented, setConsented] = useState(false);
+  const [showAuto, setShowAuto] = useState(false);
+  const [autoParams, setAutoParams] = useState<AutoParams>(loadAutoParams);
   const builderRef = useRef(ohlcvBuilder);
   builderRef.current = ohlcvBuilder;
   const loggedRef = useRef<Set<string>>(new Set());
@@ -103,6 +117,23 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
     if (!activeAccountId) { say('Select a trading account first'); return; }
     const t = prices[o.symbol];
     if (!t?.bid || !t?.ask) { say(`No live quote for ${o.symbol} — refusing to trade stale data`); return; }
+    // Automation & risk parameters (trader-set, enforced here for real).
+    const ap = loadAutoParams();
+    const log = loadSignalLog();
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const executedToday = log.filter((e) => e.action === 'executed' && e.ts >= midnight.getTime());
+    if (executedToday.length >= ap.maxPerDay) {
+      appendSignalLog({ ts: Date.now(), symbol: o.symbol, tf: o.tfLabel, direction: o.direction, score: o.score, action: 'rejected', detail: `max ${ap.maxPerDay} scanner trades/day reached` });
+      say(`⛔ Your automation limit: ${ap.maxPerDay} scanner trades/day already used.`); return;
+    }
+    const lastExec = executedToday.length ? Math.max(...executedToday.map((e) => e.ts)) : 0;
+    if (lastExec && Date.now() - lastExec < ap.minGapMin * 60_000) {
+      const left = Math.ceil((ap.minGapMin * 60_000 - (Date.now() - lastExec)) / 60_000);
+      say(`⛔ Trade spacing: your rule requires ${ap.minGapMin} min between scanner trades (${left} min left).`); return;
+    }
+    if (o.score < ap.minScore) {
+      say(`⛔ Score ${o.score} is below your minimum-to-execute (${ap.minScore}). Signal stays watch-only.`); return;
+    }
     // Conflict check (§14): one scanner trade per symbol; warn on any open position.
     const open = positions.filter((p) => p.status === 'open' && p.symbol === o.symbol);
     if (open.some((p) => String((p as unknown as { comment?: string }).comment ?? '').startsWith('Scanner:'))) {
@@ -153,9 +184,21 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
     border: `1px solid ${active ? `${color}88` : 'rgba(255,255,255,0.1)'}`,
   });
 
+  const patchAuto = (patch: Partial<AutoParams>) => {
+    setAutoParams((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(AUTOPARAMS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   return (
-    <div className="fixed inset-0 z-[9500] flex items-start justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.88)', backdropFilter: 'blur(3px)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="my-4 w-full max-w-[1150px] rounded-xl border shadow-2xl" style={{ backgroundColor: '#080D16', borderColor: 'rgba(41,171,226,0.35)' }}>
+    <div
+      className={standalone ? 'flex w-full items-start justify-center p-4' : 'fixed inset-0 z-[9500] flex items-start justify-center overflow-y-auto p-4'}
+      style={standalone ? undefined : { backgroundColor: 'rgba(3,7,12,0.88)', backdropFilter: 'blur(3px)' }}
+      onMouseDown={standalone ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className={`w-full rounded-xl border shadow-2xl ${standalone ? '' : 'my-4 max-w-[1150px]'}`} style={{ backgroundColor: '#080D16', borderColor: 'rgba(41,171,226,0.35)' }}>
 
         {/* ── Top command bar ── */}
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
@@ -175,6 +218,14 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
             style={{ backgroundColor: 'rgba(255,82,82,0.15)', color: '#FF5252', border: '1px solid rgba(255,82,82,0.55)' }}>
             <OctagonX size={12} /> EMERGENCY STOP
           </button>
+          {!standalone && (
+            <button onClick={() => window.open('/terminal/scan-trade', '_blank')}
+              title="Open SCAN & TRADE as a standalone window (new tab) — same account, positions and rules; ideal for a second monitor"
+              className="rounded px-2.5 py-1.5 text-[10px] font-bold transition-all hover:brightness-125"
+              style={{ backgroundColor: 'rgba(41,171,226,0.12)', color: '#29ABE2', border: '1px solid rgba(41,171,226,0.4)' }}>
+              ⧉ Window
+            </button>
+          )}
           <button onClick={onClose} className="rounded p-1.5 text-white/40 transition-colors hover:text-white"><X size={16} /></button>
         </div>
 
@@ -237,7 +288,11 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
             title="Only scan symbols where you hold an open position">
             Portfolio mode
           </button>
-          <button onClick={() => setShowLog((s) => !s)} className="ml-auto rounded px-2 py-0.5 text-[9px] font-semibold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+          <button onClick={() => setShowAuto((s) => !s)} className="ml-auto rounded px-2 py-0.5 text-[9px] font-bold transition-all"
+            style={{ backgroundColor: showAuto ? 'rgba(255,179,0,0.18)' : 'rgba(255,179,0,0.06)', color: '#FFB300', border: '1px solid rgba(255,179,0,0.35)' }}>
+            ⚙ Automation
+          </button>
+          <button onClick={() => setShowLog((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-semibold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
             Signal log
           </button>
           <button onClick={exportLog} className="flex items-center gap-1 rounded px-2 py-0.5 text-[9px] font-semibold text-white/45 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
@@ -245,8 +300,37 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
           </button>
         </div>
 
+        {/* ── Automation & risk parameters (trader-set, enforced at execution) ── */}
+        {showAuto && (
+          <div className="border-b px-4 py-3" style={{ borderColor: 'rgba(255,179,0,0.25)', backgroundColor: 'rgba(255,179,0,0.04)' }}>
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: '#FFB300' }}>Automation & risk parameters — enforced on every scanner execution</div>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="text-[10px] text-white/50">Max scanner trades / day
+                <input type="number" min={1} max={100} value={autoParams.maxPerDay}
+                  onChange={(e) => patchAuto({ maxPerDay: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
+                  className="ml-2 w-[56px] rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[11px] text-white outline-none" style={{ border: '1px solid rgba(255,179,0,0.3)' }} />
+              </label>
+              <label className="text-[10px] text-white/50">Min score to execute
+                <input type="number" min={0} max={100} value={autoParams.minScore}
+                  onChange={(e) => patchAuto({ minScore: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) })}
+                  className="ml-2 w-[56px] rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[11px] text-white outline-none" style={{ border: '1px solid rgba(255,179,0,0.3)' }} />
+              </label>
+              <label className="text-[10px] text-white/50">Min minutes between trades
+                <input type="number" min={0} max={720} value={autoParams.minGapMin}
+                  onChange={(e) => patchAuto({ minGapMin: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                  className="ml-2 w-[56px] rounded bg-white/[0.06] px-1.5 py-1 font-mono text-[11px] text-white outline-none" style={{ border: '1px solid rgba(255,179,0,0.3)' }} />
+              </label>
+              <span className="text-[9px] text-white/40">
+                Auto entry/exit executes SL + TP1 with every order; trailing/BE plan shown per card. Loss control (daily loss,
+                equity floor, cooldowns, news guard…) is enforced by your 🛡 Shield rules on this same order path.
+              </span>
+            </div>
+            <p className="mt-2 text-[9px]" style={{ color: '#FFB300' }}>{SCANNER_EXONERATION}</p>
+          </div>
+        )}
+
         {/* ── Body ── */}
-        <div className="max-h-[66vh] overflow-y-auto p-4" style={{ scrollbarWidth: 'thin' }}>
+        <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[66vh]'}`} style={{ scrollbarWidth: 'thin' }}>
           {mode === 'off' && (
             <p className="py-8 text-center text-[12px] text-white/40">Scanner is OFF. Switch to SIGNAL ONLY to analyse the market.</p>
           )}
@@ -336,7 +420,10 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
             </div>
           )}
 
-          <p className="mt-3 text-[9px] leading-relaxed text-white/30">
+          <p className="mt-3 text-[9px] font-semibold leading-relaxed" style={{ color: 'rgba(255,179,0,0.75)' }}>
+            {SCANNER_EXONERATION}
+          </p>
+          <p className="mt-1 text-[9px] leading-relaxed text-white/30">
             Trade opportunities, scores, alerts, forecasts, hedging suggestions and automated actions are analytical
             tools, not guarantees of profit. Markets can move rapidly, correlations can fail, and losses may exceed
             expectations. The trader remains responsible for enabling automation, reviewing risk settings and deciding
@@ -357,6 +444,7 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose }: {
                 tagged <span className="font-mono">Scanner:&lt;tf&gt;</span> for a separate audit trail. You remain fully
                 responsible for every execution.
               </p>
+              <p className="mb-2 text-[10px] font-semibold" style={{ color: '#FFB300' }}>{SCANNER_EXONERATION}</p>
               <div className="flex justify-end gap-2">
                 <button onClick={() => setExpanded(null)} className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>Stay in Signal Only</button>
                 <button onClick={() => { acceptConsent(); setExpanded(null); }}

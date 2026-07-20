@@ -32,7 +32,11 @@ import {
 const MINT = '#00E5A0';
 const VIOLET = '#AB47BC';
 
-export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OHLCVBuilder | null; onClose: () => void }) {
+// §1 — one-line exoneration, shown in the panel footer and the confirm modal.
+export const HEDGE_EXONERATION =
+  'All signals, hedge suggestions and automated trades are used entirely at the trader’s own risk; neither the broker nor the Raptor platform is responsible for trading losses, missed opportunities, execution delays or market outcomes.';
+
+export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }: { ohlcvBuilder: OHLCVBuilder | null; onClose: () => void; standalone?: boolean }) {
   const { activeSymbol, prices, positions, activeAccountId, triggerRefresh } = useTradingStore();
   const [specs, setSpecs] = useState<Record<string, InstrumentSpec> | null>(null);
   const [calendar, setCalendar] = useState<NewsEvent[]>([]);
@@ -217,8 +221,12 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
   );
 
   return (
-    <div className="fixed inset-0 z-[9500] flex items-start justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)', backdropFilter: 'blur(3px)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="my-4 w-full max-w-[1150px] rounded-xl border shadow-2xl" style={{ backgroundColor: '#080D16', borderColor: 'rgba(171,71,188,0.35)' }}>
+    <div
+      className={standalone ? 'flex w-full items-start justify-center p-4' : 'fixed inset-0 z-[9500] flex items-start justify-center overflow-y-auto p-4'}
+      style={standalone ? undefined : { backgroundColor: 'rgba(3,7,12,0.85)', backdropFilter: 'blur(3px)' }}
+      onMouseDown={standalone ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className={`w-full rounded-xl border shadow-2xl ${standalone ? '' : 'my-4 max-w-[1150px]'}`} style={{ backgroundColor: '#080D16', borderColor: 'rgba(171,71,188,0.35)' }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div>
@@ -230,10 +238,20 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
               hedging adds spread/swap/margin costs and residual risk always remains. Never a guarantee.
             </p>
           </div>
-          <button onClick={onClose} className="rounded p-1.5 text-white/40 transition-colors hover:text-white"><X size={16} /></button>
+          <div className="flex items-center gap-2">
+            {!standalone && (
+              <button onClick={() => window.open('/terminal/hedge-trade', '_blank')}
+                title="Open HEDGE & TRADE as a standalone window (new tab) — same account, positions, hedge groups and rules; ideal for a second monitor"
+                className="rounded px-2.5 py-1.5 text-[10px] font-bold transition-all hover:brightness-125"
+                style={{ backgroundColor: 'rgba(171,71,188,0.12)', color: '#CE93D8', border: '1px solid rgba(171,71,188,0.4)' }}>
+                ⧉ Window
+              </button>
+            )}
+            <button onClick={onClose} className="rounded p-1.5 text-white/40 transition-colors hover:text-white"><X size={16} /></button>
+          </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto p-4" style={{ scrollbarWidth: 'thin' }}>
+        <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[78vh]'}`} style={{ scrollbarWidth: 'thin' }}>
           {/* ── Inputs ── */}
           <div className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
             <label className="text-[9px] uppercase tracking-wide text-white/40">Primary
@@ -492,7 +510,10 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
             </div>
           )}
 
-          <p className="text-[9px] leading-relaxed text-white/30">
+          <p className="text-[9px] font-semibold leading-relaxed" style={{ color: 'rgba(255,179,0,0.75)' }}>
+            {HEDGE_EXONERATION}
+          </p>
+          <p className="mt-1 text-[9px] leading-relaxed text-white/30">
             Suggested exit conditions for any hedge: primary reaches its stop or target · correlation falls below your
             threshold or reverses · the news event passes · volatility normalises · hedge cost exceeds its protection.
             A hedge can reduce one risk while adding others (spread, swap, margin, execution, correlation). Estimated
@@ -546,10 +567,11 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                   </p>
                 ) : null;
               })()}
-              <p className="mb-3 text-[10px] text-white/40">
+              <p className="mb-1 text-[10px] text-white/40">
                 Exit plan: remove the hedge when the primary hits its stop/target, the correlation drops or reverses, or the
                 protection no longer justifies its cost. Shield rules apply to this order like any other. Estimates, not guarantees.
               </p>
+              <p className="mb-3 text-[9px] font-semibold" style={{ color: '#FFB300' }}>{HEDGE_EXONERATION}</p>
               <div className="flex justify-end gap-2">
                 <button onClick={() => setPreview(null)} className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>Cancel</button>
                 <button onClick={() => executeHedge(preview)} disabled={placing}
