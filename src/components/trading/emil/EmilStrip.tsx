@@ -8,7 +8,7 @@ import { useTradingStore } from '@/stores/trading';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { getCalendar, type NewsEvent } from '@/lib/trading/news-guard';
 import { getInstrumentSpecs, type InstrumentSpec } from '@/lib/insights/risk';
-import { buildCouncil, isEmilOnboarded, type EmilConsensus } from '@/lib/trading/emil-council';
+import { buildCouncil, isEmilOnboarded, isEmilAutoConsented, type EmilConsensus } from '@/lib/trading/emil-council';
 
 export default function EmilStrip({ ohlcvBuilder, onOpenEmil }: { ohlcvBuilder: OHLCVBuilder | null; onOpenEmil: () => void }) {
   const { activeSymbol, prices, positions, activeAccountId, accountSummary } = useTradingStore();
@@ -49,11 +49,23 @@ export default function EmilStrip({ ohlcvBuilder, onOpenEmil }: { ohlcvBuilder: 
   }
 
   return (
-    <button onClick={onOpenEmil}
-      className="flex w-full items-center gap-2 rounded border px-3 py-1.5 text-left font-mono text-[10px] transition-all hover:brightness-125"
-      style={{ borderColor: 'rgba(255,213,79,0.3)', backgroundColor: 'rgba(255,213,79,0.05)', color: '#FFD54F' }}
-      title="EMIL Agent Council — click for the full console">
-      🧠 {council ? council.headline : `EMIL · reading ${activeSymbol}…`}
-    </button>
+    <div className="flex w-full items-center gap-1.5">
+      <button onClick={onOpenEmil}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded border px-3 py-1.5 text-left font-mono text-[10px] transition-all hover:brightness-125"
+        style={{ borderColor: 'rgba(255,213,79,0.3)', backgroundColor: 'rgba(255,213,79,0.05)', color: '#FFD54F' }}
+        title="EMIL Agent Council — click for the full console">
+        <span className="truncate">🧠 {council ? council.headline : `EMIL · reading ${activeSymbol}…`}</span>
+      </button>
+      {/* The trader decides whether EMIL may trade & hedge — arming lives in
+          his console behind the typed-consent gate; this is the doorway. */}
+      <button onClick={onOpenEmil}
+        className="shrink-0 rounded border px-2.5 py-1.5 text-[9px] font-bold transition-all hover:brightness-125"
+        style={{ borderColor: 'rgba(206,147,216,0.45)', backgroundColor: 'rgba(206,147,216,0.1)', color: '#CE93D8' }}
+        title={isEmilAutoConsented()
+          ? 'You have consented before — open EMIL’s console to arm the pilot for this session (it always re-confirms the envelope)'
+          : 'Open EMIL’s console to review permissions, accept the disclaimer and decide whether EMIL may trade & hedge'}>
+        {isEmilAutoConsented() ? '🤖 Arm EMIL to trade & hedge' : '🤖 Let EMIL trade & hedge…'}
+      </button>
+    </div>
   );
 }
