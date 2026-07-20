@@ -27,8 +27,15 @@ import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
 import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, marketMood, type RiskMood, type ForecastRead, type EventGuidance, type MoodRead } from '@/lib/trading/emil-macro';
 import { parseMission, type MissionParse } from '@/lib/trading/emil-mission';
-import { runScan, DEFAULT_FILTERS, type Opportunity } from '@/lib/trading/scanner-engine';
+import { runScan, DEFAULT_FILTERS, assessOpportunity, type Opportunity } from '@/lib/trading/scanner-engine';
 import { SCAN_TFS } from '@/lib/trading/scanner-engine';
+import {
+  ADAPT_TFS, EXTENDED_TFS, UNSUPPORTED_TF_NOTE, ADAPT_DISCLAIMER,
+  loadAdaptPrefs, saveAdaptPrefs, effectiveAllowedTFs, tfRoles, suitabilityMatrix,
+  stabilityCheck, recordModeSwitch, tradeChangeAllowed, recordTradeChange,
+  ensureIdentity, appendIdentityChange, loadIdentities, currentManagedTf,
+  type AdaptPrefs, type MatrixRow,
+} from '@/lib/trading/emil-adapt';
 import { sessionSnapshot, fmtMins, type SessionSnapshot } from '@/lib/trading/emil-sessions';
 
 // ── Wake Me for Markets (browser-honest: notifications + beeps; SMS/calls/
@@ -104,6 +111,9 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [modeBoard, setModeBoard] = useState<{ mode: string; conf: number }[]>([]);
   const [wake, setWake] = useState<WakeSettings>(loadWake);
   const [sessions, setSessions] = useState<SessionSnapshot | null>(null);
+  const [adaptPrefs, setAdaptPrefs] = useState<AdaptPrefs>(loadAdaptPrefs);
+  const [adaptGate, setAdaptGate] = useState(false);
+  const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
   const [sleepNoNew, setSleepNoNew] = useState(false);
   const sleepNoNewRef = useRef(false);
   sleepNoNewRef.current = sleepNoNew;
@@ -159,6 +169,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         filters: { ...DEFAULT_FILTERS, minScore: 60 },
       });
       setRadar(found.slice(0, 6));
+      // Mode × timeframe suitability matrix for the focused symbol (live, transparent).
+      setMatrixRows(suitabilityMatrix({
+        builder, symbol: activeSymbol, tick: prices[activeSymbol], calendar,
+        allowed: effectiveAllowedTFs(loadAdaptPrefs()),
+      }));
     };
     compute();
     const id = setInterval(compute, 20_000);
@@ -215,6 +230,12 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
   }, [wakeAlert]);
+
+  const updateAdapt = useCallback((patch: Partial<AdaptPrefs>, readback: string) => {
+    setAdaptPrefs((p) => { const next = { ...p, ...patch }; saveAdaptPrefs(next); return next; });
+    emilLog('mode', `ADAPTATION: ${readback}`);
+    setLogTick((t) => t + 1);
+  }, []);
 
   const stopEverything = useCallback((reason: string) => {
     setMode('observe');
@@ -301,6 +322,11 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           if (cur == null) continue;
           const openPx = Number(pos.open_price);
 
+          // Trade identity (§10): freeze the original setup facts at first
+          // sighting — mode/TF changes later never rewrite this history.
+          const r0Seed = pos.sl != null && pos.sl !== 0 ? (openPx - Number(pos.sl)) * dir : null;
+          ensureIdentity(pos, r0Seed != null && r0Seed > 0 ? r0Seed : null);
+
           // R-ladder stop management: capture the ORIGINAL risk on first
           // sighting, then +1R → break-even, +2R → lock +1R, +3R → +2R…
           if (pos.sl != null && pos.sl !== 0) {
@@ -317,11 +343,40 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 const newSl = Number((openPx + dir * targetLockR * risk0).toFixed(openPx < 20 ? 5 : 2));
                 try {
                   await orderService.modifyPosition(pos.id, newSl, pos.tp ?? undefined);
+                  appendIdentityChange(pos.id, { ts: Date.now(), kind: 'stop', from: String(pos.sl), to: String(newSl), note: targetLockR === 0 ? 'break-even' : `lock +${targetLockR}R` });
                   emilLog('breakeven', targetLockR === 0
                     ? `${pos.symbol}: +1R reached — stop to break-even (${newSl}). The trade can no longer lose.`
                     : `${pos.symbol}: +${Math.floor(profitR)}R reached — stop trailed to lock +${targetLockR}R (${newSl}).`);
                   setLogTick((x) => x + 1);
                 } catch { /* may have closed */ }
+              }
+            }
+
+            // §4 Dynamic timeframe expansion — only AFTER profit is protected:
+            // stop at break-even or better, the next ladder timeframe confirms
+            // the move, adaptation isn't paused, and the per-trade change cap
+            // holds. Management relabels one step up (capped at H4 — overnight/
+            // weekend authorisation controls beyond that aren't built, honestly).
+            // The stop NEVER widens and risk never increases from this.
+            if (risk0 && risk0 > 0 && pos.sl != null) {
+              const profitRNow = (Number(cur) - openPx) * dir / risk0;
+              const lockRNow = (Number(pos.sl) - openPx) * dir / risk0;
+              const identNow = loadIdentities()[pos.id];
+              if (identNow && profitRNow >= 1 && lockRNow >= 0 && !loadAdaptPrefs().pause && tradeChangeAllowed(pos.id)) {
+                const curTf = currentManagedTf(identNow);
+                const idx = ADAPT_TFS.findIndex((t) => t.label === curTf);
+                const capIdx = ADAPT_TFS.findIndex((t) => t.label === 'H4');
+                const nextTf = idx >= 0 && idx < capIdx ? ADAPT_TFS[idx + 1] : null;
+                if (nextTf) {
+                  const hs = classifyMarketState(builder.getAllBars(pos.symbol, nextTf.res));
+                  const alignedUp = hs && ((dir > 0 && hs.state.includes('Uptrend')) || (dir < 0 && hs.state.includes('Downtrend'))) && hs.confidence >= 65;
+                  if (alignedUp) {
+                    appendIdentityChange(pos.id, { ts: Date.now(), kind: 'tf', from: curTf, to: nextTf.label, note: `expansion: ${hs.state} on ${nextTf.label} (${hs.confidence}%) with +${profitRNow.toFixed(1)}R running and the stop locked at ${lockRNow >= 0 ? '+' : ''}${lockRNow.toFixed(1)}R` });
+                    recordTradeChange(pos.id);
+                    emilLog('mode', `${pos.symbol}: the ${curTf} ${identNow.mode.toLowerCase()} trade developed into a confirmed ${nextTf.label} trend (${hs.confidence}%). Profit is protected — stop is at break-even or better with +${profitRNow.toFixed(1)}R running — so the remainder is now managed as ${nextTf.style}. Original risk unchanged; the stop never widens to justify a longer hold.`);
+                    setLogTick((x) => x + 1);
+                  }
+                }
               }
             }
           }
@@ -332,6 +387,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           if (against && c.confidence >= p.minCouncilConf) {
             try {
               await orderService.closePosition(pos.id, Number(cur));
+              appendIdentityChange(pos.id, { ts: Date.now(), kind: 'exit', note: `council flipped ${c.stance} (${c.confidence}%) against the ${pos.direction}` });
               emilLog('exit', `${pos.symbol}: council flipped ${c.stance} (${c.confidence}%) against the ${pos.direction} — position closed at ${cur}.`);
               setLogTick((x) => x + 1);
             } catch { /* may have closed */ }
@@ -358,6 +414,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                       size: Math.max(p.baseLot, h.suggestedLots), fillPrice: Number(hFill), comment: `EMIL:HEDGE:${pos.symbol}`,
                     });
                     hedgedRef.current.add(pos.id);
+                    appendIdentityChange(pos.id, { ts: Date.now(), kind: 'hedge', to: h.symbol, note: `${h.hedgeDirection} ${h.symbol} hedge leg at ${adverseR.toFixed(1)}R adverse` });
                     emilLog('entry', `hedge: ${pos.symbol} is ${adverseR.toFixed(1)}R adverse with an uncertain council — ${h.hedgeDirection} ${Math.max(p.baseLot, h.suggestedLots)} ${h.symbol} placed (~${h.reductionPct.toFixed(0)}% est. risk reduction, corr ${h.corr.avg?.toFixed(2)}).`);
                     setLogTick((x) => x + 1);
                   } catch (err) {
@@ -421,36 +478,50 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
         // ── Seek the BEST entry this cycle — EMIL selects the market ──
         setEmilStatus('Scanning');
         const scanUniverse = p.selectAll ? universeAll : p.symbols;
+        // Universal adaptation authority (§19): which timeframes/modes may trade now.
+        const adapt = loadAdaptPrefs();
+        const allowedTFsNow = effectiveAllowedTFs(adapt);
         const candidates: { c: EmilConsensus; opp: NonNullable<EmilConsensus['bestOpp']>; adj: number }[] = [];
         for (const symbol of scanUniverse) {
           if (emilOpenPos.some((x) => x.symbol === symbol)) continue; // one EMIL trade per symbol
           const c = buildCouncil({ builder, symbol, ticks, calendar, positions: [], history: [], specs: null, accountId: activeAccountId, balance: balanceNow, isLiveData });
           if (c.stance !== 'BULLISH LEAN' && c.stance !== 'BEARISH LEAN') continue;
           if (c.confidence < p.minCouncilConf) continue;
-          const opp = c.bestOpp;
-          if (!opp || opp.score < minScoreEff) continue;
-          if (emilShouldAvoid(symbol, opp.tfLabel)) continue; // learned avoidance — losing buckets are benched
-          const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
-          if (!aligned) continue;
-          if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) continue; // slice of profits only
-          // Trade Mode controller: only allowed modes may trade (trader/shared control).
-          if (p.modeControl !== 'emil' && !p.enabledModes.includes(opp.style)) continue;
           // News buffer: no entries within 30 min of a red-flag event on the symbol.
           if (highImpactWithin(symbolCurrencies(symbol), calendar, 30).length) continue;
           // Uncertainty gate: EMIL refuses to enter markets he cannot read.
           const unc = uncertaintyScore(builder, symbol, ticks[symbol], calendar);
           if (unc.level === 'HIGH') continue;
-          candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) });
+          const consider = (opp: EmilConsensus['bestOpp']) => {
+            if (!opp || opp.score < minScoreEff) return;
+            if (!allowedTFsNow.includes(opp.tfLabel)) return;                 // timeframe authority
+            if (adapt.lockedMode && opp.style !== adapt.lockedMode) return;   // locked mode
+            if (emilShouldAvoid(symbol, opp.tfLabel)) return; // learned avoidance — losing buckets are benched
+            const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
+            if (!aligned) return;
+            if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) return; // slice of profits only
+            // Trade Mode controller: only allowed modes may trade (trader/shared control).
+            if (p.modeControl !== 'emil' && !p.enabledModes.includes(opp.style)) return;
+            candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) });
+          };
+          consider(c.bestOpp);
+          // Universal timeframe ladder (§2): extended TFs beyond the scanner's
+          // six compete too — only when the authority settings allow them.
+          for (const xtf of EXTENDED_TFS) {
+            if (!allowedTFsNow.includes(xtf.label)) continue;
+            consider(assessOpportunity({ builder, symbol, tf: xtf, tick: ticks[symbol], calendar, openPositionCurrencies: [], balance: balanceNow, isLiveData }));
+          }
         }
         // ── Mode Confidence board: every allowed mode competes, and No-Trade
         // is a first-class contender that wins when nothing qualifies. ──
-        const byStyle = new Map<string, number>();
+        const byCombo = new Map<string, number>();
         for (const cand of candidates) {
-          byStyle.set(cand.opp.style, Math.max(byStyle.get(cand.opp.style) ?? 0, cand.adj));
+          const k = `${cand.opp.style} (${cand.opp.tfLabel})`;
+          byCombo.set(k, Math.max(byCombo.get(k) ?? 0, cand.adj));
         }
-        const board = SCAN_TFS
-          .filter((t) => p.modeControl === 'emil' || p.enabledModes.includes(t.style))
-          .map((t) => ({ mode: `${t.style} (${t.label})`, conf: Math.min(100, byStyle.get(t.style) ?? 0) }));
+        const board = ADAPT_TFS
+          .filter((t) => allowedTFsNow.includes(t.label) && (p.modeControl === 'emil' || p.enabledModes.includes(t.style)))
+          .map((t) => ({ mode: `${t.style} (${t.label})`, conf: Math.min(100, byCombo.get(`${t.style} (${t.label})`) ?? 0) }));
         const topAdj = candidates.length ? Math.max(...candidates.map((x) => x.adj)) : 0;
         board.push({ mode: 'No-Trade', conf: candidates.length ? Math.max(20, 95 - topAdj) : 95 });
         board.sort((a, b) => b.conf - a.conf);
@@ -473,13 +544,35 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           candidates.sort((a, b) => b.adj - a.adj);
           // Conservative tie-break: among near-equal scores (±3), prefer the
           // HIGHER timeframe — never the more aggressive mode.
-          const tfIdx = (s: string) => SCAN_TFS.findIndex((t) => t.label === s);
+          const tfIdx = (s: string) => ADAPT_TFS.findIndex((t) => t.label === s);
           let bestPick = candidates[0];
           for (const cand of candidates.slice(1)) {
             if (bestPick.adj - cand.adj <= 3 && tfIdx(cand.opp.tfLabel) > tfIdx(bestPick.opp.tfLabel)) bestPick = cand;
           }
-          const chosenMode = `${bestPick.opp.style} (${bestPick.opp.tfLabel})`;
+          let chosenMode = `${bestPick.opp.style} (${bestPick.opp.tfLabel})`;
+          // §15 Adaptation Stability: switching modes needs evidence, not noise.
+          // Risk-protection paths (exits, No-Trade, Defensive) never route here.
+          if (chosenMode !== lastModeRef.current && lastModeRef.current !== 'No-Trade') {
+            const inCurrent = candidates.filter((x) => `${x.opp.style} (${x.opp.tfLabel})` === lastModeRef.current);
+            const improvement = inCurrent.length ? bestPick.adj - inCurrent[0].adj : Infinity;
+            const stab = stabilityCheck({ pause: adapt.pause, improvement });
+            if (!stab.ok) {
+              if (inCurrent.length) {
+                bestPick = inCurrent[0];
+                chosenMode = lastModeRef.current;
+                emilLog('mode', `stability: staying in ${lastModeRef.current} — ${stab.reason}. Switching costs spread and focus; the evidence must pay for it.`);
+                setLogTick((x) => x + 1);
+              } else if (adapt.pause) {
+                emilLog('mode', `adaptation paused by you and no qualified setup remains in ${lastModeRef.current} — standing aside this cycle rather than switching modes.`);
+                setCurrentMode(lastModeRef.current); setEmilStatus('Watching'); setLogTick((x) => x + 1);
+                return;
+              }
+              // Cooldown with nothing left in the current mode: leaving a dry
+              // mode is not flip-flopping — the switch proceeds.
+            }
+          }
           if (lastModeRef.current !== chosenMode) {
+            recordModeSwitch();
             emilLog('mode', `mode switch: ${lastModeRef.current} → ${chosenMode} — reason: highest-confidence qualified setup (${bestPick.opp.symbol}, score ${bestPick.opp.score}, council ${bestPick.c.confidence}%); conservative tie-break favours higher timeframes; never switched to chase losses.`);
             prevModeRef.current = lastModeRef.current;
             lastModeRef.current = chosenMode;
@@ -799,6 +892,174 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 </div>
               )}
 
+              {/* ── 🧭 Universal Adaptation Authority (§19) ── */}
+              <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(0,229,255,0.3)' }}>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: '#00E5FF' }}>🧭 Universal Adaptation — who selects modes &amp; timeframes</span>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => updateAdapt({ control: 'trader' }, 'authority → TRADER PREFERENCE. Your allowed timeframes, locks and pause govern; the Let-EMIL-Select-Everything switch is dormant.')}
+                      className="rounded px-2.5 py-1 text-[10px] font-bold transition-all hover:brightness-125"
+                      style={{
+                        backgroundColor: adaptPrefs.control === 'trader' ? 'rgba(0,229,255,0.18)' : 'rgba(255,255,255,0.03)',
+                        color: adaptPrefs.control === 'trader' ? '#00E5FF' : 'rgba(255,255,255,0.3)',
+                        border: `1px solid ${adaptPrefs.control === 'trader' ? 'rgba(0,229,255,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                        opacity: adaptPrefs.control === 'trader' ? 1 : 0.55,
+                      }}>
+                      Trader preference {adaptPrefs.control === 'trader' ? '· ACTIVE' : '· dormant'}
+                    </button>
+                    <button onClick={() => {
+                      if (!adaptPrefs.consentAt) { setAdaptGate(true); return; }
+                      updateAdapt({ control: 'emil' }, 'authority → LET EMIL SELECT EVERYTHING (consent on record). Market, instrument, direction, mode, all ladder timeframes, entry/exit and management are EMIL-selected — always inside your risk envelope, Shield and the Guardian.');
+                    }}
+                      className="rounded px-2.5 py-1 text-[10px] font-bold transition-all hover:brightness-125"
+                      style={{
+                        backgroundColor: adaptPrefs.control === 'emil' ? 'rgba(255,213,79,0.18)' : 'rgba(255,255,255,0.03)',
+                        color: adaptPrefs.control === 'emil' ? '#FFD54F' : 'rgba(255,255,255,0.3)',
+                        border: `1px solid ${adaptPrefs.control === 'emil' ? 'rgba(255,213,79,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                        opacity: adaptPrefs.control === 'emil' ? 1 : 0.55,
+                      }}>
+                      🤖 Let EMIL Select Everything {adaptPrefs.control === 'emil' ? '· ACTIVE' : '· dormant'}
+                    </button>
+                  </div>
+                </div>
+                {/* Trader preference fields — dormant while EMIL holds authority */}
+                <div className={adaptPrefs.control === 'emil' ? 'pointer-events-none opacity-30' : ''}>
+                  <div className="mb-1 text-[9px] uppercase tracking-wide text-white/40">Allowed timeframes {adaptPrefs.control === 'emil' ? '(dormant — EMIL holds selection authority)' : '(EMIL trades only these)'}</div>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {ADAPT_TFS.map((t) => (
+                      <button key={t.label}
+                        onClick={() => updateAdapt({ allowedTFs: adaptPrefs.allowedTFs.includes(t.label) ? adaptPrefs.allowedTFs.filter((x) => x !== t.label) : [...adaptPrefs.allowedTFs, t.label] }, `allowed timeframes → ${(adaptPrefs.allowedTFs.includes(t.label) ? adaptPrefs.allowedTFs.filter((x) => x !== t.label) : [...adaptPrefs.allowedTFs, t.label]).join(', ') || 'none'}`)}
+                        className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold transition-all"
+                        style={{
+                          backgroundColor: adaptPrefs.allowedTFs.includes(t.label) ? 'rgba(0,229,255,0.2)' : 'rgba(255,255,255,0.04)',
+                          color: adaptPrefs.allowedTFs.includes(t.label) ? '#00E5FF' : 'rgba(255,255,255,0.35)',
+                          border: `1px solid ${adaptPrefs.allowedTFs.includes(t.label) ? 'rgba(0,229,255,0.55)' : 'rgba(255,255,255,0.1)'}`,
+                        }}
+                        title={`${t.style} · holding ${t.holding}`}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[9px] text-white/55">
+                    <label className="flex items-center gap-1.5">Lock timeframe
+                      <select value={adaptPrefs.lockedTF ?? ''} onChange={(e) => updateAdapt({ lockedTF: e.target.value || null }, e.target.value ? `timeframe LOCKED to ${e.target.value}` : 'timeframe lock removed')}
+                        className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-white outline-none" style={{ border: '1px solid rgba(0,229,255,0.3)' }}>
+                        <option value="" style={{ backgroundColor: '#0A0F1A' }}>none</option>
+                        {ADAPT_TFS.map((t) => <option key={t.label} value={t.label} style={{ backgroundColor: '#0A0F1A' }}>{t.label}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1.5">Lock mode
+                      <select value={adaptPrefs.lockedMode ?? ''} onChange={(e) => updateAdapt({ lockedMode: e.target.value || null }, e.target.value ? `mode LOCKED to ${e.target.value}` : 'mode lock removed')}
+                        className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-white outline-none" style={{ border: '1px solid rgba(0,229,255,0.3)' }}>
+                        <option value="" style={{ backgroundColor: '#0A0F1A' }}>none</option>
+                        {[...new Set(ADAPT_TFS.map((t) => t.style))].map((s) => <option key={s} value={s} style={{ backgroundColor: '#0A0F1A' }}>{s}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="checkbox" checked={adaptPrefs.pause} onChange={(e) => updateAdapt({ pause: e.target.checked }, e.target.checked ? 'adaptation PAUSED — no mode/timeframe switching; risk-protection exits still run' : 'adaptation resumed')} className="accent-[#00E5FF]" />
+                      Pause adaptation (risk-protection exits always keep running)
+                    </label>
+                  </div>
+                </div>
+                {adaptPrefs.control === 'emil' && (
+                  <p className="mt-1.5 text-[9px]" style={{ color: 'rgba(255,213,79,0.75)' }}>
+                    EMIL selects instrument, direction, mode, every ladder timeframe, entry, exit and management — bounded by your consent envelope
+                    (risk %, base lot {String(autoParams.baseLot)}, daily stops), Shield and the independent Guardian. Consent recorded {adaptPrefs.consentAt ? new Date(adaptPrefs.consentAt).toLocaleString() : '—'}.
+                    Switch back to Trader preference any time — it takes effect next cycle.
+                  </p>
+                )}
+                <p className="mt-1.5 text-[8px] leading-relaxed text-white/25">{UNSUPPORTED_TF_NOTE}</p>
+                <p className="text-[8px] text-white/25">A mode or timeframe change never changes sizing rules: base lot stays {String(autoParams.baseLot)} and every size is computed from your approved risk — adaptation is never an excuse to trade bigger, hold a failed position, or dodge a valid stop.</p>
+              </div>
+
+              {/* ── Mode × Timeframe suitability matrix (§6) ── */}
+              {matrixRows.length > 0 && (
+                <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(0,229,255,0.2)' }}>
+                  <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">
+                    Mode × timeframe suitability · {activeSymbol} · live, risk-adjusted — highest-quality wins, not highest raw profit
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left font-mono text-[9px]">
+                      <thead>
+                        <tr className="text-white/35">
+                          <th className="pr-3 font-normal">Mode</th><th className="pr-3 font-normal">TF</th>
+                          <th className="pr-3 font-normal">Suitability</th><th className="pr-3 font-normal">Confidence</th>
+                          <th className="pr-3 font-normal">Risk</th><th className="font-normal">Expected duration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matrixRows.slice(0, 9).map((r, i) => (
+                          <tr key={`${r.mode}-${r.tf}`} title={r.note}
+                            style={{ color: r.mode === 'No-Trade' ? '#FFB300' : i === 0 ? '#00E5FF' : 'rgba(255,255,255,0.55)' }}>
+                            <td className="pr-3">{r.mode}</td>
+                            <td className="pr-3">{r.tf}</td>
+                            <td className="pr-3">
+                              <span className="mr-1 inline-block h-1.5 w-14 rounded bg-white/[0.06] align-middle">
+                                <span className="block h-full rounded" style={{ width: `${r.suitability}%`, backgroundColor: r.suitability >= 70 ? '#00C27A' : r.suitability >= 55 ? '#D4E157' : r.suitability >= 40 ? '#FFB300' : 'rgba(255,255,255,0.25)' }} />
+                              </span>
+                              {r.suitability}%
+                            </td>
+                            <td className="pr-3">{r.confidence}</td>
+                            <td className="pr-3">{r.risk}</td>
+                            <td>{r.duration}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {(() => {
+                    const top = matrixRows.find((r) => r.mode !== 'No-Trade' && r.suitability > 0);
+                    const roles = top ? tfRoles(top.tf) : null;
+                    return roles ? (
+                      <p className="mt-1.5 text-[8px] text-white/30">
+                        Timeframe roles for the top pick ({top!.tf} entry): context {roles.context} · trend {roles.trend} · setup {roles.setup} · confirmation {roles.confirmation} · entry {roles.entry} · management {roles.management} · exit {roles.exit}. Roles shift as the trade evolves — recorded, never rewritten.
+                      </p>
+                    ) : null;
+                  })()}
+                  <p className="text-[8px] text-white/25">Updates every 20s from live bars. Range regimes read as observation-only — a range execution model is not built and is never faked.</p>
+                </div>
+              )}
+
+              {/* ── Live Adaptation Panel (§20): trade identities, never rewritten ── */}
+              {(() => {
+                const idents = Object.values(loadIdentities()).sort((a, b) => b.firstSeen - a.firstSeen).slice(0, 4);
+                if (!idents.length) return null;
+                return (
+                  <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(0,229,255,0.2)' }} data-logtick={logTick}>
+                    <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">Live adaptation — trade identity records (original facts preserved)</div>
+                    {idents.map((t) => {
+                      const curTf = currentManagedTf(t);
+                      const lastChange = t.changes[t.changes.length - 1];
+                      return (
+                        <div key={t.id} className="mb-1.5 border-b pb-1.5 text-[9px] last:mb-0 last:border-0 last:pb-0" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                          <span className="font-mono font-bold text-white/75">{t.symbol} {t.direction}</span>
+                          <span className="text-white/45"> · opened as {t.mode} on {t.tf}{curTf !== t.tf ? ` → now managed on ${curTf}` : ''} · original SL {t.originalStop ?? '—'} · {t.changes.length} change(s){lastChange ? ` · last: ${lastChange.kind} ${new Date(lastChange.ts).toLocaleTimeString()}` : ''}</span>
+                          {lastChange && <p className="text-white/35">↳ {lastChange.note}</p>}
+                        </div>
+                      );
+                    })}
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <button onClick={() => updateAdapt({ pause: !adaptPrefs.pause }, adaptPrefs.pause ? 'adaptation resumed' : 'adaptation PAUSED from the live panel')}
+                        className="rounded px-2 py-0.5 text-[8px] font-bold transition-all hover:brightness-125" style={{ color: '#00E5FF', border: '1px solid rgba(0,229,255,0.35)' }}>
+                        {adaptPrefs.pause ? '▶ Resume adaptation' : '⏸ Pause adaptation'}
+                      </button>
+                      <button onClick={() => { setAutoParams((p) => { const next = { ...p, smallSteady: true }; saveEmilAutoParams(next); return next; }); emilLog('mode', 'RETURN TO CONSERVATIVE: Small & Steady ON — base lot only, quality bar +10.'); setLogTick((x) => x + 1); }}
+                        className="rounded px-2 py-0.5 text-[8px] font-bold transition-all hover:brightness-125" style={{ color: '#9CCC65', border: '1px solid rgba(156,204,101,0.35)' }}>
+                        🛡 Return to conservative
+                      </button>
+                      <button onClick={() => { setSleepNoNew(true); emilLog('mode', 'NO-TRADE MODE: no new entries; existing EMIL positions still managed.'); setLogTick((x) => x + 1); }}
+                        className="rounded px-2 py-0.5 text-[8px] font-bold transition-all hover:brightness-125" style={{ color: '#FFB300', border: '1px solid rgba(255,179,0,0.35)' }}>
+                        🚫 No-Trade mode
+                      </button>
+                      <button onClick={() => stopEverything('emergency stop from the adaptation panel')}
+                        className="rounded px-2 py-0.5 text-[8px] font-bold transition-all hover:brightness-125" style={{ color: '#FF5252', border: '1px solid rgba(255,82,82,0.4)' }}>
+                        ⛔ Emergency stop
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* ── Global Session Map + Wake & Sleep ── */}
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
@@ -1032,7 +1293,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                       </p>
                       <div className="mt-1 flex gap-1.5">
                         <button onClick={() => {
-                          const blob = new Blob([JSON.stringify({ learning: loadEmilLearning(), log: loadEmilLog(), exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+                          const blob = new Blob([JSON.stringify({ learning: loadEmilLearning(), log: loadEmilLog(), tradeIdentities: loadIdentities(), exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
                           const a = document.createElement('a');
                           a.href = URL.createObjectURL(blob);
                           a.download = `emil-knowledge-${new Date().toISOString().slice(0, 10)}.json`;
@@ -1240,6 +1501,38 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
                   style={{ background: 'linear-gradient(180deg,#CE93D8,#AB47BC)', boxShadow: '0 0 14px rgba(171,71,188,0.5)' }}>
                   ARM AUTONOMOUS PILOT
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── §24 consent gate: Let EMIL Select Everything ── */}
+        {adaptGate && (
+          <div className="fixed inset-0 z-[9600] flex items-center justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) setAdaptGate(false); }}>
+            <div className="my-4 w-full max-w-[520px] rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(255,213,79,0.5)' }}>
+              <div className="mb-2 text-[14px] font-bold text-white">Let EMIL Select Everything — read before enabling</div>
+              <p className="mb-2 text-[10px] leading-relaxed text-white/55">
+                With this authority EMIL independently selects the market, instrument, buy/sell direction, trading mode,
+                primary/confirmation/entry/exit timeframes across the full supported ladder, entry type, stop and target
+                methods, holding duration, trade management, hedge method and session — every choice still bounded by your
+                consent envelope (risk %, base lot, daily stops), the Shield rules and the independent Guardian, which EMIL
+                cannot silence. Position size is always computed from approved risk; a mode or timeframe change never
+                increases it.
+              </p>
+              <p className="mb-3 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
+                {ADAPT_DISCLAIMER}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAdaptGate(false)} className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>Cancel</button>
+                <button
+                  onClick={() => {
+                    updateAdapt({ control: 'emil', consentAt: Date.now() }, 'CONSENT recorded — authority → LET EMIL SELECT EVERYTHING. Full ladder timeframes and all modes enabled inside the risk envelope; Guardian and Shield remain independent and final.');
+                    setAdaptGate(false);
+                  }}
+                  className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110"
+                  style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)', boxShadow: '0 0 14px rgba(255,213,79,0.5)' }}>
+                  I ACCEPT — record consent
                 </button>
               </div>
             </div>
