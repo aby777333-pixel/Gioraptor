@@ -281,6 +281,7 @@ export default function ChartSourceSwitcher({
     return () => registerOhlcvBuilder(null);
   }, [ohlcvBuilder]);
 
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -334,6 +335,37 @@ export default function ChartSourceSwitcher({
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 3000);
   }, []);
+
+  // Global decoupling alarm: watch every hedge group's live correlation even
+  // while the Hedge panel is closed. Weakened/reversed relationships toast
+  // once per group per 30 min (throttle in localStorage).
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const { loadHedgeGroups, correlationRead } = await import('@/lib/trading/hedge-engine');
+        const groups = loadHedgeGroups();
+        if (!groups.length || !ohlcvRef.current) return;
+        for (const g of groups) {
+          const throttleKey = `raptor_hedge_alarm_${g.id}`;
+          const last = Number(localStorage.getItem(throttleKey) ?? 0);
+          if (Date.now() - last < 30 * 60_000) continue;
+          const corrNow = correlationRead(ohlcvRef.current, g.primarySymbol, g.hedgeSymbol).avg;
+          if (corrNow == null) continue;
+          let msg: string | null = null;
+          if (Math.sign(corrNow) !== Math.sign(g.corrAtEntry) && Math.abs(g.corrAtEntry) > 0.3) {
+            msg = `⚠ HEDGE ALARM: "${g.name}" correlation has REVERSED (${g.corrAtEntry.toFixed(2)} → ${corrNow.toFixed(2)}) — the hedge may now ADD risk. Review it in ⇄ HEDGE.`;
+          } else if (Math.abs(corrNow) < Math.abs(g.corrAtEntry) - 0.25) {
+            msg = `⚠ Hedge "${g.name}": correlation weakening (${g.corrAtEntry.toFixed(2)} → ${corrNow.toFixed(2)}) — protection is degrading; consider reducing.`;
+          }
+          if (msg) {
+            localStorage.setItem(throttleKey, String(Date.now()));
+            showEAToast(msg);
+          }
+        }
+      } catch { /* never let the alarm break the terminal */ }
+    }, 90_000);
+    return () => clearInterval(id);
+  }, [showEAToast]);
 
   // Close the QuickTrade panel on outside click.
   useEffect(() => {

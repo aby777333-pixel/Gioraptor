@@ -25,7 +25,8 @@ import { symbolCurrencies } from '@/lib/trading/protection';
 import { getCalendar, upcomingHighImpact, fmtEta, type NewsEvent } from '@/lib/trading/news-guard';
 import {
   findHedges, currencyExposureMap, loadHedgeGroups, saveHedgeGroups, correlationRead,
-  type HedgeCandidate, type HedgeInputs, type HedgeGroup,
+  stressTest, leadLag, spreadZ, weekendGap, correlationMatrix,
+  type HedgeCandidate, type HedgeInputs, type HedgeGroup, type StressResult,
 } from '@/lib/trading/hedge-engine';
 
 const MINT = '#00E5A0';
@@ -45,6 +46,8 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
   const [groups, setGroups] = useState<HedgeGroup[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [matrix, setMatrix] = useState<{ symbols: string[]; cells: (number | null)[][] } | null>(null);
+  const [stress, setStress] = useState<StressResult | null>(null);
   const builderRef = useRef(ohlcvBuilder);
   builderRef.current = ohlcvBuilder;
 
@@ -86,6 +89,14 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
   }, [calendar]);
 
   const exposure = useMemo(() => (specs ? currencyExposureMap(positions, specs) : []), [positions, specs]);
+
+  // Stress Lab runs automatically when a hedge preview opens.
+  useEffect(() => {
+    const builder = builderRef.current;
+    if (!preview || !builder || !specs) { setStress(null); return; }
+    setStress(stressTest(builder, inputs, preview, specs));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
 
   // ── Execute the hedge leg (trader-confirmed; Shield rules apply) ──
   const executeHedge = useCallback(async (c: HedgeCandidate) => {
@@ -279,6 +290,25 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
                   ))}
                   {c.sharedCurrencies.length > 0 && <span>· shares {c.sharedCurrencies.join('/')}</span>}
                 </div>
+                {(() => {
+                  const builder = builderRef.current;
+                  if (!builder) return null;
+                  const ll = leadLag(builder, primary, c.symbol);
+                  const z = spreadZ(builder, primary, c.symbol);
+                  return (
+                    <div className="mt-1 flex flex-wrap gap-3 text-[9px] text-white/40">
+                      {ll && ll.shift !== 0 && (
+                        <span>⏩ {ll.shift > 0 ? primary : c.symbol} tends to lead by ~{Math.abs(ll.shift)} H1 bar(s) (shifted corr {ll.corr.toFixed(2)} vs {ll.syncCorr.toFixed(2)} in sync)</span>
+                      )}
+                      {ll && ll.shift === 0 && <span>⏩ no lead–lag edge — the pair moves in sync</span>}
+                      {z != null && (
+                        <span style={{ color: Math.abs(z) > 2 ? '#FFB300' : undefined }}>
+                          📐 spread z-score {z.toFixed(1)}σ{Math.abs(z) > 2 ? ' — unusually stretched apart (can revert OR keep stretching)' : ''}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 {news && (
                   <div className="mt-1.5 flex items-center gap-1.5 text-[10px]" style={{ color: '#FFB300' }}>
                     <AlertTriangle size={11} /> {news.currency} “{news.title}” in {fmtEta(news.timeMs)} — the relationship can destabilise through news.
@@ -287,6 +317,52 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
               </div>
             );
           })}
+
+          {/* ── Correlation matrix (on demand — 20×20 live H1 grid) ── */}
+          <div className="mb-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-white/50">Live correlation matrix (H1)</div>
+              <button
+                onClick={() => { const b = builderRef.current; if (b) setMatrix(correlationMatrix(b, universe)); }}
+                className="rounded px-2.5 py-1 text-[9px] font-bold transition-all hover:brightness-125"
+                style={{ backgroundColor: 'rgba(0,180,216,0.12)', color: '#00B4D8', border: '1px solid rgba(0,180,216,0.35)' }}>
+                {matrix ? 'Recompute' : 'Compute matrix'}
+              </button>
+            </div>
+            {matrix && (
+              <div className="mt-2 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+                <table className="border-collapse font-mono text-[8px]">
+                  <thead>
+                    <tr>
+                      <th />
+                      {matrix.symbols.map((s) => <th key={s} className="px-0.5 pb-1 text-white/40" style={{ writingMode: 'vertical-rl' }}>{s}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matrix.symbols.map((row, i) => (
+                      <tr key={row}>
+                        <td className="pr-1 text-white/40">{row}</td>
+                        {matrix.symbols.map((col, j) => {
+                          const v = matrix.cells[i][j];
+                          const bg = v == null ? 'rgba(255,255,255,0.03)'
+                            : v >= 0 ? `rgba(0,194,122,${Math.min(0.85, Math.abs(v)) * 0.8})`
+                            : `rgba(255,82,82,${Math.min(0.85, Math.abs(v)) * 0.8})`;
+                          return (
+                            <td key={col} title={`${row} vs ${col}: ${v != null ? v.toFixed(2) : 'insufficient data'}`}
+                              className="h-4 w-6 cursor-default text-center"
+                              style={{ backgroundColor: bg, color: i === j ? 'transparent' : 'rgba(255,255,255,0.75)' }}>
+                              {i === j ? '' : v != null ? Math.round(v * 100) / 100 === 0 ? '0' : (v).toFixed(1) : '·'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-1 text-[9px] text-white/30">Green = positive, red = negative, intensity = strength. Live H1 returns — the grid changes as the market does.</p>
+              </div>
+            )}
+          </div>
 
           {/* ── Currency exposure map ── */}
           {exposure.length > 0 && (
@@ -382,6 +458,35 @@ export default function HedgePanel({ ohlcvBuilder, onClose }: { ohlcvBuilder: OH
               {(() => { const n = newsFor([primary, preview.symbol]); return n ? (
                 <p className="mb-2 text-[10px]" style={{ color: '#FFB300' }}>⚠ {n.currency} “{n.title}” in {fmtEta(n.timeMs)} — relationships often destabilise through news.</p>
               ) : null; })()}
+              {/* Stress Lab — real-history replay of this exact hedge */}
+              {stress && (
+                <div className="mb-2 rounded border p-2.5" style={{ borderColor: 'rgba(0,180,216,0.3)', backgroundColor: 'rgba(0,180,216,0.05)' }}>
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: '#00B4D8' }}>
+                    Stress Lab — last {stress.days} days replayed (history, not a forecast)
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+                    <Row k="Unhedged P&L" v={`${stress.unhedgedFinal >= 0 ? '+' : ''}$${stress.unhedgedFinal.toFixed(0)}`} />
+                    <Row k="Hedged P&L" v={`${stress.hedgedFinal >= 0 ? '+' : ''}$${stress.hedgedFinal.toFixed(0)}`} />
+                    <Row k="Worst drawdown (unhedged)" v={`$${Math.abs(stress.ddUnhedged).toFixed(0)}`} color="#FF5252" />
+                    <Row k="Worst drawdown (hedged)" v={`$${Math.abs(stress.ddHedged).toFixed(0)}`} color={Math.abs(stress.ddHedged) < Math.abs(stress.ddUnhedged) ? MINT : '#FF5252'} />
+                    <Row k="Hourly volatility (unhedged)" v={`$${stress.volUnhedged.toFixed(1)}`} />
+                    <Row k="Hourly volatility (hedged)" v={`$${stress.volHedged.toFixed(1)}`} />
+                  </div>
+                  <p className="mt-1 text-[9px] text-white/45">
+                    The hedge reduced 24h drawdowns in <b>{stress.helpedPct.toFixed(0)}%</b> of {stress.windows} rolling windows
+                    {stress.helpedPct < 50 ? ' — in this sample it hurt more often than it helped. Take that seriously.' : ' — and increased loss in the rest. Both outcomes are normal for hedges.'}
+                  </p>
+                </div>
+              )}
+              {(() => {
+                const builder = builderRef.current;
+                const g = builder ? weekendGap(builder, primary) : null;
+                return g ? (
+                  <p className="mb-2 text-[9px] text-white/40">
+                    🌙 Weekend gaps on {primary} in this data: median {g.medianPct.toFixed(2)}%, worst {g.worstPct.toFixed(2)}% across {g.n} weekend(s) — relevant if you hold this hedge over a weekend.
+                  </p>
+                ) : null;
+              })()}
               <p className="mb-3 text-[9px] text-white/35">
                 Exit plan: remove the hedge when the primary hits its stop/target, the correlation drops or reverses, or the
                 protection no longer justifies its cost. Shield rules apply to this order like any other. Estimates, not guarantees.

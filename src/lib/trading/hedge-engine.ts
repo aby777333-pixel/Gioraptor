@@ -263,6 +263,182 @@ export function currencyExposureMap(
     .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
 }
 
+// ── Hedge Stress Lab (§16-lite): historical simulation ──────────
+// Replays REAL H1 closes: how would (primary alone) vs (primary + this
+// hedge) have behaved? Honest by construction — it is history, not a
+// forecast, and the report says so.
+
+export interface StressResult {
+  days: number;
+  unhedgedFinal: number;   // $ P&L of the primary alone over the window
+  hedgedFinal: number;     // $ P&L of primary + hedge legs
+  ddUnhedged: number;      // worst peak-to-trough drawdown, $
+  ddHedged: number;
+  volUnhedged: number;     // std of hourly P&L changes, $
+  volHedged: number;
+  helpedPct: number;       // % of rolling 24h windows where the hedge cut the drawdown
+  windows: number;
+}
+
+export function stressTest(
+  builder: OHLCVBuilder,
+  inputs: HedgeInputs,
+  c: HedgeCandidate,
+  specs: Record<string, InstrumentSpec>,
+): StressResult | null {
+  const specP = specs[inputs.primary]; const specH = specs[c.symbol];
+  if (!specP || !specH) return null;
+  const A = builder.getAllBars(inputs.primary, '60');
+  const B = builder.getAllBars(c.symbol, '60');
+  const mapB = new Map<number, number>();
+  for (const b of B) mapB.set(b.time, b.close);
+  const closesA: number[] = []; const closesB: number[] = [];
+  for (const bar of A) {
+    const cb = mapB.get(bar.time);
+    if (cb != null) { closesA.push(bar.close); closesB.push(cb); }
+  }
+  const n = Math.min(closesA.length, 720); // up to ~30 trading days of H1
+  if (n < 48) return null;
+  const a = closesA.slice(-n); const b = closesB.slice(-n);
+  const dirP = inputs.direction === 'BUY' ? 1 : -1;
+  const dirH = c.hedgeDirection === 'BUY' ? 1 : -1;
+  const vpuP = valuePerUnitPerLot(specP) * inputs.lots;
+  const vpuH = valuePerUnitPerLot(specH) * c.suggestedLots;
+
+  const un: number[] = []; const he: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const pnlP = (a[i] - a[0]) * dirP * vpuP;
+    const pnlH = (b[i] - b[0]) * dirH * vpuH;
+    un.push(pnlP); he.push(pnlP + pnlH);
+  }
+  const dd = (s: number[]) => { let peak = -Infinity, worst = 0; for (const v of s) { peak = Math.max(peak, v); worst = Math.min(worst, v - peak); } return worst; };
+  const vol = (s: number[]) => {
+    const d: number[] = []; for (let i = 1; i < s.length; i++) d.push(s[i] - s[i - 1]);
+    const m = d.reduce((x, y) => x + y, 0) / d.length;
+    return Math.sqrt(d.reduce((x, y) => x + (y - m) ** 2, 0) / d.length);
+  };
+  // Rolling 24h windows: did the hedge reduce the window's drawdown?
+  let helped = 0; let windows = 0;
+  for (let s = 0; s + 24 <= n; s += 24) {
+    const wu = un.slice(s, s + 24).map((v) => v - un[s]);
+    const wh = he.slice(s, s + 24).map((v) => v - he[s]);
+    windows++;
+    if (Math.abs(dd(wh)) < Math.abs(dd(wu))) helped++;
+  }
+  return {
+    days: Math.round(n / 24),
+    unhedgedFinal: un[n - 1], hedgedFinal: he[n - 1],
+    ddUnhedged: dd(un), ddHedged: dd(he),
+    volUnhedged: vol(un), volHedged: vol(he),
+    helpedPct: windows ? (helped / windows) * 100 : 0,
+    windows,
+  };
+}
+
+// ── Lead–lag detector ───────────────────────────────────────────
+// Cross-correlation at ±3 H1-bar shifts: does one instrument tend to move
+// first? Informational only — lead–lag relationships drift constantly.
+
+export function leadLag(builder: OHLCVBuilder, primary: string, candidate: string):
+  { shift: number; corr: number; syncCorr: number } | null {
+  const [ra, rb] = (() => {
+    const A = builder.getAllBars(primary, '60'); const B = builder.getAllBars(candidate, '60');
+    const mapB = new Map<number, number>();
+    for (const bar of B) mapB.set(bar.time, bar.close);
+    const xa: number[] = []; const xb: number[] = [];
+    let pa: number | null = null; let pb: number | null = null;
+    for (const bar of A) {
+      const cb = mapB.get(bar.time);
+      if (cb == null) continue;
+      if (pa != null && pb != null && pa > 0 && pb > 0) { xa.push(Math.log(bar.close / pa)); xb.push(Math.log(cb / pb)); }
+      pa = bar.close; pb = cb;
+    }
+    return [xa.slice(-168), xb.slice(-168)];
+  })();
+  const sync = pearson(ra, rb);
+  if (sync == null) return null;
+  let best = { shift: 0, corr: sync };
+  for (const shift of [-3, -2, -1, 1, 2, 3]) {
+    const x = shift > 0 ? ra.slice(0, -shift) : ra.slice(-shift);
+    const y = shift > 0 ? rb.slice(shift) : rb.slice(0, ra.length + shift);
+    const cc = pearson(x, y);
+    if (cc != null && Math.abs(cc) > Math.abs(best.corr) + 0.05) best = { shift, corr: cc };
+  }
+  return { ...best, syncCorr: sync };
+}
+
+// ── Spread divergence z-score (pseudo-cointegration read, §3) ───
+// Z-score of the log price ratio vs its rolling H1 mean. |z| > 2 = the two
+// instruments are unusually stretched apart — mean-reversion pressure, but
+// NEVER a certainty ("stretched" can always stretch further).
+
+export function spreadZ(builder: OHLCVBuilder, primary: string, candidate: string): number | null {
+  const A = builder.getAllBars(primary, '60'); const B = builder.getAllBars(candidate, '60');
+  const mapB = new Map<number, number>();
+  for (const b of B) mapB.set(b.time, b.close);
+  const spread: number[] = [];
+  for (const bar of A) {
+    const cb = mapB.get(bar.time);
+    if (cb != null && bar.close > 0 && cb > 0) spread.push(Math.log(bar.close) - Math.log(cb));
+  }
+  const s = spread.slice(-168);
+  if (s.length < 48) return null;
+  const m = s.reduce((a, b) => a + b, 0) / s.length;
+  const sd = Math.sqrt(s.reduce((a, b) => a + (b - m) ** 2, 0) / s.length);
+  if (!(sd > 0)) return null;
+  return (s[s.length - 1] - m) / sd;
+}
+
+// ── Weekend gap analyzer ────────────────────────────────────────
+// Median and worst open-vs-prior-close gap across weekends in the D1 data,
+// as a % of price — informs the Weekend Hedge decision with real history.
+
+export function weekendGap(builder: OHLCVBuilder, symbol: string):
+  { medianPct: number; worstPct: number; n: number } | null {
+  const bars = builder.getAllBars(symbol, '1D');
+  if (bars.length < 10) return null;
+  const gaps: number[] = [];
+  for (let i = 1; i < bars.length; i++) {
+    const dt = bars[i].time - bars[i - 1].time;
+    if (dt > 1.5 * 86_400 && bars[i - 1].close > 0) {
+      gaps.push(Math.abs(bars[i].open - bars[i - 1].close) / bars[i - 1].close * 100);
+    }
+  }
+  if (!gaps.length) return null;
+  const sorted = [...gaps].sort((a, b) => a - b);
+  return { medianPct: sorted[Math.floor(sorted.length / 2)], worstPct: sorted[sorted.length - 1], n: gaps.length };
+}
+
+// ── Correlation matrix (all pairs, H1) ──────────────────────────
+
+export function correlationMatrix(builder: OHLCVBuilder, symbols: string[]):
+  { symbols: string[]; cells: (number | null)[][] } {
+  const returns = symbols.map((s) => {
+    const bars = builder.getAllBars(s, '60');
+    const byTime = new Map<number, number>();
+    let prev: number | null = null;
+    for (const b of bars) {
+      if (prev != null && prev > 0) byTime.set(b.time, Math.log(b.close / prev));
+      prev = b.close;
+    }
+    return byTime;
+  });
+  const cells: (number | null)[][] = symbols.map(() => symbols.map(() => null));
+  for (let i = 0; i < symbols.length; i++) {
+    cells[i][i] = 1;
+    for (let j = i + 1; j < symbols.length; j++) {
+      const x: number[] = []; const y: number[] = [];
+      for (const [t, r] of returns[i]) {
+        const rj = returns[j].get(t);
+        if (rj != null) { x.push(r); y.push(rj); }
+      }
+      const c = pearson(x.slice(-168), y.slice(-168));
+      cells[i][j] = c; cells[j][i] = c;
+    }
+  }
+  return { symbols, cells };
+}
+
 // ── Hedge groups (combined position view, §11) ──────────────────
 
 export interface HedgeGroup {
