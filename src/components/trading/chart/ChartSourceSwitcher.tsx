@@ -35,6 +35,7 @@ import TimeframeBar from './TimeframeBar';
 import TemplatesMenu from './TemplatesMenu';
 import MarketsMenu from './MarketsMenu';
 import DomLadder from './DomLadder';
+import ProtectionMenu from './ProtectionMenu';
 import RaptorScriptMenu from './RaptorScriptMenu';
 import HeaderPortal from './HeaderPortal';
 import { headerBtnStyle, glowStyle } from './header-theme';
@@ -737,6 +738,9 @@ export default function ChartSourceSwitcher({
             <NotebookPen size={12} /> Journal
           </button>
         )}
+
+        {/* Shield — trader-protection rules (self-imposed, enforced at the order gate) */}
+        <ProtectionMenu onToast={showEAToast} />
 
         {/* DOM — click-to-trade price ladder (real order service, both charts) */}
         <DomLadder activeSymbol={activeSymbol} prices={prices} onToast={showEAToast} />

@@ -8,7 +8,7 @@ import type { CSSProperties } from 'react';
 
 export type HeaderHueKey =
   | 'source' | 'trade' | 'templates' | 'watchlist' | 'alerts' | 'markets'
-  | 'insights' | 'risk' | 'journal' | 'dom' | 'script' | 'eas' | 'tf';
+  | 'insights' | 'risk' | 'journal' | 'dom' | 'script' | 'eas' | 'tf' | 'protect';
 
 // hex = bright active color · rgb = same color as "r,g,b" for rgba() mixes
 const HUES: Record<HeaderHueKey, { hex: string; rgb: string }> = {
@@ -25,6 +25,7 @@ const HUES: Record<HeaderHueKey, { hex: string; rgb: string }> = {
   script:    { hex: '#5C8AFF', rgb: '92,138,255' },  // Raptor Script — indigo
   eas:       { hex: '#00C27A', rgb: '0,194,122' },   // EAs / Robots — green
   tf:        { hex: '#29ABE2', rgb: '41,171,226' },  // timeframe pills — brand blue
+  protect:   { hex: '#00E5A0', rgb: '0,229,160' },   // Shield / protection — mint
 };
 
 /** Style for a header trigger button. Dull tint at rest; bright glow when

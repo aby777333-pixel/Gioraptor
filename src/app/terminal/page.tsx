@@ -8,6 +8,7 @@ import PositionsPanel from '@/components/trading/positions/PositionsPanel';
 import AccountBar from '@/components/trading/account-summary/AccountBar';
 import RightPanel from '@/components/trading/RightPanel';
 import KeyboardShortcuts from '@/components/trading/KeyboardShortcuts';
+import TermsGateModal from '@/components/trading/TermsGateModal';
 import dynamic from 'next/dynamic';
 import { loadWorkspacePrefs, applyWorkspacePrefs } from '@/lib/insights/workspace';
 
@@ -278,6 +279,9 @@ export default function TerminalPage() {
       {showShortcuts && (
         <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />
       )}
+
+      {/* Platform terms & risk acknowledgement — blocks until accepted */}
+      <TermsGateModal />
     </div>
   );
 }

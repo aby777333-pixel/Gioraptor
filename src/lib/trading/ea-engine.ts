@@ -507,15 +507,27 @@ export class EARuntime {
       const sl = a > 0 ? (regime === 'BUY' ? fillPrice - slAtrMult * a : fillPrice + slAtrMult * a) : undefined;
       const tp = a > 0 ? (regime === 'BUY' ? fillPrice + tpAtrMult * a : fillPrice - tpAtrMult * a) : undefined;
 
-      const result = await orderService.placeMarketOrder({
-        accountId,
-        symbol: inst.symbol,
-        direction: regime,
-        size: lot,
-        sl, tp,
-        fillPrice,
-        comment: `EA:${inst.name}`,
-      }) as { success?: boolean; position_id?: string } | null;
+      let result: { success?: boolean; position_id?: string } | null = null;
+      try {
+        result = await orderService.placeMarketOrder({
+          accountId,
+          symbol: inst.symbol,
+          direction: regime,
+          size: lot,
+          sl, tp,
+          fillPrice,
+          comment: `EA:${inst.name}`,
+        }) as { success?: boolean; position_id?: string } | null;
+      } catch (err) {
+        // Order rejected (Shield protection rule or broker-side control) —
+        // surface it on the EA chip instead of an unhandled rejection.
+        this.deps.onStats(inst.key, {
+          trades: inst.trades,
+          direction: inst.direction,
+          lastAction: `Order blocked: ${err instanceof Error ? err.message.slice(0, 120) : 'rejected'}`,
+        });
+        return;
+      }
 
       if (result?.success && result.position_id) {
         inst.positionId = result.position_id;

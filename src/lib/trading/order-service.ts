@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
+import { protectionCheck, invalidateDayStats } from '@/lib/trading/protection';
 
 export const orderService = {
   async placeMarketOrder(params: {
@@ -11,6 +12,12 @@ export const orderService = {
     fillPrice: number;
     comment?: string;
   }) {
+    // Trader Protection gate (Shield menu rules) — throws with a
+    // plain-language reason when a self-imposed rule blocks the order.
+    await protectionCheck({
+      accountId: params.accountId, symbol: params.symbol, direction: params.direction,
+      size: params.size, sl: params.sl ?? null, entryPrice: params.fillPrice,
+    });
     const supabase = createClient();
     const { data, error } = await supabase.rpc('place_market_order', {
       p_account_id: params.accountId,
@@ -23,6 +30,7 @@ export const orderService = {
       p_comment: params.comment ?? null,
     });
     if (error) throw error;
+    invalidateDayStats();
     return data;
   },
 
@@ -33,6 +41,7 @@ export const orderService = {
       p_close_price: closePrice,
     });
     if (error) throw error;
+    invalidateDayStats();
     return data;
   },
 
@@ -58,6 +67,10 @@ export const orderService = {
     tp?: number;
     comment?: string;
   }) {
+    await protectionCheck({
+      accountId: params.accountId, symbol: params.symbol, direction: params.direction,
+      size: params.size, sl: params.sl ?? null, entryPrice: params.price,
+    });
     const supabase = createClient();
     const { data, error } = await supabase.rpc('place_pending_order', {
       p_account_id: params.accountId,
