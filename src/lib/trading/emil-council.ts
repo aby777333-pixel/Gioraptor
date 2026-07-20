@@ -198,6 +198,10 @@ export interface EmilAutoParams {
   profitOnly: boolean;      // capital never risked once armed: trade from profits only
   protectedCapital: number; // $ balance line EMIL must never draw below with new risk
   tradableProfitPct: number;// % of the profit cushion available to risk per trade
+  // Trade Mode Engine (§modes): who controls the mode, and which are allowed.
+  setupChoice: 'mine' | 'emil' | 'hybrid';   // Use My Parameters / Let EMIL Handle All / Guide EMIL
+  modeControl: 'trader' | 'shared' | 'emil'; // trader picks · EMIL picks from approved list · EMIL fully managed
+  enabledModes: string[];                    // allowed style labels (matched to ScanTF.style)
 }
 
 export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
@@ -216,6 +220,9 @@ export const DEFAULT_EMIL_AUTOPARAMS: EmilAutoParams = {
   profitOnly: false,
   protectedCapital: 0,
   tradableProfitPct: 20,
+  setupChoice: 'emil',
+  modeControl: 'emil',
+  enabledModes: SCAN_TFS.map((t) => t.style),
 };
 
 const EMIL_PARAMS_KEY = 'raptor_emil_autoparams_v1';

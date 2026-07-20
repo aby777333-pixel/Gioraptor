@@ -26,6 +26,8 @@ import { upcomingHighImpact, type NewsEvent } from '@/lib/trading/news-guard';
 export interface ScanTF { label: string; res: Resolution; style: string; holding: string }
 
 export const SCAN_TFS: ScanTF[] = [
+  { label: 'M1',  res: '1',   style: 'Scalping',      holding: 'minutes' },
+  { label: 'M5',  res: '5',   style: 'Fast Intraday', holding: 'minutes to an hour' },
   { label: 'M15', res: '15',  style: 'Intraday',   holding: 'minutes to one session' },
   { label: 'H1',  res: '60',  style: 'Intraday / Swing', holding: 'hours to a day' },
   { label: 'H4',  res: '240', style: 'Swing',      holding: 'a day to several weeks' },

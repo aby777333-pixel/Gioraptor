@@ -26,6 +26,7 @@ import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
 import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, type RiskMood, type ForecastRead, type EventGuidance } from '@/lib/trading/emil-macro';
+import { SCAN_TFS } from '@/lib/trading/scanner-engine';
 import { classifyMarketState } from '@/lib/nexus/market-state';
 import { highImpactWithin, fmtEta } from '@/lib/trading/news-guard';
 
@@ -61,6 +62,10 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [emilStatus, setEmilStatus] = useState('Watching');
   const [riskState, setRiskState] = useState('Normal');
   const [macro, setMacro] = useState<{ mood: RiskMood; forecast: ForecastRead | null; events: EventGuidance[] } | null>(null);
+  const [modeBoard, setModeBoard] = useState<{ mode: string; conf: number }[]>([]);
+  const [currentMode, setCurrentMode] = useState('No-Trade');
+  const lastModeRef = useRef<string>('No-Trade');
+  const prevModeRef = useRef<string>('—');
   const [placing, setPlacing] = useState(false);
   const [logTick, setLogTick] = useState(0);
   const builderRef = useRef(ohlcvBuilder);
@@ -328,6 +333,8 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           const aligned = (c.stance === 'BULLISH LEAN' && opp.direction === 'BUY') || (c.stance === 'BEARISH LEAN' && opp.direction === 'SELL');
           if (!aligned) continue;
           if (p.profitOnly && (opp.maxLossEstimate == null || opp.maxLossEstimate > maxRiskAllowed)) continue; // slice of profits only
+          // Trade Mode controller: only allowed modes may trade (trader/shared control).
+          if (p.modeControl !== 'emil' && !p.enabledModes.includes(opp.style)) continue;
           // News buffer: no entries within 30 min of a red-flag event on the symbol.
           if (highImpactWithin(symbolCurrencies(symbol), calendar, 30).length) continue;
           // Uncertainty gate: EMIL refuses to enter markets he cannot read.
@@ -335,11 +342,47 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
           if (unc.level === 'HIGH') continue;
           candidates.push({ c, opp, adj: opp.score + emilLearnBonus(symbol, opp.tfLabel) - (unc.level === 'ELEVATED' ? 8 : 0) });
         }
+        // ── Mode Confidence board: every allowed mode competes, and No-Trade
+        // is a first-class contender that wins when nothing qualifies. ──
+        const byStyle = new Map<string, number>();
+        for (const cand of candidates) {
+          byStyle.set(cand.opp.style, Math.max(byStyle.get(cand.opp.style) ?? 0, cand.adj));
+        }
+        const board = SCAN_TFS
+          .filter((t) => p.modeControl === 'emil' || p.enabledModes.includes(t.style))
+          .map((t) => ({ mode: `${t.style} (${t.label})`, conf: Math.min(100, byStyle.get(t.style) ?? 0) }));
+        const topAdj = candidates.length ? Math.max(...candidates.map((x) => x.adj)) : 0;
+        board.push({ mode: 'No-Trade', conf: candidates.length ? Math.max(20, 95 - topAdj) : 95 });
+        board.sort((a, b) => b.conf - a.conf);
+        setModeBoard(board);
+
         if (candidates.length) {
           setEmilStatus('Trading');
-          candidates.sort((a, b) => b.adj - a.adj); // learned edge breaks the tie
-          const bestPick = candidates[0];
+          candidates.sort((a, b) => b.adj - a.adj);
+          // Conservative tie-break: among near-equal scores (±3), prefer the
+          // HIGHER timeframe — never the more aggressive mode.
+          const tfIdx = (s: string) => SCAN_TFS.findIndex((t) => t.label === s);
+          let bestPick = candidates[0];
+          for (const cand of candidates.slice(1)) {
+            if (bestPick.adj - cand.adj <= 3 && tfIdx(cand.opp.tfLabel) > tfIdx(bestPick.opp.tfLabel)) bestPick = cand;
+          }
+          const chosenMode = `${bestPick.opp.style} (${bestPick.opp.tfLabel})`;
+          if (lastModeRef.current !== chosenMode) {
+            emilLog('mode', `mode switch: ${lastModeRef.current} → ${chosenMode} — reason: highest-confidence qualified setup (${bestPick.opp.symbol}, score ${bestPick.opp.score}, council ${bestPick.c.confidence}%); conservative tie-break favours higher timeframes; never switched to chase losses.`);
+            prevModeRef.current = lastModeRef.current;
+            lastModeRef.current = chosenMode;
+            setLogTick((x) => x + 1);
+          }
+          setCurrentMode(chosenMode);
           await placeEmilOrder(bestPick.opp, `EMIL:AUTO:${bestPick.opp.tfLabel}`);
+        } else {
+          if (lastModeRef.current !== 'No-Trade') {
+            emilLog('mode', `mode switch: ${lastModeRef.current} → No-Trade — no setup clears the quality/uncertainty/news bars. EMIL is protecting capital; staying flat is a successful decision.`);
+            prevModeRef.current = lastModeRef.current;
+            lastModeRef.current = 'No-Trade';
+            setLogTick((x) => x + 1);
+          }
+          setCurrentMode('No-Trade');
         }
         setEmilStatus('Watching');
       } catch { /* never let the pilot crash the console */ }
@@ -513,6 +556,37 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 </div>
               )}
 
+              {/* ── Trade Mode board (autonomous pilot) ── */}
+              {mode === 'auto' && modeBoard.length === 0 && (
+                <div className="mt-3 rounded-lg border p-3 text-[10px] text-white/45" style={{ borderColor: 'rgba(206,147,216,0.25)' }}>
+                  🧭 Trade Mode board — pilot armed, first cycle pending{!activeAccountId ? ' · select a trading account for EMIL to act' : ''}. Modes compete each cycle; No-Trade wins when nothing qualifies.
+                </div>
+              )}
+              {mode === 'auto' && modeBoard.length > 0 && (
+                <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(206,147,216,0.3)' }}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: '#CE93D8' }}>Trade Mode board</span>
+                    <span className="rounded px-2 py-0.5 font-mono text-[10px] font-bold" style={{ backgroundColor: 'rgba(206,147,216,0.15)', color: '#CE93D8', border: '1px solid rgba(206,147,216,0.5)' }}>
+                      Current: {currentMode}
+                    </span>
+                    <span className="text-[9px] text-white/35">previous: {prevModeRef.current}</span>
+                  </div>
+                  {modeBoard.map((m) => (
+                    <div key={m.mode} className="mb-0.5 flex items-center gap-2 text-[10px]">
+                      <span className="w-40 shrink-0" style={{ color: m.mode === 'No-Trade' ? '#FFB300' : 'rgba(255,255,255,0.6)' }}>{m.mode}</span>
+                      <div className="h-2 flex-1 rounded bg-white/[0.05]">
+                        <div className="h-full rounded" style={{ width: `${m.conf}%`, backgroundColor: m.mode === currentMode ? 'rgba(206,147,216,0.8)' : m.mode === 'No-Trade' ? 'rgba(255,179,0,0.6)' : 'rgba(255,255,255,0.2)' }} />
+                      </div>
+                      <span className="w-9 shrink-0 text-right font-mono text-white/55">{Math.round(m.conf)}</span>
+                    </div>
+                  ))}
+                  <p className="mt-1 text-[8px] text-white/30">
+                    Modes compete on live setup quality; No-Trade wins whenever risk outweighs opportunity. Ties resolve to the
+                    more conservative (higher) timeframe. EMIL never switches modes to chase a loss.
+                  </p>
+                </div>
+              )}
+
               {/* ── Global Macro Intelligence (real data only) ── */}
               {macro && (
                 <div className="mt-3 grid gap-2 lg:grid-cols-2">
@@ -670,6 +744,56 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 one per symbol) and exit (break-even at +1R, council-flip close, daily profit lock, daily loss stop).
                 Outside it, EMIL refuses and tells you why. Every order passes your Shield rules.
               </p>
+              {/* Setup choice: A) my parameters · B) EMIL managed · C) hybrid */}
+              <div className="mb-2 grid grid-cols-3 gap-1.5">
+                {([
+                  ['mine', 'Use My Parameters', 'You define instruments and modes; EMIL optimises only inside your boundaries.'],
+                  ['emil', 'Let EMIL Handle All', 'EMIL selects modes, instruments and timeframes — the risk envelope below still binds him.'],
+                  ['hybrid', 'Guide EMIL', 'You set the limits and the approved mode list; EMIL chooses among them.'],
+                ] as const).map(([v, label, desc]) => (
+                  <button key={v}
+                    onClick={() => setAutoParams((p) => ({
+                      ...p, setupChoice: v,
+                      modeControl: v === 'emil' ? 'emil' : v === 'mine' ? 'trader' : 'shared',
+                      selectAll: v === 'emil' ? true : p.selectAll,
+                    }))}
+                    className="rounded border px-2 py-1.5 text-left transition-all hover:brightness-125"
+                    style={{
+                      borderColor: autoParams.setupChoice === v ? 'rgba(206,147,216,0.7)' : 'rgba(255,255,255,0.1)',
+                      backgroundColor: autoParams.setupChoice === v ? 'rgba(206,147,216,0.15)' : 'rgba(255,255,255,0.03)',
+                    }}
+                    title={desc}>
+                    <div className="text-[10px] font-bold" style={{ color: autoParams.setupChoice === v ? '#CE93D8' : 'rgba(255,255,255,0.6)' }}>{label}</div>
+                    <div className="text-[8px] leading-snug text-white/35">{desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Trade modes: allowed styles (trader/shared control) */}
+              {autoParams.modeControl !== 'emil' && (
+                <div className="mb-2">
+                  <div className="mb-1 text-[9px] uppercase tracking-wide text-white/40">
+                    Approved trade modes {autoParams.modeControl === 'trader' ? '(EMIL trades only these)' : '(EMIL picks the best among these)'}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {SCAN_TFS.map((t) => (
+                      <button key={t.style}
+                        onClick={() => setAutoParams((p) => ({ ...p, enabledModes: p.enabledModes.includes(t.style) ? p.enabledModes.filter((x) => x !== t.style) : [...p.enabledModes, t.style] }))}
+                        className="rounded px-1.5 py-0.5 text-[9px] font-bold transition-all"
+                        style={{
+                          backgroundColor: autoParams.enabledModes.includes(t.style) ? 'rgba(206,147,216,0.25)' : 'rgba(255,255,255,0.04)',
+                          color: autoParams.enabledModes.includes(t.style) ? '#CE93D8' : 'rgba(255,255,255,0.35)',
+                          border: `1px solid ${autoParams.enabledModes.includes(t.style) ? 'rgba(206,147,216,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                        }}
+                        title={`${t.label} · holding ${t.holding}`}>
+                        {t.style} ({t.label})
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-0.5 text-[8px] text-white/30">Martingale, grid escalation and averaging-down do not exist as modes and stay disabled by design.</p>
+                </div>
+              )}
+
               <div className="mb-2">
                 <label className="mb-1.5 flex items-center gap-2 text-[10px] font-bold" style={{ color: '#CE93D8' }}>
                   <input type="checkbox" checked={autoParams.selectAll}
@@ -765,14 +889,15 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                   onClick={() => {
                     if (gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL') return;
                     if (!autoParams.selectAll && !autoParams.symbols.length) return;
+                    if (autoParams.modeControl !== 'emil' && !autoParams.enabledModes.length) return;
                     saveEmilAutoParams(autoParams);
                     recordEmilAutoConsent(gateTyped.trim(), autoParams);
                     setGateOpen(false); setGateTyped('');
                     setMode('auto');
-                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.selectAll ? 'EMIL selects instruments (full universe)' : autoParams.symbols.join(', ')} · base lot ${autoParams.baseLot} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}${autoParams.autoHedge ? ' · auto-hedge ON' : ''}${autoParams.smallSteady ? ' · Small&Steady' : ''}${autoParams.profitOnly ? ` · PROFIT-ONLY (capital $${autoParams.protectedCapital} protected, ${autoParams.tradableProfitPct}% of cushion/trade)` : ''} · learning always on`);
+                    emilLog('mode', `AUTONOMOUS PILOT armed — ${autoParams.selectAll ? 'EMIL selects instruments (full universe)' : autoParams.symbols.join(', ')} · base lot ${autoParams.baseLot} · risk ${autoParams.riskPct}%/trade · max ${autoParams.maxPerDay}/day · stop after ${autoParams.stopAfterLosses} losses · loss stop $${autoParams.dailyLossStop}${autoParams.dailyProfitLock ? ` · profit lock $${autoParams.dailyProfitLock}` : ''}${autoParams.autoHedge ? ' · auto-hedge ON' : ''}${autoParams.smallSteady ? ' · Small&Steady' : ''}${autoParams.profitOnly ? ` · PROFIT-ONLY (capital $${autoParams.protectedCapital} protected, ${autoParams.tradableProfitPct}% of cushion/trade)` : ''} · setup ${autoParams.setupChoice === 'emil' ? 'Let EMIL Handle All' : autoParams.setupChoice === 'mine' ? 'My Parameters' : 'Guide EMIL'} · modes ${autoParams.modeControl === 'emil' ? 'EMIL managed (all)' : autoParams.enabledModes.join('/')} · learning always on`);
                     setLogTick((t) => t + 1);
                   }}
-                  disabled={gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL' || (!autoParams.selectAll && !autoParams.symbols.length)}
+                  disabled={gateTyped.trim().toUpperCase() !== 'I AUTHORIZE EMIL' || (!autoParams.selectAll && !autoParams.symbols.length) || (autoParams.modeControl !== 'emil' && !autoParams.enabledModes.length)}
                   className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
                   style={{ background: 'linear-gradient(180deg,#CE93D8,#AB47BC)', boxShadow: '0 0 14px rgba(171,71,188,0.5)' }}>
                   ARM AUTONOMOUS PILOT
