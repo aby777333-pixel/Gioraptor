@@ -262,6 +262,7 @@ export default function AutoHedgeSection({ ohlcvBuilder, prices, specs, calendar
             {num('Minutes in loss first', 'activationMinutes', 5)}
             {num('Min |correlation|', 'minCorrelation', 0.05)}
             {num('Max hedge instruments (1-3)', 'maxHedgeInstruments')}
+            {num('Max hedge lots per leg (default 0.05)', 'maxHedgeLots', 0.01)}
             {num('Basket target $ (bare-minimum mode)', 'basketTargetUsd', 0.5)}
             {num('Max basket loss $', 'maxBasketLossUsd', 1)}
             {num('Engine daily loss stop $', 'dailyLossLimitUsd', 1)}

@@ -25,7 +25,10 @@ import { symbolCurrencies } from '@/lib/trading/protection';
 
 export interface ScanAutoParams {
   mode: 'small-profit' | 'conservative' | 'balanced' | 'custom';
-  riskPct: number;             // % balance risked per trade vs the stop
+  lotMode: 'fixed' | 'risk';   // fixed = always fixedLot (default); risk = % sizing
+  fixedLot: number;            // default 0.01 — the starting lot for every trade
+  maxLotPerTrade: number;      // hard cap regardless of sizing mode
+  riskPct: number;             // % balance risked per trade vs the stop (risk mode)
   minScore: number;            // opportunity score floor
   minRR: number;               // minimum risk:reward (zone.riskReward1)
   maxPerDay: number;           // engine trades per day
@@ -48,6 +51,9 @@ export const SCAN_MODES: Record<Exclude<ScanAutoParams['mode'], 'custom'>, Parti
 
 export const DEFAULT_SCAN_AUTO_PARAMS: ScanAutoParams = {
   mode: 'conservative',
+  lotMode: 'fixed',
+  fixedLot: 0.01,
+  maxLotPerTrade: 0.05,
   riskPct: 0.75,
   minScore: 70,
   minRR: 1.5,
@@ -227,19 +233,17 @@ export function evaluateScanAuto(ctx: {
   const stopDist = Math.abs(entry - sl);
   if (!(entry > 0) || !(stopDist > 0)) return { kind: 'none', note: `${best.symbol}: no valid stop distance — refused (no stop, no trade)` };
 
-  // Rough $ per price-unit per lot via expectedPips relationship is indirect;
-  // use a conservative 0.01 base and scale by risk budget when balance known.
-  let lots = 0.01;
-  if (ctx.balance > 0) {
-    // value per unit per lot approximation from the opportunity's own numbers:
-    // expectedPips ↔ zone targets are in price units; use $10 per pip per lot FX default.
+  // Sizing: FIXED lot is the default (0.01 — small by design); risk-% mode is
+  // opt-in. Either way the per-trade lot cap is a hard ceiling.
+  let lots = Math.max(0.01, p.fixedLot);
+  if (p.lotMode === 'risk' && ctx.balance > 0) {
     const pipSize = best.symbol.includes('JPY') ? 0.01 : best.assetClass === 'forex' ? 0.0001 : stopDist / 50;
     const stopPips = stopDist / pipSize;
     const riskMoney = ctx.balance * p.riskPct / 100;
     const perPipPerLot = 10; // conservative FX approximation on this platform
     lots = Math.max(0.01, Math.floor((riskMoney / Math.max(1, stopPips * perPipPerLot)) * 100) / 100);
-    lots = Math.min(lots, 0.5);
   }
+  lots = Math.min(lots, Math.max(0.01, p.maxLotPerTrade));
 
   // Account-level Risk Governor — the final authority.
   const verdict = governorCheck({

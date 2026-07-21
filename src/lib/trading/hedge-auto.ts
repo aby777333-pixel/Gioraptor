@@ -46,6 +46,7 @@ export interface HedgeAutoParams {
   maxLevels: number;             // recovery stages that may ADD risk (1-2)
   hedgePct: number;              // exposure fraction to offset (0.25-1)
   maxLotMult: number;            // hedge lots cap = primary lots × this
+  maxHedgeLots: number;          // absolute hedge-leg lot cap (default 0.05 — start small)
   // Exits — Bare-Minimum Profit Mode is the default
   basketTargetUsd: number;       // close the basket at this net gain
   basketMaxTargetUsd: number;    // never hold hoping beyond this
@@ -73,6 +74,7 @@ export const DEFAULT_HEDGE_AUTO_PARAMS: HedgeAutoParams = {
   maxLevels: 1,
   hedgePct: 0.5,
   maxLotMult: 2.5,
+  maxHedgeLots: 0.05,
   basketTargetUsd: 2,
   basketMaxTargetUsd: 7,
   maxBasketLossUsd: 10,
@@ -354,9 +356,13 @@ export function evaluateHedgeAuto(ctx: {
       hedgeAutoLog('blocked', `${best.symbol}: entry cost $${best.spreadCost.toFixed(2)} eats the expected exposure reduction`); continue;
     }
 
-    // Lot cap: never beyond primary lots × maxLotMult, never blind doubling.
-    const lots = Math.min(best.suggestedLots, Math.round(primary.size * p.maxLotMult * 100) / 100);
-    if (lots < 0.01) continue;
+    // Lot caps: never beyond primary × multiplier AND never beyond the
+    // absolute hedge-lot cap (start small — 0.01 upward, never doubling).
+    const lots = Math.max(0.01, Math.min(
+      best.suggestedLots,
+      Math.round(primary.size * p.maxLotMult * 100) / 100,
+      Math.max(0.01, p.maxHedgeLots),
+    ));
 
     // Account-level Risk Governor — the final authority.
     const verdict = governorCheck({

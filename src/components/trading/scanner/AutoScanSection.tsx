@@ -197,7 +197,24 @@ export default function AutoScanSection({ ohlcvBuilder, prices, calendar, accoun
               ))}
             </div>
             <div className="mt-1.5 space-y-1">
-              {num('Risk % per trade', 'riskPct', 0.25)}
+              <div className="flex items-center justify-between gap-2 text-[9px] text-white/55">
+                <span>Lot sizing</span>
+                <span className="flex gap-1">
+                  {(['fixed', 'risk'] as const).map((m) => (
+                    <button key={m} onClick={() => patch({ lotMode: m })}
+                      className="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase transition-all"
+                      style={{
+                        backgroundColor: params.lotMode === m ? 'rgba(41,171,226,0.15)' : 'rgba(255,255,255,0.04)',
+                        color: params.lotMode === m ? BLUE : 'rgba(255,255,255,0.4)',
+                        border: `1px solid ${params.lotMode === m ? 'rgba(41,171,226,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                      }}>
+                      {m === 'fixed' ? 'Fixed lot' : 'Risk %'}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              {params.lotMode === 'fixed' ? num('Fixed lot (default 0.01)', 'fixedLot', 0.01) : num('Risk % per trade', 'riskPct', 0.25)}
+              {num('Max lot per trade (hard cap)', 'maxLotPerTrade', 0.01)}
               {num('Min opportunity score', 'minScore', 5)}
               {num('Min risk:reward', 'minRR', 0.1)}
             </div>
@@ -264,7 +281,7 @@ export default function AutoScanSection({ ohlcvBuilder, prices, calendar, accoun
               {SCAN_AUTO_DISCLAIMER}
             </p>
             <div className="mb-2 rounded border p-2 text-[9px] text-white/55" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-              You are confirming these limits: risk <b className="text-white">{params.riskPct}%</b> per trade · max <b className="text-white">{params.maxPerDay}</b>/day ·
+              You are confirming these limits: lots <b className="text-white">{params.lotMode === 'fixed' ? `fixed ${params.fixedLot}` : `${params.riskPct}% risk`}</b> (cap {params.maxLotPerTrade}) · max <b className="text-white">{params.maxPerDay}</b>/day ·
               max <b className="text-white">{params.maxOpenTrades}</b> open · daily loss stop <b className="text-white">${params.dailyLossLimitUsd}</b> ·
               stop after <b className="text-white">{params.consecutiveLossStop}</b> straight losses · min score <b className="text-white">{params.minScore}</b>.
               This consent is separate from Auto Hedge — enabling one never enables the other.

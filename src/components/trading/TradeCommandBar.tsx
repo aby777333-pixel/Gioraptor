@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { Wand2, Check, X as XIcon, MessageCircleQuestion } from 'lucide-react';
 import {
-  parseTradeCommand, applyDirectives, answerQuestion,
+  parseTradeCommand, applyDirectives, answerQuestion, QUESTION_LIBRARY,
   type CommandScope, type ParseResult,
 } from '@/lib/trading/nl-commands';
 
@@ -30,14 +30,17 @@ export default function TradeCommandBar({ scope, accent, onApplied }: {
   const [answer, setAnswer] = useState<string[] | null>(null);
   const [appliedNote, setAppliedNote] = useState<string[] | null>(null);
 
-  const parse = () => {
-    if (!text.trim()) return;
+  const parse = (input?: string) => {
+    const t = (input ?? text).trim();
+    if (!t) return;
     setAppliedNote(null);
-    const r = parseTradeCommand(text, scope);
-    if (r.isQuestion) { setAnswer(answerQuestion(scope)); setResult(null); return; }
+    const r = parseTradeCommand(t, scope);
+    if (r.isQuestion) { setAnswer(answerQuestion(scope, t)); setResult(null); return; }
     setAnswer(null);
     setResult(r);
   };
+
+  const ask = (q: string) => { setText(q); setAppliedNote(null); setResult(null); setAnswer(answerQuestion(scope, q)); };
 
   const confirm = () => {
     if (!result || result.directives.length === 0) return;
@@ -59,11 +62,23 @@ export default function TradeCommandBar({ scope, accent, onApplied }: {
           placeholder={EXAMPLES[scope]}
           className="flex-1 rounded bg-white/[0.05] px-2 py-1.5 text-[10px] text-white placeholder:text-white/25 outline-none"
           style={{ border: '1px solid rgba(255,255,255,0.1)' }} />
-        <button onClick={parse}
+        <button onClick={() => parse()}
           className="rounded px-3 py-1.5 text-[10px] font-bold text-black transition-all hover:brightness-110"
           style={{ backgroundColor: accent }}>
           Parse
         </button>
+      </div>
+
+      {/* Question chips — click to ask; the engine answers from its real state and logs */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <span className="text-[8px] font-bold uppercase tracking-wide text-white/30">Ask the engine:</span>
+        {QUESTION_LIBRARY[scope].map((q) => (
+          <button key={q} onClick={() => ask(q)}
+            className="rounded px-1.5 py-0.5 text-[8px] font-semibold text-white/45 transition-all hover:text-white"
+            style={{ border: '1px solid rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+            {q}
+          </button>
+        ))}
       </div>
 
       {/* Question answer */}

@@ -23,11 +23,11 @@
 
 import {
   loadHedgeAutoParams, saveHedgeAutoParams, setHedgeAutoOn, isHedgeAutoConsented,
-  hedgeAutoLog, HEDGE_PRESETS, type HedgeAutoParams,
+  hedgeAutoLog, loadHedgeAutoLog, loadBaskets, HEDGE_PRESETS, type HedgeAutoParams,
 } from '@/lib/trading/hedge-auto';
 import {
   loadScanAutoParams, saveScanAutoParams, setScanAutoOn, isScanAutoConsented,
-  scanAutoLog, SCAN_MODES, type ScanAutoParams,
+  scanAutoLog, loadScanAutoLog, SCAN_MODES, type ScanAutoParams,
 } from '@/lib/trading/scan-auto';
 import { loadGovernorLimits, saveGovernorLimits, type GovernorLimits } from '@/lib/trading/risk-governor';
 
@@ -164,6 +164,14 @@ const RULES: Rule[] = [
   { scope: 'hedge', re: /(no|not|never|do\s*n.t)\b.*hedge\b.*news|news\b.*(no|not)\b.*hedge/i,
     build: () => d('hedge', 'newsBlackout', 'News blackout', true, 'Never open hedges near red-flag news events') },
 
+  // ── Lot sizing ──
+  { scope: 'scan', re: /(start|use|fixed)\b.*(every\s+trade|lot)\b.*(with|of|size)?|lot\s+size\s+of/i,
+    build: (c) => { if (!/lot/i.test(c) || /hedge/i.test(c)) return null; const v = firstLots(c); return v != null && v <= 5 && /start|fixed|every/i.test(c) ? d('scan', 'fixedLot', 'Fixed lot per trade', v, `Start every engine trade with ${v} lot (fixed sizing)`) : null; } },
+  { scope: 'scan', re: /(never|not)\b.*exceed\b.*lot|maximum\b.*lot\b.*trade/i,
+    build: (c) => { if (/hedge/i.test(c)) return null; const v = firstLots(c); return v != null && v <= 5 ? d('scan', 'maxLotPerTrade', 'Max lot per trade', v, `Never exceed ${v} lot on any engine trade (hard cap)`) : null; } },
+  { scope: 'hedge', re: /hedge\b.*(never|not)?\b.*(exceed|beyond|maximum|max)\b.*lot|start\b.*hedge\b.*lot/i,
+    build: (c) => { const v = firstLots(c); return v != null && v <= 5 ? d('hedge', 'maxHedgeLots', 'Max hedge lots per leg', v, `Never let a hedge leg exceed ${v} lot`) : null; } },
+
   // ── Scan risk & limits ──
   { scope: 'scan', re: /risk\b.*(no\s+more\s+than|at\s+most|maximum|of)?\b.*(percent|%)/i,
     build: (c) => { const v = firstPercent(c); return v != null && v <= 5 ? d('scan', 'riskPct', 'Risk % per trade', v, `Risk no more than ${v}% of balance per trade`) : null; } },
@@ -222,9 +230,66 @@ const RULES: Rule[] = [
 
 const QUESTION_RE = /^(why|what|how|is|are|which|can|should|am|do(es)?\s|has|where|when)\b|\?\s*$/i;
 
-export function answerQuestion(scope: CommandScope): string[] {
+/** Canned questions shown as clickable chips on the command bars. */
+export const QUESTION_LIBRARY: Record<CommandScope, string[]> = {
+  hedge: [
+    'Why has Auto Hedge paused?',
+    'What did the engine reject and why?',
+    'What are my current hedge limits?',
+    'How close am I to the daily loss limit?',
+    'What is the basket profit target?',
+    'What would make a hedge fail?',
+    'Which baskets are active?',
+    'What happens if I intervene manually?',
+    'Is EMIL restricted to advice?',
+  ],
+  scan: [
+    'Why has Auto Scan stopped trading?',
+    'What did the engine reject and why?',
+    'What are my current risk limits?',
+    'How close am I to the daily loss limit?',
+    'What lot size will the engine use?',
+    'How many trades remain today?',
+    'What happens if I intervene manually?',
+    'Is EMIL restricted to advice?',
+  ],
+};
+
+export function answerQuestion(scope: CommandScope, question = ''): string[] {
   const gov = loadGovernorLimits();
   const lines: string[] = [];
+  const q = question.toLowerCase();
+  const log = scope === 'hedge' ? loadHedgeAutoLog() : loadScanAutoLog();
+
+  // Targeted intents first — then the standard status snapshot below.
+  if (/why|reject|block|paus|stopp|halt/.test(q)) {
+    const interesting = log.filter((l) => ['blocked', 'halt', 'manual', 'error'].includes(l.kind)).slice(-5).reverse();
+    if (interesting.length) {
+      lines.push('Most recent engine refusals / halts (every decision carries its reason):');
+      for (const l of interesting) lines.push(`· ${new Date(l.ts).toLocaleTimeString()} [${l.kind.toUpperCase()}] ${l.text}`);
+    } else {
+      lines.push('No refusals, halts or manual interventions recorded yet — the full history lives in the engine log.');
+    }
+    lines.push('Also note: the engine only evaluates while this window is open, and it stands down when consent is missing, a daily limit is hit, or the Risk Governor blocks new exposure.');
+  }
+  if (/intervene|manual/.test(q)) {
+    lines.push(scope === 'hedge'
+      ? 'Manual intervention: touching a basket position switches Auto Hedge OFF for that basket — you manage it from there. "Reassess & Resume" recalculates at current prices before the engine takes it back. Nothing resumes silently.'
+      : 'Manual intervention: engine positions carry their SL/TP from entry. If you modify or close one it becomes yours — the engine never fights or reverses a manual change.');
+  }
+  if (/emil/.test(q)) {
+    lines.push('EMIL has been removed from this module entirely — it lives only in its own console and never had execution authority here. Hedge Trade and Scan Trade are fully independent of EMIL and of each other.');
+  }
+  if (scope === 'hedge' && /basket/.test(q)) {
+    const active = loadBaskets().filter((b) => b.status !== 'closed');
+    lines.push(active.length
+      ? `Active baskets: ${active.map((b) => `${b.primarySymbol} (stage ${b.stage}, ${b.status}, target +$${b.targetUsd} / max -$${b.maxLossUsd})`).join(' · ')}`
+      : 'No active hedge baskets right now.');
+  }
+  if (scope === 'scan' && /lot/.test(q)) {
+    const p = loadScanAutoParams();
+    lines.push(`Lot sizing: ${p.lotMode === 'fixed' ? `FIXED ${p.fixedLot} lots per trade` : `${p.riskPct}% of balance vs the stop`} — hard cap ${p.maxLotPerTrade} lots per trade, and the account Risk Governor caps combined exposure on top.`);
+  }
   if (scope === 'hedge') {
     const p = loadHedgeAutoParams();
     lines.push(`Auto Hedge is ${isHedgeAutoConsented() ? 'consented' : 'NOT yet consented'} · preset ${p.preset}.`);

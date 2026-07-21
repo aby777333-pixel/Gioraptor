@@ -25,8 +25,6 @@ import {
   recordScanGrades, resolveScanGrades, scanGradeSummary,
   type Opportunity, type ScanFilters, type AssetClass,
 } from '@/lib/trading/scanner-engine';
-import EmilStrip from '@/components/trading/emil/EmilStrip';
-import { armEmil } from '@/lib/trading/emil-arm';
 import AutoScanSection from '@/components/trading/scanner/AutoScanSection';
 
 type AutoMode = 'off' | 'signal' | 'manual';
@@ -268,10 +266,8 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
           triggerRefresh={triggerRefresh}
         />
 
-        {/* ── EMIL council read (advice only — no execution authority here) ── */}
-        <div className="border-b px-4 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
-        </div>
+        {/* EMIL removed from this module entirely (2026-07-21, owner request):
+            Scan Trade is fully independent — EMIL lives only in /terminal/emil. */}
 
         {/* ── Filters ── */}
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
@@ -413,21 +409,6 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
                 <button onClick={() => setExpanded(expanded === o.id ? null : o.id)}
                   className="ml-auto rounded px-2.5 py-1 text-[9px] font-bold text-white/55 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.15)' }}>
                   {expanded === o.id ? 'Hide detail' : 'Full card'}
-                </button>
-                <button onClick={() => {
-                  armEmil({
-                    kind: 'scan', symbol: o.symbol, direction: o.direction,
-                    lots: Math.max(0.01, o.suggestedLots ?? 0.01),
-                    entryRef: o.zone.preferred, stop: o.zone.stop, target: o.zone.target1,
-                    tf: o.tfLabel, score: o.score, reasons: o.reasonsFor.slice(0, 2), source: 'Scanner',
-                  });
-                  appendSignalLog({ ts: Date.now(), symbol: o.symbol, tf: o.tfLabel, direction: o.direction, score: o.score, action: 'prepared', detail: 'armed to EMIL (prepare-only; execution needs explicit authorization in the EMIL console)' });
-                  window.open('/terminal/emil', '_blank');
-                }}
-                  title="Arm EMIL with this opportunity — EMIL opens with the full context and PREPARES ONLY. Opening is not authority: execution needs your explicit per-trade confirmation there."
-                  className="rounded px-2.5 py-1 text-[9px] font-bold transition-all hover:brightness-125"
-                  style={{ color: '#FFD54F', border: '1px solid rgba(255,213,79,0.45)', backgroundColor: 'rgba(255,213,79,0.08)' }}>
-                  🤖 Arm EMIL
                 </button>
                 {mode === 'manual' && (
                   <button onClick={() => { setConfirmOpp(o); appendSignalLog({ ts: Date.now(), symbol: o.symbol, tf: o.tfLabel, direction: o.direction, score: o.score, action: 'prepared' }); }}

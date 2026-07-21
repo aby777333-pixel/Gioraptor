@@ -28,8 +28,6 @@ import {
   stressTest, leadLag, spreadZ, weekendGap, correlationMatrix,
   type HedgeCandidate, type HedgeInputs, type HedgeGroup, type StressResult,
 } from '@/lib/trading/hedge-engine';
-import EmilStrip from '@/components/trading/emil/EmilStrip';
-import { armEmil } from '@/lib/trading/emil-arm';
 import AutoHedgeSection from '@/components/trading/hedge/AutoHedgeSection';
 
 const MINT = '#00E5A0';
@@ -289,10 +287,8 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
         </div>
 
         <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[78vh]'}`} style={{ scrollbarWidth: 'thin' }}>
-          {/* ── EMIL council read (advice only — no execution authority here) ── */}
-          <div className="mb-3">
-            <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
-          </div>
+          {/* EMIL removed from this module entirely (2026-07-21, owner request):
+              Hedge Trade is fully independent — EMIL lives only in /terminal/emil. */}
 
           {/* ── AUTO HEDGE — independent engine (consent-gated) ── */}
           <AutoHedgeSection
@@ -650,24 +646,6 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
               </p>
               <p className="mb-3 text-[9px] font-semibold" style={{ color: '#FFB300' }}>{HEDGE_EXONERATION}</p>
               <div className="flex justify-end gap-2">
-                <button onClick={() => {
-                  const t = prices[preview.symbol];
-                  const mid = t?.bid != null && t?.ask != null ? (t.bid + t.ask) / 2 : 0;
-                  armEmil({
-                    kind: 'hedge', symbol: preview.symbol, direction: preview.hedgeDirection,
-                    lots: Math.max(0.01, preview.suggestedLots), entryRef: mid, stop: null, target: null,
-                    primary: inputs.primary, hedgeRatioPct: preview.reductionPct,
-                    corr: preview.corr.avg ?? null, reductionPct: preview.reductionPct,
-                    reasons: [`hedges ${inputs.primary} ${inputs.direction} exposure`, `est. risk reduction ~${preview.reductionPct.toFixed(0)}%`],
-                    source: 'Hedge Engine',
-                  });
-                  window.open('/terminal/emil', '_blank');
-                }}
-                  title="Arm EMIL with this hedge — EMIL opens with the full context and PREPARES ONLY. Opening is not authority: execution needs your explicit confirmation there."
-                  className="rounded px-3 py-2 text-[11px] font-bold transition-all hover:brightness-125"
-                  style={{ color: '#FFD54F', border: '1px solid rgba(255,213,79,0.45)', backgroundColor: 'rgba(255,213,79,0.08)' }}>
-                  🤖 Arm EMIL
-                </button>
                 <button onClick={() => setPreview(null)} className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>Cancel</button>
                 <button onClick={() => executeHedge(preview)} disabled={placing}
                   className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-40"
