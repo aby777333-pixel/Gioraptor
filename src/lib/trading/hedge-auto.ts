@@ -163,6 +163,28 @@ export function revokeHedgeAutoConsent(): void {
   try { localStorage.removeItem(CONSENT_KEY); localStorage.setItem(ON_KEY, '0'); } catch { /* ignore */ }
 }
 
+// ── Per-position eligibility (the positions-panel A-Hedge toggle) ──
+// Default: every position is hedge-eligible while Auto Hedge is on.
+// A per-position OFF excludes just that position from monitoring.
+
+const ELIGIBLE_KEY = 'raptor_hedgeauto_eligible_v1';
+
+function loadEligibility(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(ELIGIBLE_KEY) || '{}'); } catch { return {}; }
+}
+export function isPositionHedgeEligible(positionId: string): boolean {
+  return loadEligibility()[positionId] !== false;
+}
+export function setPositionHedgeEligible(positionId: string, on: boolean): void {
+  try {
+    const map = loadEligibility();
+    map[positionId] = on;
+    const keys = Object.keys(map);
+    if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete map[k];
+    localStorage.setItem(ELIGIBLE_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
 // ── Baskets ─────────────────────────────────────────────────────
 
 export type BasketStatus = 'monitoring' | 'active' | 'exit' | 'manual' | 'closed';
@@ -296,6 +318,7 @@ export function evaluateHedgeAuto(ctx: {
   const eligible = open.filter((x) =>
     !basketedIds.has(x.id) &&
     !(x.comment ?? '').toLowerCase().startsWith('hedgeauto') &&
+    isPositionHedgeEligible(x.id) &&
     Number(x.unrealized_pnl ?? 0) <= -p.activationLossUsd);
 
   for (const primary of eligible) {

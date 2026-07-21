@@ -7,6 +7,11 @@ import { orderService } from '@/lib/trading/order-service';
 import { formatPrice, formatPnL, formatLot, cn } from '@/lib/utils/format';
 import type { Position, Order } from '@/types/trading';
 import EditOrderModal from './EditOrderModal';
+import {
+  isHedgeAutoOn, setHedgeAutoOn, isHedgeAutoConsented, recordHedgeAutoConsent,
+  isPositionHedgeEligible, setPositionHedgeEligible, loadHedgeAutoParams,
+  hedgeAutoLog, HEDGE_AUTO_DISCLAIMER,
+} from '@/lib/trading/hedge-auto';
 
 type TabKey = 'positions' | 'pending' | 'history' | 'inbox' | 'logs';
 
@@ -84,6 +89,7 @@ const PNL_COL = fr(90);
 const OPT_COLS3: { key: string; width: string }[] = [
   { key: 'pnlPct', width: fr(60) },
 ];
+const AHEDGE_COL = fr(62);
 const ACTIONS_COL = fr(70);
 const OPT_COLS4: { key: string; width: string }[] = [
   { key: 'remark', width: '1fr' },
@@ -96,6 +102,7 @@ function buildColTemplate(visible: Set<string>): string {
   for (const c of OPT_COLS2) { if (visible.has(c.key)) parts.push(c.width); }
   parts.push(PNL_COL);
   for (const c of OPT_COLS3) { if (visible.has(c.key)) parts.push(c.width); }
+  parts.push(AHEDGE_COL);
   parts.push(ACTIONS_COL);
   for (const c of OPT_COLS4) { if (visible.has(c.key)) parts.push(c.width); }
   return parts.join(' ');
@@ -127,6 +134,10 @@ export default function PositionsPanel() {
   const [sortAsc, setSortAsc] = useState(true);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [showTableSettings, setShowTableSettings] = useState(false);
+  // Per-position Auto Hedge toggle (disclaimer-gated) — re-render key.
+  const [hedgeGatePos, setHedgeGatePos] = useState<Position | null>(null);
+  const [hedgeTyped, setHedgeTyped] = useState('');
+  const [, setHedgeTick] = useState(0);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     () => new Set(['entryValue', 'marketValue', 'pnlPct', 'commission', 'remark'])
   );
@@ -558,6 +569,7 @@ export default function PositionsPanel() {
                   {visibleColumns.has('commission') && <ColHeader label="Commission" field="commission" align="right" />}
                   <ColHeader label="Profit/Loss" field="pnl" align="right" />
                   {visibleColumns.has('pnlPct') && <ColHeader label="P/L in %" align="right" />}
+                  <ColHeader label="A-Hedge" align="center" />
                   <ColHeader label="Actions" align="center" />
                   {visibleColumns.has('remark') && <ColHeader label="Remark" />}
                 </div>
@@ -694,6 +706,38 @@ export default function PositionsPanel() {
                         </span>
                       )}
 
+                      {/* A-HEDGE — per-position Auto Hedge toggle (disclaimer-gated).
+                          Hedge legs themselves are never re-hedged. */}
+                      <span className="flex items-center justify-center">
+                        {(() => {
+                          const isHedgeLeg = String((pos as unknown as { comment?: string | null }).comment ?? '').toLowerCase().startsWith('hedgeauto');
+                          if (isHedgeLeg) {
+                            return <span className="text-[8px] font-bold" style={{ color: '#CE93D8' }} title="This IS an Auto Hedge leg — it is managed by its basket and never re-hedged.">LEG</span>;
+                          }
+                          const effectiveOn = isHedgeAutoConsented() && isHedgeAutoOn() && isPositionHedgeEligible(pos.id);
+                          return (
+                            <button
+                              onClick={() => {
+                                if (effectiveOn) {
+                                  setPositionHedgeEligible(pos.id, false);
+                                  hedgeAutoLog('toggle', `A-Hedge OFF for ${pos.symbol} position ${pos.id} (positions panel)`);
+                                  setHedgeTick((t) => t + 1);
+                                } else {
+                                  setHedgeGatePos(pos);
+                                }
+                              }}
+                              className="relative rounded-full transition-colors"
+                              style={{ width: 30, height: 15, backgroundColor: effectiveOn ? '#00E5A0' : 'rgba(255,255,255,0.14)' }}
+                              title={effectiveOn
+                                ? `Auto Hedge is protecting this position (hedges after $${loadHedgeAutoParams().activationLossUsd} loss) — click to exclude it`
+                                : 'Enable Auto Hedge protection for this position — disclaimer applies'}
+                            >
+                              <span className="absolute top-[2px] rounded-full bg-white transition-all" style={{ width: 11, height: 11, left: effectiveOn ? 17 : 2 }} />
+                            </button>
+                          );
+                        })()}
+                      </span>
+
                       {/* ACTIONS */}
                       <span className="flex items-center justify-center gap-1">
                         <button
@@ -793,6 +837,7 @@ export default function PositionsPanel() {
                       {formatPnL(totalProfit)}
                     </span>
                     {visibleColumns.has('pnlPct') && <span />}
+                    <span />
                     <span />
                     {visibleColumns.has('remark') && <span style={{ color: S.textDim, fontSize: 9 }}>TOTAL</span>}
                   </div>
@@ -1053,6 +1098,56 @@ export default function PositionsPanel() {
             triggerRefresh();
           }}
         />
+      )}
+
+      {/* A-Hedge disclaimer gate — per-position Auto Hedge enable */}
+      {hedgeGatePos && (
+        <div className="fixed inset-0 z-[9700] flex items-center justify-center overflow-y-auto p-4" style={{ backgroundColor: 'rgba(3,7,12,0.85)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) { setHedgeGatePos(null); setHedgeTyped(''); } }}>
+          <div className="my-4 w-full max-w-[560px] rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: '#0A0F1A', borderColor: 'rgba(0,229,160,0.5)' }}>
+            <div className="mb-2 text-[15px] font-bold text-white">
+              Enable Auto Hedge for {hedgeGatePos.symbol} {hedgeGatePos.direction} {formatLot(hedgeGatePos.size)}
+            </div>
+            <p className="mb-2 text-[10px] leading-relaxed text-white/55">
+              The independent Hedge Trade engine will monitor this position and may open correlated hedge trades once it loses more than the
+              configured threshold (currently ${loadHedgeAutoParams().activationLossUsd}), within your basket and daily limits. EMIL has no
+              execution authority in this module. The engine evaluates while a Hedge Trade window is open.
+            </p>
+            <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
+              {HEDGE_AUTO_DISCLAIMER}
+            </p>
+            {!isHedgeAutoConsented() && (
+              <>
+                <p className="mb-1 text-[10px] text-white/55">First activation — type <b className="text-white">I ACCEPT HEDGE RISK</b> to record consent:</p>
+                <input value={hedgeTyped} onChange={(e) => setHedgeTyped(e.target.value)} placeholder="I ACCEPT HEDGE RISK"
+                  className="mb-3 w-full rounded bg-white/[0.06] px-2 py-1.5 text-[11px] text-white outline-none" />
+              </>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setHedgeGatePos(null); setHedgeTyped(''); }}
+                className="rounded px-3 py-2 text-[11px] font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)' }}>
+                Cancel
+              </button>
+              <button
+                disabled={!isHedgeAutoConsented() && hedgeTyped.trim().toUpperCase() !== 'I ACCEPT HEDGE RISK'}
+                onClick={() => {
+                  if (!isHedgeAutoConsented()) {
+                    recordHedgeAutoConsent(hedgeTyped.trim(), loadHedgeAutoParams(), activeAccountId);
+                    hedgeAutoLog('consent', 'Auto Hedge consent recorded from the positions panel A-Hedge toggle');
+                  }
+                  setHedgeAutoOn(true);
+                  setPositionHedgeEligible(hedgeGatePos.id, true);
+                  hedgeAutoLog('toggle', `A-Hedge ON for ${hedgeGatePos.symbol} position ${hedgeGatePos.id} (positions panel) — engine active`);
+                  setFeedback({ type: 'success', message: `Auto Hedge armed for ${hedgeGatePos.symbol} — the engine evaluates while a Hedge Trade window is open.` });
+                  setHedgeGatePos(null); setHedgeTyped('');
+                  setHedgeTick((t) => t + 1);
+                }}
+                className="rounded px-4 py-2 text-[11px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-40"
+                style={{ background: 'linear-gradient(180deg,#00E5A0,#00B87F)' }}>
+                I ACCEPT — protect this position
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
