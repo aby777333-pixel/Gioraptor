@@ -15,8 +15,10 @@ import CodeEditor, { DEFAULT_CODE } from '@/components/ea/CodeEditor';
 import StrategyConfig from '@/components/ea/StrategyConfig';
 import BacktestResults from '@/components/ea/BacktestResults';
 import DragDropBuilder from '@/components/ea/DragDropBuilder';
+import SourceGenerator from '@/components/ea/SourceGenerator';
+import { Wand2 } from 'lucide-react';
 
-type EditorTab = 'code' | 'visual';
+type EditorTab = 'code' | 'visual' | 'generator';
 type RightTab = 'config' | 'results';
 
 export default function EABuilderPage() {
@@ -212,14 +214,28 @@ export default function EABuilderPage() {
               icon={<Blocks size={13} />}
               label="Visual Builder"
             />
+            <EditorTabButton
+              active={editorTab === 'generator'}
+              onClick={() => setEditorTab('generator')}
+              icon={<Wand2 size={13} />}
+              label="Source Generator"
+            />
           </div>
 
           {/* Editor content */}
           <div className="flex-1 overflow-hidden">
             {editorTab === 'code' ? (
               <CodeEditor code={code} onChange={setCode} />
-            ) : (
+            ) : editorTab === 'visual' ? (
               <DragDropBuilder />
+            ) : (
+              <SourceGenerator
+                onInsert={(generated, name) => {
+                  setCode(generated);
+                  setStrategyName(name);
+                  setEditorTab('code');
+                }}
+              />
             )}
           </div>
         </div>
