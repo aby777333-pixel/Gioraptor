@@ -73,16 +73,8 @@ const menuCategories: MenuCategory[] = [
       { href: '/dashboard/journal', icon: <Newspaper size={14} />, label: 'Trade Journal', desc: 'Notes & insights' },
     ],
   },
-  {
-    label: 'Invest',
-    icon: <Users size={14} />,
-    items: [
-      { href: 'https://zippy-piroshki-21aa30.netlify.app/copy', icon: <Users size={14} />, label: 'Copy Trading', desc: 'Follow top traders' },
-      { href: 'https://zippy-piroshki-21aa30.netlify.app/pamm', icon: <PieChart size={14} />, label: 'PAMM / MAM', desc: 'Managed accounts' },
-      { href: '/dashboard/prop', icon: <Wallet size={14} />, label: 'Prop Trading', desc: 'Funded challenges' },
-      { href: '/dashboard/referrals', icon: <Users size={14} />, label: 'IB / Referrals', desc: 'Earn commissions' },
-    ],
-  },
+  // 'Invest' dropdown hidden per owner request (2026-07-21). Copy/PAMM/Prop/IB
+  // remain reachable from the portal; removed from the terminal top nav.
   {
     label: 'Tools',
     icon: <Layers size={14} />,

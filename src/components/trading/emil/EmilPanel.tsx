@@ -38,7 +38,8 @@ import { findHedges } from '@/lib/trading/hedge-engine';
 import { getLock, symbolCurrencies } from '@/lib/trading/protection';
 import { emilLearnBonus } from '@/lib/trading/emil-council';
 import { riskMood, uncertaintyScore, forecastScenarios, eventGuidance, marketMood, type RiskMood, type ForecastRead, type EventGuidance, type MoodRead } from '@/lib/trading/emil-macro';
-import { parseMission, type MissionParse } from '@/lib/trading/emil-mission';
+import { parseMission, isEmilQuestion, answerEmilQuestion, EMIL_QUESTIONS, type MissionParse } from '@/lib/trading/emil-mission';
+import { loadGovernorLimits } from '@/lib/trading/risk-governor';
 import { runScan, DEFAULT_FILTERS, assessOpportunity, type Opportunity } from '@/lib/trading/scanner-engine';
 import { SCAN_TFS } from '@/lib/trading/scanner-engine';
 import {
@@ -119,6 +120,7 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
   const [debate, setDebate] = useState(false);
   const [missionText, setMissionText] = useState('');
   const [missionParse, setMissionParse] = useState<MissionParse | null>(null);
+  const [missionAnswer, setMissionAnswer] = useState<string[] | null>(null);
   const [radar, setRadar] = useState<Opportunity[]>([]);
   const [modeBoard, setModeBoard] = useState<{ mode: string; conf: number }[]>([]);
   const [wake, setWake] = useState<WakeSettings>(loadWake);
@@ -333,8 +335,32 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
     }
     const parsed = parseMission(textToParse, universe);
     parsed.rules.unshift(...preRules);
+    setMissionAnswer(null);
     setMissionParse(parsed);
   }, [sarvamOk]);
+
+  // Questions vs missions: a question-like input gets a read-only status answer
+  // from EMIL's live state (parity with the Hedge/Scan command bars). Nothing
+  // here executes — it never writes the envelope.
+  const askEmil = (question: string) => {
+    setMissionText(question);
+    setMissionParse(null);
+    setMissionAnswer(answerEmilQuestion(question, {
+      armed: mode === 'auto',
+      mode: currentMode,
+      params: autoParams,
+      gov: loadGovernorLimits(),
+      log: loadEmilLog(),
+    }));
+  };
+
+  // Route the mission bar: questions → answer, instructions → parse.
+  const submitMission = (text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    if (isEmilQuestion(t)) askEmil(t);
+    else void runMissionParse(t);
+  };
 
   // Voice command: mic → 16kHz WAV → Lara speech-to-text-translate →
   // English transcript → the same mission pipeline. Nothing executes from
@@ -1087,7 +1113,8 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                 <div className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>🎯 Mission Control — tell EMIL what you want, typed or spoken, in English or your language</div>
                 <div className="flex gap-2">
                   <input value={missionText} onChange={(e) => setMissionText(e.target.value)}
-                    placeholder='e.g. "Only trade gold and EURUSD. Risk no more than 0.5 percent. Stop after two losses. Lock the day at a $300 target."'
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitMission(missionText); }}
+                    placeholder='Tell EMIL a mission, or ask a question — e.g. "Only trade gold. Risk 0.5 percent. Stop after two losses." or "Is EMIL allowed to execute?"'
                     className="min-w-0 flex-1 rounded bg-white/[0.06] px-3 py-2.5 text-[13px] text-white placeholder:text-white/25 outline-none" style={{ border: '1px solid rgba(255,213,79,0.3)' }} />
                   <button onClick={handleVoice} disabled={voiceBusy}
                     title={recording ? 'Stop recording and transcribe' : 'Voice command via Lara — speak English or an Indian language; EMIL reads back before anything applies'}
@@ -1097,13 +1124,33 @@ export default function EmilPanel({ ohlcvBuilder, isLiveData, onClose, standalon
                       : { backgroundColor: 'rgba(255,138,101,0.12)', color: '#FF8A65', border: '1px solid rgba(255,138,101,0.4)' }}>
                     {voiceBusy ? '…' : recording ? '⏹ Stop' : '🎤'}
                   </button>
-                  <button onClick={() => runMissionParse(missionText)}
+                  <button onClick={() => submitMission(missionText)}
                     disabled={!missionText.trim()}
                     className="shrink-0 rounded px-4 py-2.5 text-[12px] font-bold text-black transition-all hover:brightness-110 disabled:opacity-30"
                     style={{ background: 'linear-gradient(180deg,#FFD54F,#FFB300)' }}>
-                    Parse mission
+                    Send
                   </button>
                 </div>
+
+                {/* Ask EMIL — clickable questions answered from EMIL's live state */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                  <span className="text-[8px] font-bold uppercase tracking-wide text-white/30">Ask EMIL:</span>
+                  {EMIL_QUESTIONS.map((qq) => (
+                    <button key={qq} onClick={() => askEmil(qq)}
+                      className="rounded px-1.5 py-0.5 text-[8px] font-semibold text-white/45 transition-all hover:text-white"
+                      style={{ border: '1px solid rgba(255,213,79,0.25)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      {qq}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Question answer — read-only status, nothing executes */}
+                {missionAnswer && (
+                  <div className="mt-2 rounded border p-2" style={{ borderColor: 'rgba(255,213,79,0.25)' }}>
+                    <div className="mb-1 text-[9px] font-bold uppercase tracking-wide" style={{ color: '#FFD54F' }}>EMIL answers</div>
+                    {missionAnswer.map((l, i) => <p key={i} className="mb-0.5 text-[10px] leading-relaxed text-white/60">{l}</p>)}
+                  </div>
+                )}
                 {missionParse && (
                   <div className="mt-2 text-[10px]">
                     {missionParse.rules.map((r, i) => <p key={i} style={{ color: '#00C27A' }}>✓ <b>{r.label}:</b> <span className="text-white/60">{r.detail}</span></p>)}

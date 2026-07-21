@@ -283,9 +283,22 @@ export default function AutoHedgeSection({ ohlcvBuilder, prices, specs, calendar
         </div>
       )}
 
-      {/* Active baskets */}
-      {activeBaskets.length > 0 && (
-        <div className="mt-2 space-y-1.5">
+      {/* Active baskets — always shown (with an empty state) so the trader can
+          always see whether any auto-hedges exist and where they appear. */}
+      <div className="mt-2">
+        <div className="mb-1 flex items-center gap-2 text-[9px] font-bold uppercase tracking-wide text-white/40">
+          <span>Active hedge baskets ({activeBaskets.length})</span>
+          <button onClick={() => setBaskets(loadBaskets())} title="Reload baskets from storage"
+            className="rounded px-1.5 py-0.5 text-[8px] font-bold text-white/40 transition-colors hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+            Refresh
+          </button>
+        </div>
+        {activeBaskets.length === 0 ? (
+          <div className="rounded border p-2 text-[9px] leading-relaxed text-white/45" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+            No active hedge baskets. {on ? 'Auto Hedge is ON — it' : 'Auto Hedge is OFF; when enabled it'} opens a protective hedge once an eligible position sits in loss past your activation threshold. Positions the engine opens are tagged <span className="font-mono text-white/70">HedgeAuto</span> and appear here and in your Positions panel — manual hedges you place also show in Positions. {on ? 'The engine only runs while a Hedge Trade window is open (server-side 24/7 is a future phase).' : ''}
+          </div>
+        ) : (
+        <div className="space-y-1.5">
           {activeBaskets.map((b) => {
             const stageLabel = b.status === 'manual' ? 'MANUAL INTERVENTION' : ['Monitoring', 'Protective Hedge', 'Balanced Recovery', 'Exit Management', 'Forced Closure'][b.stage];
             return (
@@ -318,7 +331,8 @@ export default function AutoHedgeSection({ ohlcvBuilder, prices, specs, calendar
             );
           })}
         </div>
-      )}
+        )}
+      </div>
 
       {/* Decision log */}
       {showLog && (

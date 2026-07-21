@@ -152,3 +152,79 @@ export function parseMission(text: string, universe: string[]): MissionParse {
 
   return { rules, unknown, patch, wakeMinConviction, wakeSessions };
 }
+
+// ── EMIL question handling ────────────────────────────────────────────
+// Parity with the Hedge/Scan command bars: clickable questions EMIL answers
+// from its REAL state (armed status, limits, Governor, recent decisions).
+// Nothing here executes — it's read-only status, so it's always safe to ask.
+
+/** Heuristic: is this input a question rather than a mission instruction? */
+export function isEmilQuestion(text: string): boolean {
+  return /^(why|what|how|is|are|which|can|should|does|do|where|when|will|am)\b|\?\s*$/i.test(text.trim());
+}
+
+/** Canned questions shown as clickable chips under EMIL's mission bar. */
+export const EMIL_QUESTIONS: string[] = [
+  'Is EMIL trading right now?',
+  'Is EMIL allowed to execute or only advise?',
+  'What are my current EMIL limits?',
+  'Why did EMIL not take a trade?',
+  'What mode is EMIL in?',
+  'Which instruments can EMIL trade?',
+  'What will EMIL do without my answer?',
+];
+
+export interface EmilQAContext {
+  armed: boolean;
+  mode: string | null;
+  params: EmilAutoParams;
+  gov: { maxTotalLots: number; maxAutomatedLots: number; maxPerSymbolLots: number; maxOpenPositions: number; dailyLossLimitPct: number };
+  log: { ts: number; kind: string; text: string }[];
+}
+
+/** Answer a question from EMIL's live state — never invents, never executes. */
+export function answerEmilQuestion(question: string, ctx: EmilQAContext): string[] {
+  const q = question.toLowerCase();
+  const p = ctx.params;
+  const lines: string[] = [];
+
+  if (/advise|execute|allowed|permission|restrict/.test(q)) {
+    lines.push(ctx.armed
+      ? 'EMIL is ARMED — it may execute within your approved limits. The Account Risk Governor and Shield rules still outrank every action.'
+      : 'EMIL is NOT armed — it only advises. Nothing executes until you arm the pilot and pass the consent gate.');
+    return lines;
+  }
+
+  if (/why|reject|block|paus|stop|halt|not (?:take|trade|enter|open)|no trade/.test(q)) {
+    const interesting = ctx.log.filter((l) => ['blocked', 'halt', 'manual', 'error', 'mode'].includes(l.kind)).slice(-5).reverse();
+    if (interesting.length) {
+      lines.push('EMIL’s most recent decisions / refusals (each carries its reason):');
+      for (const l of interesting) lines.push(`· ${new Date(l.ts).toLocaleTimeString()} [${l.kind.toUpperCase()}] ${l.text}`);
+    } else {
+      lines.push('No refusals or halts logged recently. EMIL only enters when a qualified setup clears the council, the Governor and Shield — otherwise it waits.');
+    }
+    return lines;
+  }
+
+  if (/instrument|symbol|which.*trade|pairs?/.test(q)) {
+    lines.push(p.selectAll ? 'EMIL may consider every instrument in your watch universe.' : `EMIL is restricted to: ${(p.symbols ?? []).join(', ') || 'none set — pick instruments or enable Select-All'}.`);
+    return lines;
+  }
+
+  if (/without my answer|no answer|unanswered|fall ?back/.test(q)) {
+    lines.push('If you don’t answer a wake alert, EMIL never invents permission — it falls back to your already-approved rules only, and otherwise holds.');
+    return lines;
+  }
+
+  if (/\bmode\b/.test(q)) {
+    lines.push(`Mode control: ${p.modeControl}${p.enabledModes?.length ? ` (allowed: ${p.enabledModes.join(', ')})` : ''}. Active now: ${ctx.mode ?? 'none / monitoring'}.`);
+    return lines;
+  }
+
+  // Default: a full status snapshot.
+  lines.push(ctx.armed ? '● EMIL is ARMED — executing within your approved limits.' : '○ EMIL is monitoring only (not armed) — advice, no execution.');
+  lines.push(`Risk per trade ${p.riskPct}% · base lot ${p.baseLot} · stop after ${p.stopAfterLosses} losses · max ${p.maxPerDay}/day · daily profit lock $${p.dailyProfitLock || '—'} · daily loss stop $${p.dailyLossStop}.`);
+  lines.push(`Account Risk Governor (above every engine): max total ${ctx.gov.maxTotalLots} lots · max automated ${ctx.gov.maxAutomatedLots} · max/symbol ${ctx.gov.maxPerSymbolLots} · max ${ctx.gov.maxOpenPositions} positions · daily loss ${ctx.gov.dailyLossLimitPct}%.`);
+  lines.push(p.selectAll ? 'Instruments: EMIL’s pick from your whole universe.' : `Instruments: ${(p.symbols ?? []).join(', ') || 'none set'}.`);
+  return lines;
+}
