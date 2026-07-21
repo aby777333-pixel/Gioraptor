@@ -24,6 +24,7 @@ import { todayTrades, tiltScore, edgeMeter, type ClosedTrade } from '@/lib/tradi
 import type { InstrumentSpec } from '@/lib/insights/risk';
 import { currencyExposureMap } from '@/lib/trading/hedge-engine';
 import { EA_STRATEGY_LIBRARY, strategyLibraryRead } from '@/lib/trading/emil-ea-knowledge';
+import { relevantWisdom } from '@/lib/trading/emil-trading-wisdom';
 
 export type CouncilStance = 'bull' | 'bear' | 'neutral';
 
@@ -184,6 +185,14 @@ export function buildCouncil(params: {
         : `Directional engines lean ${stance === 'BULLISH LEAN' ? 'long' : 'short'} with average confidence ${confidence}%. That is a lean, not a certainty.`,
     'What could go wrong: the regime can flip on one candle, news can gap through stops, correlations can break, and every engine here is an estimate computed from ' + (isLiveData ? 'live' : 'simulated platform') + ' data. Capital first, always.',
   ];
+
+  // Trading Wisdom advisory — distilled method principles from studying the
+  // worldwide EA ecosystem. Adds caution/context only; never raises risk.
+  const wise = relevantWisdom([
+    stance, state?.state ?? '', news ? 'news' : '', lock ? 'lock' : '',
+    tilt?.level === 'HIGH' ? 'tilt' : '', best?.label ?? '', symbol,
+  ], 1)[0];
+  if (wise) explanation.push(`Wisdom (${wise.topic}): ${wise.application} Caution: ${wise.caution}`);
 
   return { symbol, votes, bulls, bears, neutrals, stance, confidence, protectionState, headline, explanation, bestOpp: best, computedAt: Date.now() };
 }

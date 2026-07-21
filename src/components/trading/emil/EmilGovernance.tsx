@@ -97,6 +97,17 @@ export default function EmilGovernance({ builder, council, prices, calendar, aut
     setObjectives(next); saveObjectives(next);
     onLog(`objectives → ${next.length ? next.map((x, i) => `${i + 1}.${x}`).join(' ') : 'cleared'}${objectiveEffects(next).notes.length ? ' · effects: ' + objectiveEffects(next).notes.join('; ') : ''}`);
   };
+  // Bulk selection: keep the existing priority order, append the rest in
+  // catalog order; All off clears the hierarchy entirely.
+  const selectAllObjectives = () => {
+    const next = [...objectives, ...OBJECTIVE_CATALOG.filter((o) => !objectives.includes(o))];
+    setObjectives(next); saveObjectives(next);
+    onLog(`objectives → ALL ${next.length} selected — existing priority kept, the rest appended in catalog order${objectiveEffects(next).notes.length ? ' · effects: ' + objectiveEffects(next).notes.join('; ') : ''}`);
+  };
+  const clearObjectives = () => {
+    setObjectives([]); saveObjectives([]);
+    onLog('objectives → ALL OFF — hierarchy cleared, the envelope parameters govern alone');
+  };
 
   return (
     <>
@@ -124,8 +135,24 @@ export default function EmilGovernance({ builder, council, prices, calendar, aut
 
       {/* 🎯 Objective hierarchy */}
       <div className="mt-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-        <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40">
-          Objective hierarchy — click to rank (click order = priority; conflicts resolve top-down: a low-drawdown limit outranks aggressive growth)
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <span className="text-[9px] font-bold uppercase tracking-wide text-white/40">
+            Objective hierarchy — click to rank (click order = priority; conflicts resolve top-down: a low-drawdown limit outranks aggressive growth)
+          </span>
+          <div className="ml-auto flex gap-1.5">
+            <button onClick={selectAllObjectives}
+              className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125"
+              style={{ color: '#FFD54F', border: '1px solid rgba(255,213,79,0.35)' }}
+              title="Select every objective — your current priority order is kept, the rest are appended in catalog order">
+              Select all
+            </button>
+            <button onClick={clearObjectives}
+              className="rounded px-2 py-0.5 text-[9px] font-bold text-white/50 transition-colors hover:text-white"
+              style={{ border: '1px solid rgba(255,255,255,0.15)' }}
+              title="Clear the hierarchy — the envelope parameters govern alone">
+              All off
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           {OBJECTIVE_CATALOG.map((o) => {

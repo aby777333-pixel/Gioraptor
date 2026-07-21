@@ -23,6 +23,7 @@ import {
   type KnowPrefs, type AutoWatchlist, type LearningTask, type EventBriefing,
 } from '@/lib/trading/emil-knowledge';
 import { EA_STRATEGY_LIBRARY, eaTerminology, seedEaKnowledgeFacts } from '@/lib/trading/emil-ea-knowledge';
+import { TRADING_WISDOM, seedWisdomFacts } from '@/lib/trading/emil-trading-wisdom';
 
 const PRIO_COLOR: Record<string, string> = {
   Critical: '#FF5252', Urgent: '#FF8A65', Important: '#FFB300', Useful: '#D4E157', Background: '#8B93A7',
@@ -43,6 +44,7 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
   const [showFeed, setShowFeed] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showGlossary, setShowGlossary] = useState(false);
+  const [showWisdom, setShowWisdom] = useState(false);
   const [sweepTick, setSweepTick] = useState(0);
   const [briefing, setBriefing] = useState<EventBriefing | null>(null);
   const [watchlists, setWatchlists] = useState<AutoWatchlist[]>([]);
@@ -69,6 +71,8 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
     try {
       const seeded = seedEaKnowledgeFacts();
       if (seeded > 0) onLog(`LEARNING: EA Strategy Library imported — ${seeded} strategy fact(s) added from the owner's MQL5 collection (observe-only, firewalled).`);
+      const wised = seedWisdomFacts();
+      if (wised > 0) onLog(`LEARNING: Trading Wisdom digest imported — ${wised} method principle(s) from the worldwide EA ecosystem (advisory-only, firewalled).`);
     } catch { /* library must never break the console */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -272,6 +276,9 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
         <button onClick={() => setShowGlossary((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#CE93D8', border: '1px solid rgba(206,147,216,0.35)' }}>
           {showGlossary ? 'Hide' : '🗣 EA Terminology'} ({eaTerminology().length})
         </button>
+        <button onClick={() => setShowWisdom((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#FFCA28', border: '1px solid rgba(255,202,40,0.35)' }}>
+          {showWisdom ? 'Hide' : '🦉 Trading Wisdom'} ({TRADING_WISDOM.length})
+        </button>
         {prefs.summaries && prefs.enabled && (
           <button onClick={() => onLog(`DAILY LEARNING SUMMARY — ${dailySummary()}`)}
             className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#4DD0E1', border: '1px solid rgba(77,208,225,0.35)' }}>
@@ -344,6 +351,27 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
           {eaTerminology().map((t) => (
             <p key={t.term} className="mb-1 text-[9px] leading-relaxed"><b className="text-white/70">{t.term}</b> <span className="text-white/45">— {t.def}</span></p>
           ))}
+        </div>
+      )}
+
+      {showWisdom && (
+        <div className="mt-2 max-h-72 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+          <p className="mb-1.5 text-[8px] leading-relaxed text-white/30">
+            Method principles distilled from studying the worldwide EA ecosystem — vendor pages, forums and multi-language
+            communities. Not strategies: the attributes BEHIND them. The council cites the most relevant principle in every
+            read; wisdom only ever adds caution or context and has no order path.
+          </p>
+          {TRADING_WISDOM.map((c) => (
+            <div key={c.topic} className="mb-1.5 rounded border p-2" style={{ borderColor: 'rgba(255,202,40,0.18)' }}>
+              <p className="text-[10px] font-bold text-white">{c.topic}</p>
+              <p className="text-[9px] text-white/60">{c.principle}</p>
+              <p className="text-[9px] text-white/40"><b className="text-white/55">Why:</b> {c.rationale}</p>
+              <p className="text-[9px] text-white/40"><b className="text-white/55">Council use:</b> {c.application}</p>
+              <p className="text-[9px]" style={{ color: '#FF8A65' }}><b>Caution:</b> {c.caution}</p>
+              <p className="text-[8px] text-white/25">Sources: {c.sources.join(' · ')}</p>
+            </div>
+          ))}
+          {!TRADING_WISDOM.length && <p className="text-[9px] text-white/35">No principles digested yet.</p>}
         </div>
       )}
 
