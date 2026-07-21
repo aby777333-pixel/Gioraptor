@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { NexusGlobal } from '@/components/nexus/NexusGlobal';
+import { ServiceWorker } from '@/components/ServiceWorker';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const jetbrainsMono = JetBrains_Mono({
@@ -20,6 +21,23 @@ export const metadata: Metadata = {
     description: 'The operating system for modern brokerages. 500+ instruments, sub-millisecond execution, 18 integrated modules.',
     type: 'website',
   },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Raptor',
+  },
+  icons: {
+    icon: '/raptor-logo.png',
+    apple: '/raptor-logo.png',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#060D16',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -33,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <NexusGlobal />
+          <ServiceWorker />
         </ThemeProvider>
       </body>
     </html>
