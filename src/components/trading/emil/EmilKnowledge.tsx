@@ -22,6 +22,7 @@ import {
   buildAutoWatchlists, learningPriorities, learningHealth, recordSweep, dailySummary,
   type KnowPrefs, type AutoWatchlist, type LearningTask, type EventBriefing,
 } from '@/lib/trading/emil-knowledge';
+import { EA_STRATEGY_LIBRARY, eaTerminology, seedEaKnowledgeFacts } from '@/lib/trading/emil-ea-knowledge';
 
 const PRIO_COLOR: Record<string, string> = {
   Critical: '#FF5252', Urgent: '#FF8A65', Important: '#FFB300', Useful: '#D4E157', Background: '#8B93A7',
@@ -40,6 +41,8 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
   const [showSources, setShowSources] = useState(false);
   const [showFirewall, setShowFirewall] = useState(false);
   const [showFeed, setShowFeed] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
   const [sweepTick, setSweepTick] = useState(0);
   const [briefing, setBriefing] = useState<EventBriefing | null>(null);
   const [watchlists, setWatchlists] = useState<AutoWatchlist[]>([]);
@@ -59,6 +62,16 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
     setPrefs(next); saveKnowPrefs(next);
     onLog(`LEARNING: ${readback}`);
   }, [onLog]);
+
+  // ── EA Strategy Library: seed bundled strategy cards as strategic
+  // facts once per mount (idempotent — upsertFact supersedes with history).
+  useEffect(() => {
+    try {
+      const seeded = seedEaKnowledgeFacts();
+      if (seeded > 0) onLog(`LEARNING: EA Strategy Library imported — ${seeded} strategy fact(s) added from the owner's MQL5 collection (observe-only, firewalled).`);
+    } catch { /* library must never break the console */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── The learning sweep: every 30s while a console is open ──
   useEffect(() => {
@@ -128,7 +141,7 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
   }, [onLog]);
 
   const sources = useMemo(
-    () => sourceRegistry(sarvamOk, calendar.length, Object.keys(prices).filter((s) => prices[s]?.bid != null).length),
+    () => sourceRegistry(sarvamOk, calendar.length, Object.keys(prices).filter((s) => prices[s]?.bid != null).length, EA_STRATEGY_LIBRARY.length),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sarvamOk, calendar.length, sweepTick],
   );
@@ -253,6 +266,12 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
         <button onClick={() => setShowFirewall((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#FF8A65', border: '1px solid rgba(255,138,101,0.35)' }}>
           {showFirewall ? 'Hide' : '🧱 Knowledge-to-Trading Firewall'}
         </button>
+        <button onClick={() => setShowLibrary((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#CE93D8', border: '1px solid rgba(206,147,216,0.35)' }}>
+          {showLibrary ? 'Hide' : '📚 EA Strategy Library'} ({EA_STRATEGY_LIBRARY.length})
+        </button>
+        <button onClick={() => setShowGlossary((s) => !s)} className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#CE93D8', border: '1px solid rgba(206,147,216,0.35)' }}>
+          {showGlossary ? 'Hide' : '🗣 EA Terminology'} ({eaTerminology().length})
+        </button>
         {prefs.summaries && prefs.enabled && (
           <button onClick={() => onLog(`DAILY LEARNING SUMMARY — ${dailySummary()}`)}
             className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125" style={{ color: '#4DD0E1', border: '1px solid rgba(77,208,225,0.35)' }}>
@@ -289,6 +308,39 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
             </tbody>
           </table>
           <p className="mt-1 text-[8px] text-white/25">Unconnected categories are framework slots awaiting licensed sources — EMIL never simulates a feed it does not have. Rumour-class sources, if ever connected, are monitored for sentiment only and never treated as fact.</p>
+        </div>
+      )}
+
+      {showLibrary && (
+        <div className="mt-2 max-h-72 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+          <p className="mb-1.5 text-[8px] leading-relaxed text-white/30">
+            The owner&apos;s MQL5 Expert Advisor collection, distilled from the actual entry/exit/risk source code. EMIL&apos;s Strategy
+            Library council agent cites the closest playbook for the live regime — suggestions only; nothing here can place an order.
+          </p>
+          {EA_STRATEGY_LIBRARY.map((c) => (
+            <div key={c.name} className="mb-1.5 rounded border p-2" style={{ borderColor: 'rgba(206,147,216,0.18)' }}>
+              <p className="text-[10px] font-bold text-white">
+                {c.name}{' '}
+                <span className="rounded px-1 py-0.5 font-mono text-[7px] font-bold uppercase" style={{ border: '1px solid rgba(206,147,216,0.4)', color: '#CE93D8' }}>{c.family}</span>{' '}
+                <span className="font-normal text-white/35">{c.timeframes.join(' · ')}{c.pairs.length ? ` · ${c.pairs.join(', ')}` : ''}</span>
+              </p>
+              <p className="text-[9px] text-white/45"><b className="text-white/60">Uses:</b> {c.indicators.join(' · ')}</p>
+              <p className="text-[9px] text-white/45"><b className="text-white/60">Entry:</b> {c.entry}</p>
+              <p className="text-[9px] text-white/45"><b className="text-white/60">Exit:</b> {c.exit}</p>
+              <p className="text-[9px] text-white/45"><b className="text-white/60">Risk:</b> {c.risk}</p>
+              <p className="text-[9px]" style={{ color: 'rgba(206,147,216,0.8)' }}><b>Edge claim:</b> {c.edge}</p>
+            </div>
+          ))}
+          {!EA_STRATEGY_LIBRARY.length && <p className="text-[9px] text-white/35">Library empty — no strategies imported yet.</p>}
+        </div>
+      )}
+
+      {showGlossary && (
+        <div className="mt-2 max-h-56 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+          <p className="mb-1.5 text-[8px] text-white/30">Terminology EMIL learned from the EA sources — the language of the owner&apos;s strategies, in plain trader English.</p>
+          {eaTerminology().map((t) => (
+            <p key={t.term} className="mb-1 text-[9px] leading-relaxed"><b className="text-white/70">{t.term}</b> <span className="text-white/45">— {t.def}</span></p>
+          ))}
         </div>
       )}
 

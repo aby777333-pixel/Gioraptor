@@ -70,9 +70,10 @@ export interface SourceRow {
   updates: string; note: string;
 }
 
-export function sourceRegistry(sarvamConfigured: boolean, calendarCount: number, liveSymbols: number): SourceRow[] {
+export function sourceRegistry(sarvamConfigured: boolean, calendarCount: number, liveSymbols: number, eaStrategies = 0): SourceRow[] {
   return [
     { name: 'RAPTOR platform price feed', category: 'Market data', region: 'Global', reliability: 'Official primary (simulated pricing until the real LP)', status: liveSymbols > 0 ? 'Connected' : 'Degraded', updates: 'sub-second ticks → bars on every resolution', note: `${liveSymbols} instruments quoting` },
+    { name: 'EA Strategy Library (owner MQL5 collection)', category: 'Strategy knowledge', region: 'Local', reliability: 'Official primary source (distilled from EA source code)', status: eaStrategies > 0 ? 'Connected' : 'Not connected', updates: 'bundled — refreshed on import', note: eaStrategies > 0 ? `${eaStrategies} strategies + terminology glossary` : 'no strategies imported yet' },
     { name: 'Economic calendar (ForexFactory feed)', category: 'Economic calendar', region: 'Global', reliability: 'Established secondary source', status: calendarCount > 0 ? 'Connected' : 'Degraded', updates: '30-min server cache', note: `${calendarCount} events this week` },
     { name: 'Lara language services', category: 'Language / translation', region: 'India', reliability: 'Verified institutional service', status: sarvamConfigured ? 'Connected' : 'Not connected', updates: 'on demand', note: sarvamConfigured ? 'translate + speech armed' : 'SARVAM_API_KEY not configured' },
     { name: 'EMIL trade / veto / forecast history', category: 'Platform-generated data', region: 'Local', reliability: 'Official primary source', status: 'Connected', updates: 'every pilot cycle', note: 'closed trades, Guardian vetoes, shadow setups, forecasts' },

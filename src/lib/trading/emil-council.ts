@@ -23,6 +23,7 @@ import { upcomingHighImpact, type NewsEvent } from '@/lib/trading/news-guard';
 import { todayTrades, tiltScore, edgeMeter, type ClosedTrade } from '@/lib/trading/trader-metrics';
 import type { InstrumentSpec } from '@/lib/insights/risk';
 import { currencyExposureMap } from '@/lib/trading/hedge-engine';
+import { EA_STRATEGY_LIBRARY, strategyLibraryRead } from '@/lib/trading/emil-ea-knowledge';
 
 export type CouncilStance = 'bull' | 'bear' | 'neutral';
 
@@ -146,6 +147,13 @@ export function buildCouncil(params: {
     votes.push(top
       ? { agent: 'Exposure Map', icon: '🧭', stance: 'neutral', confidence: shared ? 75 : 45, note: shared ? `largest exposure ${top.ccy} (${top.net >= 0 ? 'long' : 'short'} $${Math.abs(top.net).toFixed(0)}) — ${symbol} adds to it` : `largest exposure: ${top.ccy}` }
       : { agent: 'Exposure Map', icon: '🧭', stance: 'neutral', confidence: 40, note: 'no open positions — no concentration risk' });
+  }
+
+  // 10 · Strategy Library agent (bundled EA knowledge — cites the closest
+  // playbook for the live regime; observe-only, no execution path)
+  if (EA_STRATEGY_LIBRARY.length) {
+    const lib = strategyLibraryRead(state?.state ?? null, '1H');
+    votes.push({ agent: 'Strategy Library', icon: '📚', stance: lib.stance, confidence: lib.confidence, note: lib.note });
   }
 
   // ── Consensus ──
