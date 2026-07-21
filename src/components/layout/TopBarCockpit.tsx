@@ -38,6 +38,9 @@ export default function TopBarCockpit() {
   const [plan, setPlan] = useState<GamePlan | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [popover, setPopover] = useState<{ title: string; lines: string[] } | null>(null);
+  // Toggle: clicking the same chip again closes its popover.
+  const togglePopover = (next: { title: string; lines: string[] }) =>
+    setPopover((prev) => (prev?.title === next.title ? null : next));
   const [equityPath, setEquityPath] = useState<number[]>([]);
   const [realizedToday, setRealizedToday] = useState<number | null>(null);
   const rowsRef = useRef<ClosedTrade[]>([]);
@@ -136,7 +139,7 @@ export default function TopBarCockpit() {
       {/* 🎯 Discipline Score */}
       {disc && (
         <button className={chip} style={{ backgroundColor: 'rgba(0,229,160,0.07)', border: `1px solid ${scoreColor(disc.score)}44` }}
-          onClick={() => setPopover({ title: '🎯 Discipline Score', lines: [
+          onClick={() => togglePopover({ title: '🎯 Discipline Score', lines: [
             `${disc.score}/100 today — computed from your actual closed trades: stop-loss usage, overtrading, tilt signals and revenge patterns.`,
             ...disc.notes,
             'Traders who keep this above 80 keep their accounts. Protect the score like it is P&L — because it becomes P&L.',
@@ -152,7 +155,7 @@ export default function TopBarCockpit() {
           SHOW_HEARTBEAT to re-enable. All sampling logic stays intact. */}
       {SHOW_HEARTBEAT && (spark || realizedToday != null) && (
         <button className={chip} style={{ backgroundColor: 'rgba(41,171,226,0.06)', border: '1px solid rgba(41,171,226,0.2)' }}
-          onClick={() => setPopover({ title: '💓 P&L Heartbeat', lines: [
+          onClick={() => togglePopover({ title: '💓 P&L Heartbeat', lines: [
             realizedToday != null ? `Realized today: ${realizedToday >= 0 ? '+' : ''}$${realizedToday.toFixed(2)}.` : 'No closed trades yet today.',
             spark ? 'The line is your live equity path this session (sampled every 20s).' : 'The equity sparkline appears a minute after the session starts.',
             'A flat line is not failure — flat is a position. Chasing action to make the line move is how the line goes down.',
@@ -190,7 +193,7 @@ export default function TopBarCockpit() {
       {/* 💪 Currency Strength ribbon */}
       {strength.length >= 4 && (
         <button className={chip} style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
-          onClick={() => setPopover({ title: '💪 Currency Strength (last 24 H1 bars)', lines: [
+          onClick={() => togglePopover({ title: '💪 Currency Strength (last 24 H1 bars)', lines: [
             ...strength.map((s, i) => `${i + 1}. ${s.ccy}  ${s.raw >= 0 ? '+' : ''}${s.raw.toFixed(2)}%`),
             'Strongest → weakest, from real platform bars. The cleanest trends pair the top currency against the bottom one.',
           ] })}

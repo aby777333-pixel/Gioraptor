@@ -207,7 +207,8 @@ export default function TraderChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuild
     border: `1px solid rgba(${rgb},0.22)`,
   });
 
-  const show = useCallback((title: string, body: string[]) => setInfo({ title, body }), []);
+  // Toggle: clicking the same chip again closes its popover.
+  const show = useCallback((title: string, body: string[]) => setInfo((prev) => (prev?.title === title ? null : { title, body })), []);
 
   return (
     <div className="flex items-center gap-1" ref={anchorRef}>

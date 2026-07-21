@@ -44,6 +44,9 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
   const [freeCandidates, setFreeCandidates] = useState<{ id: string; symbol: string; open: number }[]>([]);
   const [cal, setCal] = useState<CalStats>({});
   const [info, setInfo] = useState<{ title: string; lines: string[] } | null>(null);
+  // Toggle: clicking the same chip again closes its popover.
+  const toggleInfo = (next: { title: string; lines: string[] }) =>
+    setInfo((prev) => (prev?.title === next.title ? null : next));
   const anchorRef = useRef<HTMLDivElement>(null);
   const lastClosedRef = useRef<number | null>(null);
   const builderRef = useRef(ohlcvBuilder);
@@ -176,7 +179,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
       {/* ⚡ Edge Meter */}
       {edge && (
         <button className={chip} style={cs('0,180,216')}
-          onClick={() => setInfo({ title: '⚡ Edge Meter — your personal expectancy', lines: [
+          onClick={() => toggleInfo({ title: '⚡ Edge Meter — your personal expectancy', lines: [
             `Last ${edge.n} closed trades: ${edge.avgPnl >= 0 ? '+' : ''}$${edge.avgPnl.toFixed(2)} per trade · ${edge.winRate.toFixed(0)}% win rate.`,
             edge.avgPnl >= 0
               ? 'Your process has a positive edge right now. The job is to repeat it, not to improve it mid-session.'
@@ -190,7 +193,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
       {/* 🎓 Trade Grade */}
       {avgLetter && (
         <button className={chip} style={cs('156,204,101')}
-          onClick={() => setInfo({ title: '🎓 Trade Grades — this session', lines: [
+          onClick={() => toggleInfo({ title: '🎓 Trade Grades — this session', lines: [
             `Session average: ${avgLetter} (${avgGrade!.toFixed(0)}/100) over ${sessionGrades.length} graded close(s).`,
             `Recent: ${sessionGrades.slice(-8).map((g) => g.letter).join(' · ')}`,
             'Every close is graded instantly on: stop loss, planned R:R, trend alignment, chasing and revenge timing. Grade the process — the P&L follows.',
@@ -203,7 +206,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
       {/* 🧠 Exit IQ */}
       {exitIq != null && (
         <button className={chip} style={cs('124,111,255')}
-          onClick={() => setInfo({ title: '🧠 Exit IQ', lines: [
+          onClick={() => toggleInfo({ title: '🧠 Exit IQ', lines: [
             `You are capturing ~${exitIq.toFixed(0)}% of the favorable move available around your trades (last 20 closes, measured on M5 bars to 1h after each exit).`,
             exitIq >= 70 ? 'Strong exits — you take what the market offers.' : exitIq >= 45 ? 'Decent, but a meaningful slice is being left on the table — partial exits + trailing the rest usually lifts this.' : 'Exits are cutting winners early — consider the Take-Profit ladder: bank a third, trail the rest.',
           ] })}
@@ -215,7 +218,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
       {/* 🌡️ Tilt-O-Meter */}
       {tilt && (
         <button className={`${chip} ${tilt.level === 'HIGH' ? 'animate-pulse' : ''}`} style={cs('255,82,82')}
-          onClick={() => setInfo({ title: '🌡️ Tilt-O-Meter', lines: [
+          onClick={() => toggleInfo({ title: '🌡️ Tilt-O-Meter', lines: [
             `Current read: ${tilt.level}.`,
             ...tilt.reasons.map((r) => `· ${r}`),
             'Tilt is invisible from the inside — that is the whole problem. When this reads HIGH, the highest-expectancy action available is a 15-minute walk.',
@@ -228,7 +231,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
       {/* 🆓 Free-Trade prompt */}
       {freeCandidates.length > 0 && (
         <button className={`${chip} animate-pulse`} style={{ backgroundColor: 'rgba(0,229,160,0.15)', border: '1px solid rgba(0,229,160,0.6)', boxShadow: '0 0 10px rgba(0,229,160,0.4)' }}
-          onClick={() => setInfo({ title: '🆓 Make it a free trade', lines: [
+          onClick={() => toggleInfo({ title: '🆓 Make it a free trade', lines: [
             `${freeCandidates.length} position(s) are ≥ +1R in profit: ${freeCandidates.map((c) => c.symbol).join(', ')}.`,
             'Moving the stop to break-even now removes ALL remaining risk — the trade cannot lose anymore, only win less. One click below does it for every candidate.',
             '▶ Click "MAKE FREE" to move those stops to break-even.',
@@ -240,7 +243,7 @@ export default function EdgeChips({ ohlcvBuilder }: { ohlcvBuilder: OHLCVBuilder
 
       {/* 🎲 Confidence Calibration */}
       <button className={chip} style={cs('255,179,0')}
-        onClick={() => setInfo({ title: '🎲 Confidence Calibration', lines: [
+        onClick={() => toggleInfo({ title: '🎲 Confidence Calibration', lines: [
           bestBucket
             ? `When you tag a trade "${bestBucket[0]}% sure", you actually win ${bestBucket[1].n ? Math.round((bestBucket[1].wins / bestBucket[1].n) * 100) : 0}% of the time (${bestBucket[1].wins}/${bestBucket[1].n}).`
             : 'Tag your next QuickTrade with a conviction level (the "Sure?" selector) and the platform will start comparing what you BELIEVE with what actually HAPPENS.',

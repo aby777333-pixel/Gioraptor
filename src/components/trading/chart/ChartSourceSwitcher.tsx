@@ -1023,7 +1023,7 @@ export default function ChartSourceSwitcher({
         {/* Market Insights — heat map / sessions / regime (module, admin-toggleable) */}
         {insightsEnabled && (
           <button
-            onClick={() => setInsightsOpen(true)}
+            onClick={() => setInsightsOpen((o) => !o)}
             className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
             style={headerBtnStyle('insights', insightsOpen)}
             title="Market Insights — heat map, sessions & regime (live platform data)"
@@ -1035,7 +1035,7 @@ export default function ChartSourceSwitcher({
         {/* Risk module — dashboard + position sizer (admin-toggleable) */}
         {riskEnabled && (
           <button
-            onClick={() => setRiskOpen(true)}
+            onClick={() => setRiskOpen((o) => !o)}
             className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
             style={headerBtnStyle('risk', riskOpen)}
             title="Risk Tools — dashboard & position sizer (real account data)"
@@ -1047,7 +1047,7 @@ export default function ChartSourceSwitcher({
         {/* Trade Journal module (admin-toggleable) */}
         {journalEnabled && (
           <button
-            onClick={() => setJournalOpen(true)}
+            onClick={() => setJournalOpen((o) => !o)}
             className="flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[11px] transition-all"
             style={headerBtnStyle('journal', journalOpen)}
             title="Trade Journal — annotate closed trades, analytics, CSV export"
@@ -1074,7 +1074,7 @@ export default function ChartSourceSwitcher({
           <EdgeChips ohlcvBuilder={ohlcvBuilder} />
           {hedgeEnabled && (
             <button
-              onClick={() => setHedgeOpen(true)}
+              onClick={() => setHedgeOpen((o) => !o)}
               title="AI Correlation Hedging Engine — find, size and monitor portfolio hedges (estimates, never guarantees)"
               className="raptor-hedge-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
             >
@@ -1083,7 +1083,7 @@ export default function ChartSourceSwitcher({
           )}
           {scannerEnabled && (
             <button
-              onClick={() => setScannerOpen(true)}
+              onClick={() => setScannerOpen((o) => !o)}
               title="Trade Scanner — ranked multi-market opportunities with full trade plans (analytical tools, never guarantees)"
               className="raptor-scan-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
             >
@@ -1092,7 +1092,7 @@ export default function ChartSourceSwitcher({
           )}
           {emilEnabled && (
             <button
-              onClick={() => setEmilOpen(true)}
+              onClick={() => setEmilOpen((o) => !o)}
               title="EMIL — Evolving Market Intelligence Lab: the Agent Council over every live engine (observe-only; never trades for you)"
               className="raptor-emil-blink flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
             >
