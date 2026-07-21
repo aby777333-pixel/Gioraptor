@@ -17,7 +17,6 @@ import {
   Network,
   PanelLeftClose,
   PanelLeft,
-  SlidersHorizontal,
 } from 'lucide-react';
 
 // ─── Core nav items. Flat. No sub-menus. ───────────────────
@@ -26,7 +25,6 @@ const NAV_ITEMS = [
   { href: '/terminal', label: 'Platform', icon: Monitor },
   { href: '/dealer', label: 'Dealer', icon: Gauge },
   { href: '/broker/dealing-desk', label: 'Dealing Desk', icon: Gauge },
-  { href: '/broker/symbol-config', label: 'Symbol Config', icon: SlidersHorizontal },
   { href: '/broker/risk', label: 'Risk', icon: ShieldAlert },
   { href: '/broker/clients', label: 'Clients', icon: Users },
   { href: '/broker/payments', label: 'Finance', icon: CreditCard },
