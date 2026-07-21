@@ -8,6 +8,11 @@ import {
 import {
   buildBackup, applyBackup, summarizeBackup, type SettingsBackup, type BackupGroup,
 } from '@/lib/trading/settings-backup';
+import {
+  loadNotifyPrefs, saveNotifyPrefs, ensureNotifyPermission, notifyAll,
+  NOTIFY_DEFAULTS, SEVERITY_LABEL, SEVERITY_ORDER, type NotifyPrefs, type NotifyChannel,
+} from '@/lib/nexus/notify-prefs';
+import type { NexusAlertSeverity } from '@/lib/nexus/alert-engine';
 
 type Tab = 'profile' | 'security' | 'notifications' | 'data' | 'kyc';
 
@@ -122,27 +127,98 @@ function SecurityTab() {
 }
 
 function NotificationsTab() {
+  const [prefs, setPrefs] = useState<NotifyPrefs>(NOTIFY_DEFAULTS);
+  const [perm, setPerm] = useState<string>('default');
+
+  useEffect(() => {
+    setPrefs(loadNotifyPrefs());
+    try { if (typeof Notification !== 'undefined') setPerm(Notification.permission); } catch { /* ignore */ }
+  }, []);
+
+  const update = (patch: Partial<NotifyPrefs>) => setPrefs((p) => { const n = { ...p, ...patch }; saveNotifyPrefs(n); return n; });
+  const toggleChannel = (c: NotifyChannel) => setPrefs((p) => {
+    const n = { ...p, channels: { ...p.channels, [c]: !p.channels[c] } };
+    saveNotifyPrefs(n);
+    if (c === 'browser' && n.channels.browser) { ensureNotifyPermission(); try { if (typeof Notification !== 'undefined') setTimeout(() => setPerm(Notification.permission), 400); } catch { /* ignore */ } }
+    return n;
+  });
+  const updateQuiet = (patch: Partial<NotifyPrefs['quietHours']>) => setPrefs((p) => { const n = { ...p, quietHours: { ...p.quietHours, ...patch } }; saveNotifyPrefs(n); return n; });
+  const test = () => { ensureNotifyPermission(); notifyAll('warning', 'RAPTOR test notification', 'This is how alerts will reach you.'); try { if (typeof Notification !== 'undefined') setTimeout(() => setPerm(Notification.permission), 400); } catch { /* ignore */ } };
+
+  const CHANNELS: { key: NotifyChannel; label: string; desc: string }[] = [
+    { key: 'browser', label: 'Desktop notifications', desc: 'System pop-ups even when the tab is in the background' },
+    { key: 'sound', label: 'Alert sound', desc: 'A short beep when an alert fires' },
+    { key: 'voice', label: 'Spoken voice', desc: 'Reads warning / critical alerts aloud' },
+  ];
+
   return (
-    <SettingCard title="Notification Preferences">
-      <div className="space-y-4">
-        {[
-          { label: 'Order execution alerts', desc: 'Get notified when orders are filled' },
-          { label: 'Price alerts', desc: 'Triggered price level notifications' },
-          { label: 'Margin warnings', desc: 'Low margin level alerts' },
-          { label: 'Daily P&L summary', desc: 'End-of-day trading summary' },
-          { label: 'News & market events', desc: 'Economic calendar notifications' },
-          { label: 'Copy trading updates', desc: 'When copied traders open/close positions' },
-        ].map((item) => (
-          <div key={item.label} className="flex items-center justify-between py-1">
-            <div>
-              <div className="text-sm">{item.label}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{item.desc}</div>
-            </div>
-            <ToggleSwitch />
+    <div className="space-y-4">
+      <SettingCard title="How RAPTOR interrupts you">
+        <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+          These control the interrupting channels for every alert (price, condition, account & risk). In-app toasts
+          always show as immediate confirmation. The same controls live in the Alerts menu on the chart header.
+        </p>
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <div className="text-sm">Allow interruptions</div>
+            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Master switch — off silences desktop, sound and voice</div>
           </div>
-        ))}
-      </div>
-    </SettingCard>
+          <ToggleSwitch on={prefs.master} onChange={() => update({ master: !prefs.master })} />
+        </div>
+        <div style={{ opacity: prefs.master ? 1 : 0.4, pointerEvents: prefs.master ? 'auto' : 'none' }}>
+          {CHANNELS.map((c) => (
+            <div key={c.key} className="flex items-center justify-between py-1 border-t" style={{ borderColor: 'var(--border)' }}>
+              <div>
+                <div className="text-sm flex items-center gap-2">
+                  {c.label}
+                  {c.key === 'browser' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase"
+                      style={{ backgroundColor: perm === 'granted' ? '#00C85320' : perm === 'denied' ? '#FF525220' : '#F0A50020', color: perm === 'granted' ? '#00C853' : perm === 'denied' ? '#FF5252' : '#F0A500' }}>
+                      {perm === 'granted' ? 'allowed' : perm === 'denied' ? 'blocked' : 'ask'}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{c.desc}</div>
+              </div>
+              <ToggleSwitch on={prefs.channels[c.key]} onChange={() => toggleChannel(c.key)} />
+            </div>
+          ))}
+          <div className="flex items-center justify-between py-2 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="text-sm">Only notify for</div>
+            <select value={prefs.minSeverity} onChange={(e) => update({ minSeverity: e.target.value as NexusAlertSeverity })}
+              className="px-3 py-1.5 rounded-lg text-xs outline-none border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              {SEVERITY_ORDER.map((s) => <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>)}
+            </select>
+          </div>
+        </div>
+      </SettingCard>
+
+      <SettingCard title="Quiet hours">
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <div className="text-sm">Silence non-critical alerts overnight</div>
+            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Desktop, sound and voice are muted during this window</div>
+          </div>
+          <ToggleSwitch on={prefs.quietHours.on} onChange={() => updateQuiet({ on: !prefs.quietHours.on })} />
+        </div>
+        {prefs.quietHours.on && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <input type="time" value={prefs.quietHours.start} onChange={(e) => updateQuiet({ start: e.target.value })}
+              className="px-3 py-1.5 rounded-lg text-xs outline-none border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>to</span>
+            <input type="time" value={prefs.quietHours.end} onChange={(e) => updateQuiet({ end: e.target.value })}
+              className="px-3 py-1.5 rounded-lg text-xs outline-none border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <input type="checkbox" checked={prefs.quietHours.allowCritical} onChange={() => updateQuiet({ allowCritical: !prefs.quietHours.allowCritical })} className="accent-[#0091D5]" />
+              Still let critical alerts through
+            </label>
+          </div>
+        )}
+        <button onClick={test} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold border" style={{ borderColor: '#0091D5', color: '#0091D5' }}>
+          Send test notification
+        </button>
+      </SettingCard>
+    </div>
   );
 }
 
@@ -371,11 +447,12 @@ function SelectField({ label, options }: { label: string; options: string[] }) {
   );
 }
 
-function ToggleSwitch() {
-  const [on, setOn] = useState(true);
+function ToggleSwitch({ on: onProp, onChange }: { on?: boolean; onChange?: () => void } = {}) {
+  const [onLocal, setOnLocal] = useState(true);
+  const on = onProp ?? onLocal;
   return (
     <button
-      onClick={() => setOn(!on)}
+      onClick={() => (onChange ? onChange() : setOnLocal(!onLocal))}
       className="w-10 h-5 rounded-full transition-all relative"
       style={{ backgroundColor: on ? '#0091D5' : 'var(--bg-elevated)' }}
     >
