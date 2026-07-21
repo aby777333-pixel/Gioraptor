@@ -23,6 +23,27 @@ import WidgetControls from '@/components/trading/widgets/WidgetControls';
 const ACC = '#4DD0E1';
 const DEFAULT_IDS = ['pressure', 'mtf', 'volflow', 'sr', 'breakout', 'correlation', 'hedgeopp', 'riskreward', 'possize', 'portexposure', 'ccystrength', 'session'];
 
+// Per-category hue — dim at rest, bright when active.
+const CAT_COLOR: Record<string, string> = {
+  'Default': '#4DD0E1',
+  'Direction & Pressure': '#29ABE2',
+  'Trend & Structure': '#00E5A0',
+  'Levels & Setups': '#66BB6A',
+  'Strength & Correlation': '#26C6DA',
+  'Volatility & Cost': '#FFB300',
+  'Risk & Sizing': '#9CCC65',
+  'Hedging': '#CE93D8',
+  'Account Safety': '#FF5252',
+  'Trade Management': '#7C6FFF',
+  'Timing & News': '#FF8A65',
+  'Scanner & Opportunity': '#29ABE2',
+  'Platform & Emergency': '#EF5350',
+};
+const hexA = (hex: string, a: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
+
 function WidgetCard({ def, s }: { def: WidgetDef; s: SharedCtx }) {
   const out = useMemo(() => { try { return def.compute(s); } catch { return { rows: [], note: 'unavailable' }; } }, [def, s]);
   const ctx = { symbol: out.trade?.symbol ?? s.symbol, direction: out.trade?.direction, entry: out.trade?.entry, stop: out.trade?.stop, target: out.trade?.target, lots: out.trade?.lots, source: def.name };
@@ -104,13 +125,23 @@ export default function WidgetHub({ open, onClose, ohlcvBuilder, standalone = fa
 
       {/* Category tabs */}
       <div className="flex flex-wrap gap-1 border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setCat(t)}
-            className="rounded px-2 py-0.5 text-[9px] font-bold transition-all"
-            style={{ backgroundColor: cat === t ? 'rgba(77,208,225,0.15)' : 'rgba(255,255,255,0.03)', color: cat === t ? ACC : 'rgba(255,255,255,0.45)', border: `1px solid ${cat === t ? 'rgba(77,208,225,0.45)' : 'rgba(255,255,255,0.08)'}` }}>
-            {t}{t !== 'Default' ? ` (${WIDGETS.filter((w) => w.category === t).length})` : ` (${DEFAULT_IDS.length})`}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const col = CAT_COLOR[t] ?? ACC;
+          const on = cat === t;
+          return (
+            <button key={t} onClick={() => setCat(t)}
+              className="rounded px-2 py-0.5 text-[9px] font-bold transition-all hover:brightness-125"
+              style={{
+                backgroundColor: on ? hexA(col, 0.22) : hexA(col, 0.05),
+                color: on ? col : hexA(col, 0.5),
+                border: `1px solid ${on ? hexA(col, 0.7) : hexA(col, 0.18)}`,
+                boxShadow: on ? `0 0 10px ${hexA(col, 0.4)}` : 'none',
+                textShadow: on ? `0 0 6px ${hexA(col, 0.6)}` : 'none',
+              }}>
+              {t}{t !== 'Default' ? ` (${WIDGETS.filter((w) => w.category === t).length})` : ` (${DEFAULT_IDS.length})`}
+            </button>
+          );
+        })}
       </div>
 
       {!shared ? (
