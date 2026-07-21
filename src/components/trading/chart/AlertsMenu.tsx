@@ -17,6 +17,8 @@ import {
   describeCondition, KIND_LABELS, type ConditionAlert, type ConditionKind,
 } from '@/lib/insights/condition-alerts';
 import AccountAlerts from '@/components/trading/chart/AccountAlerts';
+import NotifyPrefsPanel from '@/components/trading/chart/NotifyPrefsPanel';
+import { deliverBrowserNotification, playAlertSound } from '@/lib/nexus/notify-prefs';
 
 export interface PriceAlert {
   id: string;
@@ -84,11 +86,8 @@ export default function AlertsMenu({
       if (hit) {
         a.triggered = true; a.triggeredAt = Date.now(); changed = true;
         onToast(`🔔 ${a.symbol} ${a.condition} ${a.price} (now ${mid.toFixed(a.price < 20 ? 5 : 2)})`);
-        try {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('RAPTOR price alert', { body: `${a.symbol} ${a.condition} ${a.price}` });
-          }
-        } catch { /* ignore */ }
+        deliverBrowserNotification('warning', 'RAPTOR price alert', `${a.symbol} ${a.condition} ${a.price}`);
+        playAlertSound('warning');
       }
     }
     if (changed) persist([...list]);
@@ -123,11 +122,8 @@ export default function AlertsMenu({
       persistCond(next);
       for (const f of fired) {
         onToast(`📈 ${f.message}`);
-        try {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('RAPTOR condition alert', { body: f.message });
-          }
-        } catch { /* ignore */ }
+        deliverBrowserNotification('opportunity', 'RAPTOR condition alert', f.message);
+        playAlertSound('opportunity');
         // Feed the NEXUS Alert Center through the shared dedup/cooldown gate.
         pushExternalAlert({
           key: `cond-${f.alert.id}`, severity: 'opportunity', symbol: f.alert.symbol,
@@ -284,6 +280,9 @@ export default function AlertsMenu({
 
           {/* Account & Risk alerts — spread / margin / open-P&L / news */}
           <AccountAlerts activeSymbol={activeSymbol} onToast={onToast} />
+
+          {/* Notification preferences — how RAPTOR is allowed to interrupt you */}
+          <NotifyPrefsPanel onToast={onToast} />
         </div>
       </HeaderPortal>
     </div>

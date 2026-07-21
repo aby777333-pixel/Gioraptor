@@ -13,6 +13,7 @@ import { Plus, Trash2, Check, RotateCcw, Gauge } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { getCalendar, type NewsEvent } from '@/lib/trading/news-guard';
 import { pushExternalAlert } from '@/lib/nexus/alert-engine';
+import { deliverBrowserNotification, playAlertSound } from '@/lib/nexus/notify-prefs';
 import {
   loadAcctAlerts, saveAcctAlerts, evaluateAcctAlerts, describeAcctAlert,
   ACCT_KIND_LABELS, type AcctAlert, type AcctAlertKind,
@@ -58,9 +59,11 @@ export default function AccountAlerts({ activeSymbol, onToast }: { activeSymbol:
       const now = Date.now();
       persist(list.map((a) => { const f = fired.find((x) => x.alert.id === a.id); return f ? { ...a, triggered: true, triggeredAt: now, message: f.message } : a; }));
       for (const f of fired) {
+        const sev = f.alert.kind === 'open_profit' ? 'opportunity' : f.alert.kind === 'margin_below' || f.alert.kind === 'open_loss' ? 'critical' : 'warning';
         onToast(`⚠ ${f.message}`);
-        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('RAPTOR risk alert', { body: f.message }); } catch { /* ignore */ }
-        pushExternalAlert({ key: `acct-${f.alert.id}`, severity: f.alert.kind === 'open_profit' ? 'opportunity' : f.alert.kind === 'margin_below' || f.alert.kind === 'open_loss' ? 'critical' : 'warning', symbol: f.alert.symbol ?? '—', title: `${ACCT_KIND_LABELS[f.alert.kind]}`, detail: f.message, evidence: [describeAcctAlert(f.alert), 'Live account/market snapshot'], source: 'account-alert' });
+        deliverBrowserNotification(sev, 'RAPTOR risk alert', f.message);
+        playAlertSound(sev);
+        pushExternalAlert({ key: `acct-${f.alert.id}`, severity: sev, symbol: f.alert.symbol ?? '—', title: `${ACCT_KIND_LABELS[f.alert.kind]}`, detail: f.message, evidence: [describeAcctAlert(f.alert), 'Live account/market snapshot'], source: 'account-alert' });
       }
     };
     evalNow();
