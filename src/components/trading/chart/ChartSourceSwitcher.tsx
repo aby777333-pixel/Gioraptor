@@ -48,6 +48,7 @@ import WorkspaceChip from './WorkspaceChip';
 import FlightCheck from './FlightCheck';
 import TraderChips from './TraderChips';
 import EdgeChips from './EdgeChips';
+import WidgetHub from '@/components/trading/widgets/WidgetHub';
 import CustomEAInfoModal from './CustomEAInfoModal';
 import type { CustomEA } from '@/lib/trading/custom-ea';
 import { effectiveEngineParams, builtinInputsFor } from '@/lib/trading/ea-params';
@@ -203,6 +204,10 @@ export default function ChartSourceSwitcher({
   // EMIL — Evolving Market Intelligence Lab (entitlement emil; fail-open).
   const [emilEnabled, setEmilEnabled] = useState(true);
   const [emilOpen, setEmilOpen] = useState(false);
+
+  // Trader Utility Widget Suite + nice-to-know chip collapse.
+  const [widgetsOpen, setWidgetsOpen] = useState(false);
+  const [chipsOpen, setChipsOpen] = useState(false);
 
   // ── EA runtime: strategies evaluate on platform bars and trade
   //    through place_market_order, regardless of which chart is shown ──
@@ -1071,7 +1076,25 @@ export default function ChartSourceSwitcher({
           The free space hosts the trader chips + the live trend signal beacon. */}
       <TimeframeBar
         middle={<>
-          <EdgeChips ohlcvBuilder={ohlcvBuilder} />
+          {/* Actionable widget launcher — fills the space the nice-to-know
+              chips used to take; the chips collapse behind "Metrics". */}
+          <button
+            onClick={() => setWidgetsOpen(true)}
+            title="Trader Widget Suite — actionable reads (pressure, trend, volume, S/R, hedge, risk, exposure) each with Trade · Auto Hedge · Exit All"
+            className="flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            style={{ color: '#4DD0E1', border: '1px solid rgba(77,208,225,0.5)', backgroundColor: 'rgba(77,208,225,0.1)' }}
+          >
+            🧩 WIDGETS
+          </button>
+          <button
+            onClick={() => setChipsOpen((o) => !o)}
+            title="Show/hide the nice-to-know metric chips (countdown, regime lights, spread, discipline, radar…)"
+            className="flex shrink-0 items-center gap-1 rounded px-2 py-0.5 font-mono text-[9px] font-bold transition-all hover:brightness-125"
+            style={{ color: chipsOpen ? '#FFB300' : 'rgba(255,255,255,0.45)', border: `1px solid ${chipsOpen ? 'rgba(255,179,0,0.4)' : 'rgba(255,255,255,0.15)'}` }}
+          >
+            📊 Metrics {chipsOpen ? '▾' : '▸'}
+          </button>
+          {chipsOpen && <EdgeChips ohlcvBuilder={ohlcvBuilder} />}
           {hedgeEnabled && (
             <button
               onClick={() => setHedgeOpen((o) => !o)}
@@ -1120,7 +1143,7 @@ export default function ChartSourceSwitcher({
             style={{ color: '#29ABE2', border: '1px solid rgba(41,171,226,0.45)', backgroundColor: 'rgba(41,171,226,0.08)' }}>
             🌍 WORLD
           </button>
-          <TraderChips ohlcvBuilder={ohlcvBuilder} />
+          {chipsOpen && <TraderChips ohlcvBuilder={ohlcvBuilder} />}
           {/* EAs / Robots — lives at the right end of the TF bar (replaces the
               old header placement that overflowed off-screen) */}
         {source === 'tradingview' && (
@@ -1402,6 +1425,9 @@ export default function ChartSourceSwitcher({
 
       {/* Trade Journal module — display-only overlay */}
       {journalOpen && <JournalPanel onClose={() => setJournalOpen(false)} />}
+
+      {/* Trader Utility Widget Suite — actionable widget board */}
+      {widgetsOpen && <WidgetHub open={widgetsOpen} onClose={() => setWidgetsOpen(false)} ohlcvBuilder={ohlcvBuilder} />}
 
       {/* AI Correlation Hedging Engine — trader-confirmed execution only */}
       {hedgeOpen && <HedgePanel ohlcvBuilder={ohlcvBuilder} onClose={() => setHedgeOpen(false)} />}
