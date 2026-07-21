@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import {
-  User, Shield, Bell, Palette, Globe, Key, FileText, Upload,
+  User, Shield, Bell, Palette, Globe, Key, FileText, Upload, Download, DatabaseBackup,
 } from 'lucide-react';
+import {
+  buildBackup, applyBackup, summarizeBackup, type SettingsBackup, type BackupGroup,
+} from '@/lib/trading/settings-backup';
 
-type Tab = 'profile' | 'security' | 'notifications' | 'kyc';
+type Tab = 'profile' | 'security' | 'notifications' | 'data' | 'kyc';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('profile');
@@ -15,6 +18,7 @@ export default function SettingsPage() {
     { id: 'profile' as Tab, label: 'Profile', icon: <User size={14} /> },
     { id: 'security' as Tab, label: 'Security', icon: <Shield size={14} /> },
     { id: 'notifications' as Tab, label: 'Notifications', icon: <Bell size={14} /> },
+    { id: 'data' as Tab, label: 'Data & Backup', icon: <DatabaseBackup size={14} /> },
     { id: 'kyc' as Tab, label: 'KYC Verification', icon: <FileText size={14} /> },
   ];
 
@@ -45,6 +49,7 @@ export default function SettingsPage() {
           {tab === 'profile' && <ProfileTab />}
           {tab === 'security' && <SecurityTab />}
           {tab === 'notifications' && <NotificationsTab />}
+          {tab === 'data' && <DataBackupTab />}
           {tab === 'kyc' && <KYCTab />}
         </div>
       </div>
@@ -224,6 +229,107 @@ function KYCTab() {
           </div>
         </SettingCard>
       )}
+    </div>
+  );
+}
+
+function DataBackupTab() {
+  const [snapshot, setSnapshot] = useState<SettingsBackup | null>(null);
+  const [groups, setGroups] = useState<BackupGroup[]>([]);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [overwrite, setOverwrite] = useState(true);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const refresh = () => {
+    const b = buildBackup();
+    setSnapshot(b);
+    setGroups(summarizeBackup(b));
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const download = () => {
+    const b = buildBackup();
+    const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `raptor-settings-${b.exportedAt.slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setNotice({ kind: 'ok', text: `Exported ${b.count} settings to a JSON file.` });
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const res = applyBackup(data, overwrite);
+      if (!res.ok) { setNotice({ kind: 'err', text: res.error ?? 'Restore failed.' }); return; }
+      refresh();
+      setNotice({ kind: 'ok', text: `Restored ${res.restored} settings (${res.skipped} skipped). Reload for every change to take effect.` });
+    } catch {
+      setNotice({ kind: 'err', text: 'Could not read that file — is it a RAPTOR settings backup (.json)?' });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <SettingCard title="Back up your settings">
+        <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+          Save your RAPTOR configuration — alerts, notification preferences, risk governor limits, Shield rules,
+          auto-hedge / scan scope, saved workspaces and widget dashboards, watchlists and EMIL tuning — to a portable
+          file you can restore on another device or after clearing your browser.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={download} disabled={!snapshot || snapshot.count === 0}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30" style={{ backgroundColor: '#0091D5', color: '#000' }}>
+            <Download size={14} /> Export settings{snapshot ? ` (${snapshot.count})` : ''}
+          </button>
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border" style={{ borderColor: '#0091D5', color: '#0091D5' }}>
+            <Upload size={14} /> Restore from file
+          </button>
+          <input ref={fileRef} type="file" accept="application/json,.json" onChange={onFile} className="hidden" />
+          <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <input type="checkbox" checked={overwrite} onChange={() => setOverwrite((v) => !v)} className="accent-[#0091D5]" />
+            Overwrite existing settings on restore
+          </label>
+        </div>
+        {notice && (
+          <div className="mt-3 rounded-lg px-3 py-2 text-[11px]"
+            style={{ backgroundColor: notice.kind === 'ok' ? 'rgba(0,200,83,0.08)' : 'rgba(255,82,82,0.08)', color: notice.kind === 'ok' ? '#00C853' : '#FF5252', border: `1px solid ${notice.kind === 'ok' ? 'rgba(0,200,83,0.25)' : 'rgba(255,82,82,0.25)'}` }}>
+            {notice.text}
+          </div>
+        )}
+      </SettingCard>
+
+      <SettingCard title="What's included">
+        {groups.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No saved settings yet — they appear here as you use the terminal.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+            {groups.map((g) => (
+              <div key={g.label} className="flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--text-secondary)' }}>{g.label}</span>
+                <span className="font-mono" style={{ color: 'var(--text-muted)' }}>{g.keys.length}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </SettingCard>
+
+      <SettingCard title="Never included">
+        <div className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          <Shield size={14} className="mt-0.5 shrink-0" style={{ color: '#F0A500' }} />
+          <p className="leading-relaxed">
+            For your safety, backups exclude API keys / tokens and every consent, agreement and terms acceptance.
+            Consent stays on the device where you gave it — so after restoring on a new device, autonomous engines
+            (Auto-Hedge, Scan, EMIL) remain <span style={{ color: 'var(--text-primary)' }}>disarmed until you re-consent here</span>,
+            even if their on-switch was in the backup. Your account, positions and trade history live on the server and are never in this file.
+          </p>
+        </div>
+      </SettingCard>
     </div>
   );
 }
