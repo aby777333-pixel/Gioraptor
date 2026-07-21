@@ -11,7 +11,6 @@ import {
   Brain,
   Calendar,
   Newspaper,
-  Users,
   PieChart,
   Activity,
   Search,
@@ -88,17 +87,16 @@ const menuCategories: MenuCategory[] = [
       { href: '/dashboard/support', icon: <Settings size={14} />, label: 'Support', desc: 'Help & tickets' },
     ],
   },
+  // Broker back-office lives in the GIO4X portal staff console (JUNE 2026 →
+  // zippy-piroshki), not the terminal. The terminal's legacy /broker/* pages
+  // are being retired; the Admin menu now points admins to the real console.
   {
     label: 'Admin',
     icon: <Shield size={14} />,
     items: [
-      { href: '/broker/overview', icon: <Building2 size={14} />, label: 'Broker Dashboard', desc: 'Broker KPIs' },
-      { href: '/broker/clients', icon: <Users size={14} />, label: 'CRM / Clients', desc: 'Client management' },
-      { href: '/broker/trading-desk', icon: <Activity size={14} />, label: 'Dealing Desk', desc: 'Live positions' },
-      { href: '/broker/risk', icon: <Shield size={14} />, label: 'Risk Management', desc: 'Exposure & limits' },
-      { href: '/broker/ib', icon: <Users size={14} />, label: 'IB Network', desc: 'Affiliate management' },
-      { href: '/broker/kyc', icon: <Shield size={14} />, label: 'KYC / Compliance', desc: 'Document review' },
-      { href: '/broker/payments', icon: <Wallet size={14} />, label: 'Payments', desc: 'Deposit/withdrawal' },
+      { href: 'https://zippy-piroshki-21aa30.netlify.app/staff/command', icon: <Building2 size={14} />, label: 'Command Centre', desc: 'Brokerage control room' },
+      { href: 'https://zippy-piroshki-21aa30.netlify.app/staff', icon: <Shield size={14} />, label: 'Broker Console', desc: 'CRM, KYC, funds, dealer, IB — staff portal' },
+      { href: 'https://zippy-piroshki-21aa30.netlify.app/staff/broker', icon: <Activity size={14} />, label: 'Broker Controls', desc: 'Symbols, groups & routing' },
       { href: '/admin', icon: <Shield size={14} />, label: 'Super Admin', desc: 'GIO4X admin panel' },
     ],
   },
