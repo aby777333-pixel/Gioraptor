@@ -16,6 +16,7 @@ import {
   loadConditionAlerts, saveConditionAlerts, evaluateConditionAlerts,
   describeCondition, KIND_LABELS, type ConditionAlert, type ConditionKind,
 } from '@/lib/insights/condition-alerts';
+import AccountAlerts from '@/components/trading/chart/AccountAlerts';
 
 export interface PriceAlert {
   id: string;
@@ -280,6 +281,9 @@ export default function AlertsMenu({
               Fires once on the cross/spike (closed bars, real feed), then needs re-arming. Fired conditions also appear in the NEXUS Alert Center.
             </div>
           </div>
+
+          {/* Account & Risk alerts — spread / margin / open-P&L / news */}
+          <AccountAlerts activeSymbol={activeSymbol} onToast={onToast} />
         </div>
       </HeaderPortal>
     </div>
