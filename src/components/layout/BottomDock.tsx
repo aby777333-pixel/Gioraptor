@@ -11,10 +11,14 @@ export default function BottomDock({ children, initialHeight = 220 }: { children
   const dragging = useRef(false);
   const startY = useRef(0);
   const startH = useRef(initialHeight);
+  // See terminal page: a capture overlay keeps mousemove flowing to the parent
+  // while dragging over any TradingView iframe below.
+  const [isDragging, setIsDragging] = useState(false);
 
   const onDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragging.current = true;
+    setIsDragging(true);
     startY.current = e.clientY;
     startH.current = height;
     document.body.style.cursor = 'row-resize';
@@ -29,6 +33,7 @@ export default function BottomDock({ children, initialHeight = 220 }: { children
     const up = () => {
       if (dragging.current) {
         dragging.current = false;
+        setIsDragging(false);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       }
@@ -40,6 +45,7 @@ export default function BottomDock({ children, initialHeight = 220 }: { children
 
   return (
     <>
+      {isDragging && <div style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'row-resize' }} />}
       {/* Dragger — deliberately prominent so it's never missed */}
       <div onMouseDown={onDown} className="group relative shrink-0" title="Drag up/down to resize this panel"
         style={{ height: 12, cursor: 'row-resize', zIndex: 50 }}>

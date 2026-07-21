@@ -262,7 +262,143 @@ export function positionSize(params: { balance: number; riskPct: number; entry: 
   return { lot, riskAmount: Math.round(riskAmount * 100) / 100, stopDistance, margin: Math.round(margin * 100) / 100, maxLot, note: 'lot always rounded down to protect the risk budget' };
 }
 
-// ── 12 · Session Clock ──────────────────────────────────────────
+// ── Market Heat (rank instruments by pressure/change) ───────────
+
+export interface HeatRow { symbol: string; changePct: number; relVol: number; direction: 'up' | 'down' }
+export function marketHeat(builder: OHLCVBuilder, universe: string[], topN = 6): { hottestUp: HeatRow[]; hottestDown: HeatRow[] } {
+  const rows: HeatRow[] = [];
+  for (const sym of universe) {
+    const bars = builder.getAllBars(sym, '60');
+    if (bars.length < 25) continue;
+    const older = bars[bars.length - 12].close, now = bars[bars.length - 1].close;
+    if (!(older > 0)) continue;
+    const changePct = (now - older) / older * 100;
+    const avgVol = bars.slice(-20).reduce((a, b) => a + (b.volume || 1), 0) / 20;
+    const relVol = avgVol > 0 ? (bars[bars.length - 1].volume || 1) / avgVol : 1;
+    rows.push({ symbol: sym, changePct: Math.round(changePct * 100) / 100, relVol: Math.round(relVol * 100) / 100, direction: changePct >= 0 ? 'up' : 'down' });
+  }
+  const up = [...rows].sort((a, b) => b.changePct - a.changePct).slice(0, topN);
+  const down = [...rows].sort((a, b) => a.changePct - b.changePct).slice(0, topN);
+  return { hottestUp: up, hottestDown: down };
+}
+
+// ── Market Regime / Trend Strength / Momentum (from market-state) ─
+
+export interface RegimeRead { regime: string; confidence: number; volatility: string; suitable: string; unsuitable: string }
+export function marketRegime(builder: OHLCVBuilder, symbol: string): RegimeRead | null {
+  const st = classifyMarketState(builder.getAllBars(symbol, '60'));
+  if (!st) return null;
+  const trending = st.state.includes('Uptrend') || st.state.includes('Downtrend');
+  const strong = st.state.includes('Strong');
+  const regime = strong ? 'Strong trend' : trending ? 'Weak trend' : st.state.includes('Range') ? 'Range' : 'Chop';
+  return {
+    regime, confidence: st.confidence, volatility: st.volatility.replace(' Volatility', ''),
+    suitable: trending ? 'trend-following · pullback entries' : 'mean-reversion · range fades',
+    unsuitable: trending ? 'counter-trend fades' : 'breakout chasing',
+  };
+}
+
+export interface StrengthTrendRead { direction: 'Bullish' | 'Bearish' | 'Neutral'; strengthPct: number; maturity: string; exhaustionRisk: string }
+export function trendStrength(builder: OHLCVBuilder, symbol: string): StrengthTrendRead | null {
+  const bars = builder.getAllBars(symbol, '60');
+  if (bars.length < 60) return null;
+  const st = classifyMarketState(bars);
+  if (!st) return null;
+  const direction: StrengthTrendRead['direction'] = st.state.includes('Uptrend') ? 'Bullish' : st.state.includes('Downtrend') ? 'Bearish' : 'Neutral';
+  const highs = bars.map((b) => b.high), lows = bars.map((b) => b.low), closes = bars.map((b) => b.close);
+  const atrSeries = atr(highs, lows, closes, 14);
+  const a = Number(atrSeries[atrSeries.length - 1] ?? 0);
+  const move = Math.abs(closes[closes.length - 1] - closes[closes.length - 30]);
+  const maturity = a > 0 && move / a > 8 ? 'mature / extended' : a > 0 && move / a > 4 ? 'developing' : 'early';
+  return { direction, strengthPct: st.confidence, maturity, exhaustionRisk: maturity.startsWith('mature') ? 'elevated' : 'low' };
+}
+
+export interface MomentumRead { score: number; direction: 'Up' | 'Down' | 'Flat'; state: string }
+export function momentumRead(builder: OHLCVBuilder, symbol: string): MomentumRead | null {
+  const bars = builder.getAllBars(symbol, '60');
+  if (bars.length < 20) return null;
+  const closes = bars.map((b) => b.close);
+  const roc = (closes[closes.length - 1] - closes[closes.length - 10]) / closes[closes.length - 10] * 100;
+  const roc2 = (closes[closes.length - 6] - closes[closes.length - 12]) / closes[closes.length - 12] * 100;
+  const accel = roc - roc2;
+  const score = clamp(Math.round(50 + roc * 20), 0, 100);
+  return { score, direction: roc > 0.02 ? 'Up' : roc < -0.02 ? 'Down' : 'Flat', state: Math.abs(accel) < 0.02 ? 'steady' : accel > 0 ? 'accelerating' : 'decelerating' };
+}
+
+// ── Market Structure (HH/HL/LH/LL) ──────────────────────────────
+
+export interface StructureRead { label: string; bias: 'Bullish' | 'Bearish' | 'Neutral'; note: string }
+export function marketStructure(builder: OHLCVBuilder, symbol: string): StructureRead | null {
+  const bars = builder.getAllBars(symbol, '60');
+  if (bars.length < 40) return null;
+  const { highs, lows } = swings(bars, 80);
+  const hh = highs.length >= 2 && highs[highs.length - 1] > highs[highs.length - 2];
+  const hl = lows.length >= 2 && lows[lows.length - 1] > lows[lows.length - 2];
+  const lh = highs.length >= 2 && highs[highs.length - 1] < highs[highs.length - 2];
+  const ll = lows.length >= 2 && lows[lows.length - 1] < lows[lows.length - 2];
+  const bias: StructureRead['bias'] = hh && hl ? 'Bullish' : lh && ll ? 'Bearish' : 'Neutral';
+  const label = hh && hl ? 'Higher highs + higher lows' : lh && ll ? 'Lower highs + lower lows' : 'Mixed / ranging structure';
+  return { label, bias, note: bias === 'Neutral' ? 'no clean structure — wait for a break' : `${bias.toLowerCase()} structure intact until it breaks` };
+}
+
+// ── Volatility ──────────────────────────────────────────────────
+
+export interface VolatilityRead { atr: number; atrPct: number; percentile: number; regime: string; suggestedStopPips: number }
+export function volatilityRead(builder: OHLCVBuilder, symbol: string): VolatilityRead | null {
+  const bars = builder.getAllBars(symbol, '60');
+  if (bars.length < 60) return null;
+  const highs = bars.map((b) => b.high), lows = bars.map((b) => b.low), closes = bars.map((b) => b.close);
+  const series = atr(highs, lows, closes, 14).filter((x): x is number => x != null);
+  if (series.length < 20) return null;
+  const a = series[series.length - 1];
+  const sorted = [...series].sort((x, y) => x - y);
+  const percentile = Math.round(sorted.findIndex((x) => x >= a) / sorted.length * 100);
+  const price = closes[closes.length - 1];
+  const pip = getPipSize(symbol);
+  return { atr: a, atrPct: Math.round(a / price * 10000) / 100, percentile, regime: percentile >= 80 ? 'expanded' : percentile <= 20 ? 'compressed' : 'normal', suggestedStopPips: Math.round((a * 1.5) / pip) };
+}
+
+// ── Spread & execution cost ─────────────────────────────────────
+
+export interface CostRead { spreadPips: number | null; state: 'Normal' | 'Elevated' | 'Expensive' | 'Unsafe'; est: string }
+export function spreadCost(symbol: string, tick: Tick | undefined, spec: InstrumentSpec | undefined): CostRead {
+  if (tick?.bid == null || tick?.ask == null) return { spreadPips: null, state: 'Normal', est: 'no live quote' };
+  const spreadPips = (tick.ask - tick.bid) / getPipSize(symbol);
+  const vpu = spec ? valuePerUnitPerLot(spec) : 10;
+  const roundTrip = spreadPips * getPipSize(symbol) * vpu + 3.5;   // 0.01 lot approx + commission
+  const state: CostRead['state'] = spreadPips <= 1.5 ? 'Normal' : spreadPips <= 3 ? 'Elevated' : spreadPips <= 6 ? 'Expensive' : 'Unsafe';
+  return { spreadPips: Math.round(spreadPips * 10) / 10, state, est: `~$${roundTrip.toFixed(2)} round-trip (0.01 lot)` };
+}
+
+// ── Trade scenario (best/base/worst from ATR) ───────────────────
+
+export interface ScenarioRead { best: string; base: string; worst: string }
+export function tradeScenario(builder: OHLCVBuilder, symbol: string, spec: InstrumentSpec | undefined, lots = 0.01): ScenarioRead | null {
+  const v = volatilityRead(builder, symbol);
+  if (!v || !spec) return null;
+  const vpu = valuePerUnitPerLot(spec);
+  const oneAtr = v.atr * lots * vpu;
+  return {
+    best: `+${(oneAtr * 2).toFixed(2)} if it runs ~2 ATR`,
+    base: `±${oneAtr.toFixed(2)} typical 1-ATR swing`,
+    worst: `-${(oneAtr * 1.5).toFixed(2)} at a 1.5-ATR stop (more on a gap/slippage)`,
+  };
+}
+
+// ── Broker condition (from spec) ────────────────────────────────
+
+export interface BrokerRead { rows: { k: string; v: string }[] }
+export function brokerCondition(symbol: string, spec: InstrumentSpec | undefined, tick: Tick | undefined): BrokerRead {
+  const rows: { k: string; v: string }[] = [];
+  rows.push({ k: 'Tradable', v: tick?.bid != null ? 'yes (quoting)' : 'no live quote' });
+  if (spec) { rows.push({ k: 'Contract size', v: String(spec.contractSize) }); rows.push({ k: 'Pricescale', v: String(spec.pricescale) }); }
+  const c = spreadCost(symbol, tick, spec);
+  rows.push({ k: 'Spread', v: c.spreadPips != null ? `${c.spreadPips}p (${c.state})` : '—' });
+  rows.push({ k: 'Min lot', v: '0.01' });
+  return { rows };
+}
+
+// ── Session open/close windows ──────────────────────────────────
 
 export interface SessionRead { active: string[]; sessions: { name: string; open: boolean; minsLeft: number }[]; liquidity: string }
 

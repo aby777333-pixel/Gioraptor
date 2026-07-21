@@ -186,6 +186,52 @@ export function setPositionHedgeEligible(positionId: string, on: boolean): void 
     localStorage.setItem(ELIGIBLE_KEY, JSON.stringify(map));
   } catch { /* ignore */ }
 }
+/** Explicit per-position override: true (always hedge) / false (never) / undefined (fall through to scope). */
+export function positionHedgeOverride(positionId: string): boolean | undefined {
+  const v = loadEligibility()[positionId];
+  return typeof v === 'boolean' ? v : undefined;
+}
+
+// ── Hedge SCOPE — individual by default, account-wide only on request.
+// A widget/panel toggle covers ONLY its instrument unless "account-wide"
+// is chosen. This is why enabling Auto Hedge no longer hedges every order.
+
+export type HedgeScope = 'selective' | 'account';
+const SCOPE_KEY = 'raptor_hedgeauto_scope_v1';
+const SYMS_KEY = 'raptor_hedgeauto_symbols_v1';
+
+export function loadHedgeScope(): HedgeScope {
+  try { return localStorage.getItem(SCOPE_KEY) === 'account' ? 'account' : 'selective'; } catch { return 'selective'; }
+}
+export function setHedgeScope(s: HedgeScope): void {
+  try { localStorage.setItem(SCOPE_KEY, s); } catch { /* ignore */ }
+}
+export function loadEligibleSymbols(): string[] {
+  try { const a = JSON.parse(localStorage.getItem(SYMS_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+export function isSymbolHedgeEligible(symbol: string): boolean {
+  return loadEligibleSymbols().includes(symbol);
+}
+export function addEligibleSymbol(symbol: string): void {
+  try { const s = new Set(loadEligibleSymbols()); s.add(symbol); localStorage.setItem(SYMS_KEY, JSON.stringify([...s])); } catch { /* ignore */ }
+}
+export function removeEligibleSymbol(symbol: string): void {
+  try { localStorage.setItem(SYMS_KEY, JSON.stringify(loadEligibleSymbols().filter((x) => x !== symbol))); } catch { /* ignore */ }
+}
+
+/** Is a SYMBOL actively covered by Auto Hedge right now? (consent + engine on + scope) */
+export function symbolEffectivelyHedged(symbol: string): boolean {
+  if (!isHedgeAutoConsented() || !isHedgeAutoOn()) return false;
+  return loadHedgeScope() === 'account' || isSymbolHedgeEligible(symbol);
+}
+/** Is a specific POSITION covered? Per-position override wins, else falls to scope/symbol. */
+export function positionEffectivelyHedged(positionId: string, symbol: string): boolean {
+  if (!isHedgeAutoConsented() || !isHedgeAutoOn()) return false;
+  const ov = positionHedgeOverride(positionId);
+  if (ov === false) return false;
+  if (ov === true) return true;
+  return loadHedgeScope() === 'account' || isSymbolHedgeEligible(symbol);
+}
 
 // ── Baskets ─────────────────────────────────────────────────────
 
@@ -320,7 +366,7 @@ export function evaluateHedgeAuto(ctx: {
   const eligible = open.filter((x) =>
     !basketedIds.has(x.id) &&
     !(x.comment ?? '').toLowerCase().startsWith('hedgeauto') &&
-    isPositionHedgeEligible(x.id) &&
+    positionEffectivelyHedged(x.id, x.symbol) &&    // scope-aware: individual unless account-wide
     Number(x.unrealized_pnl ?? 0) <= -p.activationLossUsd);
 
   for (const primary of eligible) {

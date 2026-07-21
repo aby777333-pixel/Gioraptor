@@ -14,8 +14,9 @@ import { useTradingStore } from '@/stores/trading';
 import { orderService } from '@/lib/trading/order-service';
 import { getPipSize } from '@/lib/trading/ticket-math';
 import {
-  isHedgeAutoOn, setHedgeAutoOn, isHedgeAutoConsented, recordHedgeAutoConsent,
+  setHedgeAutoOn, isHedgeAutoConsented, recordHedgeAutoConsent,
   loadHedgeAutoParams, hedgeAutoLog, HEDGE_AUTO_DISCLAIMER,
+  addEligibleSymbol, removeEligibleSymbol, setHedgeScope, symbolEffectivelyHedged, loadHedgeScope,
 } from '@/lib/trading/hedge-auto';
 
 export interface TradeContext {
@@ -34,18 +35,35 @@ export default function WidgetControls({ ctx, accent }: { ctx: TradeContext; acc
   const [showHedgeGate, setShowHedgeGate] = useState(false);
   const [showExit, setShowExit] = useState(false);
   const [typed, setTyped] = useState('');
-  const [hedgeOn, setHedgeOnState] = useState(isHedgeAutoOn() && isHedgeAutoConsented());
+  // Scope: this instrument (default — individual) or account-wide (all orders).
+  const [scope, setScope] = useState<'instrument' | 'account'>('instrument');
+  const [hedgeOn, setHedgeOnState] = useState(symbolEffectivelyHedged(ctx.symbol));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const say = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 4000); };
 
+  const armHedge = (chosen: 'instrument' | 'account') => {
+    setHedgeAutoOn(true);
+    if (chosen === 'account') { setHedgeScope('account'); }
+    else { setHedgeScope('selective'); addEligibleSymbol(ctx.symbol); }
+    setHedgeOnState(true);
+    hedgeAutoLog('toggle', `Auto Hedge ON (${chosen === 'account' ? 'account-wide' : ctx.symbol + ' only'}) from ${ctx.source} widget`);
+    say(chosen === 'account' ? 'Auto Hedge ON — account-wide (all eligible orders). Keep a Hedge Trade window open.' : `Auto Hedge ON for ${ctx.symbol} only. Keep a Hedge Trade window open.`);
+  };
+
   const toggleHedge = () => {
-    if (!hedgeOn && !isHedgeAutoConsented()) { setShowHedgeGate(true); return; }
-    const next = !hedgeOn;
-    setHedgeAutoOn(next); setHedgeOnState(next);
-    hedgeAutoLog('toggle', next ? `Auto Hedge ON (account-wide) from ${ctx.source} widget` : `Auto Hedge OFF from ${ctx.source} widget`);
-    say(next ? 'Auto Hedge ON (account-wide). Keep a Hedge Trade window open for it to run.' : 'Auto Hedge OFF.');
+    if (hedgeOn) {
+      // Turn OFF for this instrument only — never kills coverage of others.
+      if (loadHedgeScope() === 'account') { setHedgeScope('selective'); }
+      removeEligibleSymbol(ctx.symbol);
+      setHedgeOnState(false);
+      hedgeAutoLog('toggle', `Auto Hedge OFF for ${ctx.symbol} from ${ctx.source} widget`);
+      say(`Auto Hedge OFF for ${ctx.symbol}.`);
+      return;
+    }
+    if (!isHedgeAutoConsented()) { setShowHedgeGate(true); return; }
+    armHedge(scope);
   };
 
   const btn = 'flex items-center gap-1 rounded px-2 py-1 text-[9px] font-bold transition-all hover:brightness-125';
@@ -57,10 +75,18 @@ export default function WidgetControls({ ctx, accent }: { ctx: TradeContext; acc
       </button>
       <button onClick={toggleHedge} className={btn}
         style={{ color: hedgeOn ? '#00E5A0' : 'rgba(255,255,255,0.5)', border: `1px solid ${hedgeOn ? 'rgba(0,229,160,0.5)' : 'rgba(255,255,255,0.15)'}`, backgroundColor: hedgeOn ? 'rgba(0,229,160,0.12)' : 'transparent' }}
-        title="Auto Hedge is a toggle and never activates silently. First enable shows the disclaimer and requires typed consent.">
+        title="Auto Hedge is a toggle and never activates silently. Applies to THIS instrument only unless you pick account-wide. First enable shows the disclaimer + typed consent.">
         <ShieldHalf size={10} /> Auto Hedge {hedgeOn ? 'ON' : 'OFF'}
       </button>
-      {hedgeOn && <span className="text-[7px] font-bold uppercase" style={{ color: 'rgba(0,229,160,0.7)' }}>scope: account-wide</span>}
+      {hedgeOn ? (
+        <span className="text-[7px] font-bold uppercase" style={{ color: 'rgba(0,229,160,0.7)' }}>scope: {loadHedgeScope() === 'account' ? 'account-wide' : `${ctx.symbol} only`}</span>
+      ) : (
+        <select value={scope} onChange={(e) => setScope(e.target.value as 'instrument' | 'account')} onClick={(e) => e.stopPropagation()}
+          className="rounded bg-white/[0.05] px-1 py-0.5 text-[8px] font-bold text-white/55 outline-none" title="Auto Hedge scope when you enable it">
+          <option value="instrument" style={{ backgroundColor: '#0A0F1A' }}>{ctx.symbol} only</option>
+          <option value="account" style={{ backgroundColor: '#0A0F1A' }}>account-wide (all)</option>
+        </select>
+      )}
       <button onClick={() => setShowExit(true)} className={btn} style={{ color: '#FF5252', border: '1px solid rgba(255,82,82,0.4)' }} title="Review open trades, then exit">
         <OctagonX size={10} /> Exit All
       </button>
@@ -70,13 +96,16 @@ export default function WidgetControls({ ctx, accent }: { ctx: TradeContext; acc
         onClose={() => setShowTicket(false)} onDone={() => { setShowTicket(false); triggerRefresh(); }} say={say} busy={busy} setBusy={setBusy} />}
 
       {showHedgeGate && (
-        <Gate title={`Enable Auto Hedge (account-wide)`} accent="#00E5A0"
+        <Gate title={`Enable Auto Hedge — ${scope === 'account' ? 'account-wide (all orders)' : `${ctx.symbol} only`}`} accent="#00E5A0"
           onClose={() => { setShowHedgeGate(false); setTyped(''); }}
           body={<>
             <p className="mb-2 rounded border px-3 py-2 text-[9px] leading-relaxed" style={{ borderColor: 'rgba(255,179,0,0.3)', backgroundColor: 'rgba(255,179,0,0.05)', color: 'rgba(255,213,120,0.9)' }}>
               Auto Hedge may open, modify, reduce, or close related positions to manage exposure. Hedging can increase margin use,
               transaction costs, swap, drawdown, and total risk. Profit or recovery is not guaranteed. Review the hedge plan and risk
               limits before enabling. {HEDGE_AUTO_DISCLAIMER}
+            </p>
+            <p className="mb-2 text-[9px] font-bold" style={{ color: '#00E5A0' }}>
+              Scope: {scope === 'account' ? 'ACCOUNT-WIDE — every eligible order will be monitored.' : `${ctx.symbol} ONLY — other instruments are not touched.`} Change the scope on the toggle before enabling if needed.
             </p>
             <div className="mb-2 rounded border p-2 text-[9px] text-white/55" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
               Active limits (from the capital-based hedge table): max hedge lots <b className="text-white">{loadHedgeAutoParams().maxHedgeLots}</b> ·
@@ -91,10 +120,9 @@ export default function WidgetControls({ ctx, accent }: { ctx: TradeContext; acc
           confirmDisabled={typed.trim().toUpperCase() !== 'I ACCEPT HEDGE RISK'}
           onConfirm={() => {
             recordHedgeAutoConsent(typed.trim(), loadHedgeAutoParams(), activeAccountId);
-            setHedgeAutoOn(true); setHedgeOnState(true);
-            hedgeAutoLog('consent', `Auto Hedge consent recorded from ${ctx.source} widget`);
+            hedgeAutoLog('consent', `Auto Hedge consent recorded from ${ctx.source} widget (scope: ${scope})`);
+            armHedge(scope);
             setShowHedgeGate(false); setTyped('');
-            say('Consent recorded — Auto Hedge is ON (account-wide).');
           }} />
       )}
 

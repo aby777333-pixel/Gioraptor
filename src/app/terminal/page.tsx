@@ -78,10 +78,15 @@ export default function TerminalPage() {
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(240);
+  // A drag-capture overlay renders above the chart's TradingView iframe while
+  // resizing — without it, once the cursor enters the iframe the parent window
+  // stops receiving mousemove and the divider freezes.
+  const [dragging, setDragging] = useState(false);
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
+    setDragging(true);
     startY.current = e.clientY;
     startHeight.current = panelHeight;
     document.body.style.cursor = 'row-resize';
@@ -98,6 +103,7 @@ export default function TerminalPage() {
     const handleUp = () => {
       if (isDragging.current) {
         isDragging.current = false;
+        setDragging(false);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       }
@@ -150,6 +156,9 @@ export default function TerminalPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[var(--bg-primary)] flex flex-col">
+      {/* Drag-capture overlay — keeps mousemove flowing to the parent while
+          resizing over the TradingView chart iframe. */}
+      {dragging && <div style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'row-resize' }} />}
       {/* TopBar */}
       <div className="border-b border-[var(--border)] shrink-0">
         <TopBar />

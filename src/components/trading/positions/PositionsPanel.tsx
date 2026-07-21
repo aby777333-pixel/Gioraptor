@@ -8,8 +8,8 @@ import { formatPrice, formatPnL, formatLot, cn } from '@/lib/utils/format';
 import type { Position, Order } from '@/types/trading';
 import EditOrderModal from './EditOrderModal';
 import {
-  isHedgeAutoOn, setHedgeAutoOn, isHedgeAutoConsented, recordHedgeAutoConsent,
-  isPositionHedgeEligible, setPositionHedgeEligible, loadHedgeAutoParams,
+  setHedgeAutoOn, isHedgeAutoConsented, recordHedgeAutoConsent,
+  setPositionHedgeEligible, positionEffectivelyHedged, loadHedgeAutoParams,
   hedgeAutoLog, HEDGE_AUTO_DISCLAIMER,
 } from '@/lib/trading/hedge-auto';
 
@@ -714,12 +714,12 @@ export default function PositionsPanel() {
                           if (isHedgeLeg) {
                             return <span className="text-[8px] font-bold" style={{ color: '#CE93D8' }} title="This IS an Auto Hedge leg — it is managed by its basket and never re-hedged.">LEG</span>;
                           }
-                          const effectiveOn = isHedgeAutoConsented() && isHedgeAutoOn() && isPositionHedgeEligible(pos.id);
+                          const effectiveOn = positionEffectivelyHedged(pos.id, pos.symbol);
                           return (
                             <button
                               onClick={() => {
                                 if (effectiveOn) {
-                                  setPositionHedgeEligible(pos.id, false);
+                                  setPositionHedgeEligible(pos.id, false);   // explicit per-position exclude
                                   hedgeAutoLog('toggle', `A-Hedge OFF for ${pos.symbol} position ${pos.id} (positions panel)`);
                                   setHedgeTick((t) => t + 1);
                                 } else {
