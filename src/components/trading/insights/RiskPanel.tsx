@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, ShieldAlert, Calculator, RefreshCw } from 'lucide-react';
+import { X, ShieldAlert, Calculator, RefreshCw, Activity } from 'lucide-react';
 import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
 import { orderService } from '@/lib/trading/order-service';
@@ -19,8 +19,10 @@ import {
   pairCorrelations, computeLotSize, atrFromBars,
   type InstrumentSpec, type PositionRisk,
 } from '@/lib/insights/risk';
+import { loadGovernorLimits } from '@/lib/trading/risk-governor';
+import { loadProtectionSettings } from '@/lib/trading/protection';
 
-type Tab = 'dashboard' | 'sizer';
+type Tab = 'dashboard' | 'sizer' | 'stress';
 
 interface AccountSummary {
   balance: number; equity: number; margin_used: number; free_margin: number;
@@ -132,7 +134,7 @@ export default function RiskPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex gap-0.5 border-b px-2 pt-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          {([['dashboard', 'Risk Dashboard', ShieldAlert], ['sizer', 'Position Sizer', Calculator]] as [Tab, string, typeof ShieldAlert][]).map(([t, label, Icon]) => (
+          {([['dashboard', 'Risk Dashboard', ShieldAlert], ['sizer', 'Position Sizer', Calculator], ['stress', 'Stress & Rules', Activity]] as [Tab, string, typeof ShieldAlert][]).map(([t, label, Icon]) => (
             <button key={t} onClick={() => setTab(t)}
               className="flex items-center gap-1.5 rounded-t px-3 py-1.5 text-[11px] font-medium transition-colors"
               style={{ backgroundColor: tab === t ? 'rgba(41,171,226,0.12)' : 'transparent', color: tab === t ? '#0091D5' : 'rgba(255,255,255,0.45)' }}>
@@ -330,6 +332,50 @@ export default function RiskPanel({ onClose }: { onClose: () => void }) {
               )}
             </div>
           )}
+
+          {tab === 'stress' && (() => {
+            const gov = loadGovernorLimits();
+            const shield = loadProtectionSettings(activeAccountId);
+            const rulesOn = Object.values(shield as unknown as Record<string, { on?: boolean }>).filter((r) => r && r.on).length;
+            const equity = summary?.equity ?? 0;
+            const floating = summary?.floating_pnl ?? 0;
+            const openLots = risks.reduce((s, r) => s + (r.size ?? 0), 0);
+            // What-if projections (estimates; real tails are larger on gaps/slippage).
+            const ifAllStops = equity - boundedRisk;                 // planned worst on bounded positions
+            const ifVolDouble = boundedRisk * 2;                     // stops ~2× wider → ~2× planned loss
+            const ifAdverse5 = equity * 0.05;                        // rough 5% adverse account move
+            const row = (k: string, v: string, c?: string) => (
+              <div className="flex items-center justify-between border-b py-1.5" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                <span className="text-white/45">{k}</span><span className="font-mono" style={{ color: c ?? 'rgba(255,255,255,0.85)' }}>{v}</span>
+              </div>
+            );
+            return (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-white/40">Stress scenarios (estimates)</div>
+                  {row('Equity now', `$${fmt(equity)}`)}
+                  {row('Floating P&L', `${floating >= 0 ? '+' : ''}$${fmt(floating)}`, pnlColor(floating))}
+                  {row('Open lots · positions', `${openLots.toFixed(2)} · ${risks.length}`)}
+                  {row('Planned worst (all stops hit)', `−$${fmt(boundedRisk)}${noSlCount ? ` + ${noSlCount} unbounded` : ''}`, '#FF5252')}
+                  {row('Equity after all stops', `$${fmt(ifAllStops)}`, ifAllStops < equity * 0.9 ? '#FFB300' : undefined)}
+                  {row('If volatility doubles', `≈ −$${fmt(ifVolDouble)} planned`, '#FFB300')}
+                  {row('If account −5%', `−$${fmt(ifAdverse5)} → governor blocks new risk`, '#FFB300')}
+                  <p className="mt-1.5 text-[8px] leading-snug text-white/30">Estimates from your open positions and stops. Real tails are larger on gaps, slippage and unbounded (no-SL) positions.</p>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-white/40">Active hard limits</div>
+                  {row('Governor · max total lots', `${gov.maxTotalLots}`)}
+                  {row('Governor · max automated lots', `${gov.maxAutomatedLots}`)}
+                  {row('Governor · max per symbol', `${gov.maxPerSymbolLots}`)}
+                  {row('Governor · max positions', `${gov.maxOpenPositions}`)}
+                  {row('Governor · daily loss cap', `${gov.dailyLossLimitPct}% ($${fmt(equity * gov.dailyLossLimitPct / 100)})`, '#FF5252')}
+                  {row('Shield rules armed', `${rulesOn}`, rulesOn > 0 ? '#00C27A' : '#FFB300')}
+                  {row('Unprotected positions', `${noSlCount}`, noSlCount > 0 ? '#FF5252' : '#00C27A')}
+                  <p className="mt-1.5 text-[8px] leading-snug text-white/30">The account Risk Governor caps every engine; Shield rules gate manual + automated orders. Edit governor limits on the Hedge Trade page, Shield rules from the toolbar.</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
