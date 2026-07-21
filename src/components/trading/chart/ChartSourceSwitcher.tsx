@@ -30,6 +30,7 @@ import { useTradingStore } from '@/stores/trading';
 import { createClient } from '@/lib/supabase/client';
 import { EARuntime, type EAStats, type EAInfo, type StrategyKind } from '@/lib/trading/ea-engine';
 import { orderService } from '@/lib/trading/order-service';
+import { defaultProtection, loadTradePrefs, saveTradePrefs } from '@/lib/trading/trade-prefs';
 import EAPropertiesModal, { type EAFullSettings, DEFAULT_FULL_SETTINGS } from './EAPropertiesModal';
 import StrategyTesterModal from './StrategyTesterModal';
 import AlertsMenu from './AlertsMenu';
@@ -145,6 +146,10 @@ export default function ChartSourceSwitcher({
   const [tpPrice, setTpPrice] = useState('');
   const [confirmTrade, setConfirmTrade] = useState(true);
   const [placing, setPlacing] = useState(false);
+  // Auto-protect default SL/TP (applied when the ticket fields are blank).
+  const [autoProtect, setAutoProtect] = useState(() => loadTradePrefs().autoProtect);
+  const [defSlPips, setDefSlPips] = useState(() => loadTradePrefs().defaultSlPips);
+  const [defTpPips, setDefTpPips] = useState(() => loadTradePrefs().defaultTpPips);
   // QuickTrade order type — mirrors the order ticket's full ladder (§ticket
   // parity): market + limit / stop / stop-limit pendings.
   const [quickType, setQuickType] = useState<string>('market');
@@ -403,11 +408,14 @@ export default function ChartSourceSwitcher({
     const fill = direction === 'BUY' ? t.ask : t.bid;
     if (confirmTrade && !useTradingStore.getState().oneClickTrading && !window.confirm(`${direction} ${size} ${activeSymbol} @ market (${fill})?`)) return;
     setPlacing(true);
+    // Apply the trader's default SL/TP when the ticket fields are blank
+    // (one-click trades are never left naked when auto-protect is on).
+    const prot = defaultProtection(activeSymbol, direction, fill, slPrice ? parseFloat(slPrice) : undefined, tpPrice ? parseFloat(tpPrice) : undefined);
     try {
       await orderService.placeMarketOrder({
         accountId: acct, symbol: activeSymbol, direction, size, fillPrice: fill,
-        sl: slPrice ? parseFloat(slPrice) : undefined,
-        tp: tpPrice ? parseFloat(tpPrice) : undefined,
+        sl: prot.sl,
+        tp: prot.tp,
         comment: 'QuickTrade',
       });
       showEAToast(`✓ ${direction} ${size} ${activeSymbol} filled @ ${fill}`);
@@ -943,6 +951,21 @@ export default function ChartSourceSwitcher({
                     </span>
                     <span className="text-[9px] font-semibold" style={{ color: oneClickTrading ? '#0091D5' : 'rgba(255,255,255,0.4)' }}>1-Click</span>
                   </button>
+                </div>
+
+                {/* Auto-protect: default SL/TP applied when the fields are blank */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded border px-2 py-1" style={{ borderColor: 'rgba(0,194,122,0.2)' }}>
+                  <label className="flex items-center gap-1.5 text-[9px] font-semibold" style={{ color: autoProtect ? '#00C27A' : 'rgba(255,255,255,0.45)' }}
+                    title="When SL/TP are left blank, apply these default distances so one-click trades are never naked.">
+                    <input type="checkbox" checked={autoProtect} onChange={(e) => { setAutoProtect(e.target.checked); saveTradePrefs({ ...loadTradePrefs(), autoProtect: e.target.checked }); }} className="accent-[#00C27A]" />
+                    Auto-protect (default SL/TP)
+                  </label>
+                  {autoProtect && (
+                    <span className="flex items-center gap-1 text-[9px] text-white/45">
+                      SL <input type="number" value={defSlPips} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setDefSlPips(v); saveTradePrefs({ ...loadTradePrefs(), defaultSlPips: v }); }} className="w-12 rounded bg-white/[0.06] px-1 py-0.5 text-right font-mono text-[9px] text-white outline-none" /> p ·
+                      TP <input type="number" value={defTpPips} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setDefTpPips(v); saveTradePrefs({ ...loadTradePrefs(), defaultTpPips: v }); }} className="w-12 rounded bg-white/[0.06] px-1 py-0.5 text-right font-mono text-[9px] text-white outline-none" /> p
+                    </span>
+                  )}
                 </div>
 
                 {/* Place button for pending order types */}

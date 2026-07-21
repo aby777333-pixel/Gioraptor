@@ -15,6 +15,8 @@ import { useTradingStore } from '@/stores/trading';
 import type { OHLCVBuilder } from '@/lib/trading/ohlcv-builder';
 import { getInstrumentSpecs, type InstrumentSpec } from '@/lib/insights/risk';
 import { getCalendar, type NewsEvent } from '@/lib/trading/news-guard';
+import { orderService } from '@/lib/trading/order-service';
+import type { JournalRow } from '@/lib/trading/trade-journal';
 import {
   WIDGETS, CATEGORIES, type SharedCtx, type WidgetDef, type LivePos,
 } from '@/lib/trading/widget-registry';
@@ -75,18 +77,31 @@ function WidgetCard({ def, s }: { def: WidgetDef; s: SharedCtx }) {
 export default function WidgetHub({ open, onClose, ohlcvBuilder, standalone = false }: {
   open: boolean; onClose: () => void; ohlcvBuilder: OHLCVBuilder | null; standalone?: boolean;
 }) {
-  const { activeSymbol, prices, positions, accountSummary } = useTradingStore();
+  const { activeSymbol, prices, positions, accountSummary, activeAccountId } = useTradingStore();
   const [specs, setSpecs] = useState<Record<string, InstrumentSpec> | null>(null);
   const [calendar, setCalendar] = useState<NewsEvent[]>([]);
+  const [closed, setClosed] = useState<JournalRow[]>([]);
   const [tick, setTick] = useState(0);
-  const [riskPct, setRiskPct] = useState(0.5);
-  const [cat, setCat] = useState<string>('Default');
+  // Dashboard memory — the board reopens on the last category + risk %.
+  const [riskPct, setRiskPct] = useState<number>(() => { try { return Number(localStorage.getItem('raptor_widget_risk') || '0.5') || 0.5; } catch { return 0.5; } });
+  const [cat, setCat] = useState<string>(() => { try { return localStorage.getItem('raptor_widget_cat') || 'Default'; } catch { return 'Default'; } });
+  useEffect(() => { try { localStorage.setItem('raptor_widget_cat', cat); } catch { /* ignore */ } }, [cat]);
+  useEffect(() => { try { localStorage.setItem('raptor_widget_risk', String(riskPct)); } catch { /* ignore */ } }, [riskPct]);
   const builderRef = useRef(ohlcvBuilder);
   builderRef.current = ohlcvBuilder;
 
   useEffect(() => { getInstrumentSpecs().then(setSpecs).catch(() => {}); }, []);
   useEffect(() => { getCalendar().then(setCalendar).catch(() => {}); }, []);
   useEffect(() => { if (!open && !standalone) return; const id = setInterval(() => setTick((t) => t + 1), 6000); return () => clearInterval(id); }, [open, standalone]);
+  // Closed-trade history for the journal-backed widgets (refreshed slowly).
+  useEffect(() => {
+    if ((!open && !standalone) || !activeAccountId) return;
+    let alive = true;
+    const load = () => orderService.getTradeHistory(activeAccountId, 120).then((r) => { if (alive && Array.isArray(r)) setClosed(r as unknown as JournalRow[]); }).catch(() => {});
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [open, standalone, activeAccountId]);
 
   const universe = useMemo(() => Object.keys(prices).filter((sy) => prices[sy]?.bid != null), [prices]);
 
@@ -94,13 +109,13 @@ export default function WidgetHub({ open, onClose, ohlcvBuilder, standalone = fa
     const b = builderRef.current;
     if (!b) return null;
     return {
-      builder: b, symbol: activeSymbol, prices, universe, positions: positions as unknown as LivePos[], specs, calendar,
+      builder: b, symbol: activeSymbol, prices, universe, positions: positions as unknown as LivePos[], specs, calendar, closed,
       balance: Number(accountSummary?.balance ?? 0), equity: Number(accountSummary?.equity ?? 0),
       freeMargin: Number(accountSummary?.free_margin ?? 0), usedMargin: Number(accountSummary?.margin_used ?? 0),
       marginLevel: Number(accountSummary?.margin_level_pct ?? 0), riskPct,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSymbol, specs, calendar, universe.length, positions, accountSummary, tick, riskPct]);
+  }, [activeSymbol, specs, calendar, closed, universe.length, positions, accountSummary, tick, riskPct]);
 
   if (!open && !standalone) return null;
 

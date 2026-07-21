@@ -26,6 +26,8 @@ import {
   trendStrength, momentumRead, marketStructure, volatilityRead, spreadCost, tradeScenario,
   brokerCondition, type Ticks,
 } from '@/lib/trading/widget-engines';
+import { feedHealth } from '@/lib/trading/feed-watchdog';
+import { journalStats, winRate, type JournalRow } from '@/lib/trading/trade-journal';
 import type { TradeContext } from '@/components/trading/widgets/WidgetControls';
 
 export interface LivePos {
@@ -42,6 +44,7 @@ export interface SharedCtx {
   positions: LivePos[];
   specs: Record<string, InstrumentSpec> | null;
   calendar: NewsEvent[];
+  closed: JournalRow[];          // real closed-trade history for the journal widgets
   balance: number;
   equity: number;
   freeMargin: number;
@@ -406,8 +409,11 @@ export const WIDGETS: WidgetDef[] = [
     if (!open.length) return { rows: [{ k: 'Open trades', v: 'none' }] };
     return { rows: open.slice(0, 6).map((p) => { const mins = p.opened_at ? Math.round((Date.now() - new Date(p.opened_at).getTime()) / 60000) : 0; return { k: `${p.symbol} ${p.direction}`, v: mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`, c: mins > 1440 ? A : undefined }; }), note: 'Watch overnight/swap costs on trades open past a session.' };
   } },
-  { id: 'streak', name: 'Consecutive Win / Loss', category: 'Trade Management', accent: B, compute: () => {
-    return { rows: [{ k: 'Streak tracking', v: 'from closed-trade history' }, { k: 'Loss-streak stop', v: `Scan: ${'2'} · Hedge: daily` }], note: 'Live streaks + cooldowns are enforced on the Scan/Hedge engines (from real closed trades).' };
+  { id: 'streak', name: 'Consecutive Win / Loss', category: 'Trade Management', accent: B, compute: (s) => {
+    const j = journalStats(s.closed);
+    if (!j.total.n) return { rows: [{ k: 'History', v: 'no closed trades yet' }], note: 'Streaks build from your real closed trades.' };
+    return { tag: j.winStreak ? `${j.winStreak}W` : j.lossStreak ? `${j.lossStreak}L` : '—', tagColor: j.winStreak ? G : j.lossStreak ? R : A,
+      rows: [{ k: 'Win streak', v: `${j.winStreak}`, c: G }, { k: 'Loss streak', v: `${j.lossStreak}`, c: R }, { k: 'Closed trades', v: `${j.total.n}` }, { k: 'Win rate', v: `${winRate(j.total)}%` }], note: j.lossStreak >= 2 ? 'reduce risk / take a cooldown' : undefined };
   } },
 
   // ═══ Timing & News ═══
@@ -421,8 +427,11 @@ export const WIDGETS: WidgetDef[] = [
     const soonest = [...sc.sessions].filter((x) => x.open).sort((a, b) => a.minsLeft - b.minsLeft)[0];
     return { rows: [{ k: 'Active sessions', v: sc.active.join(', ') || 'none (thin)' }, { k: 'Next close', v: soonest ? `${soonest.name} in ${Math.floor(soonest.minsLeft / 60)}h ${soonest.minsLeft % 60}m` : '—' }, { k: 'Liquidity', v: sc.liquidity }], note: 'Close intraday trades before the session you traded ends.' };
   } },
-  { id: 'sessionperf', name: 'Session Performance', category: 'Timing & News', accent: B, compute: () => {
-    return { rows: [{ k: 'By-session P&L', v: 'from closed-trade history' }], note: 'Per-session performance builds from your closed trades over time (Scan/Hedge reports).' };
+  { id: 'sessionperf', name: 'Session Performance', category: 'Timing & News', accent: B, compute: (s) => {
+    const j = journalStats(s.closed);
+    const entries = Object.entries(j.bySession).sort((a, b) => b[1].pnl - a[1].pnl);
+    if (!entries.length) return { rows: [{ k: 'By-session P&L', v: 'no closed trades yet' }], note: 'Builds from your real closed trades.' };
+    return { rows: entries.map(([sess, b]) => ({ k: sess, v: `${b.pnl >= 0 ? '+' : ''}$${b.pnl.toFixed(2)} · ${winRate(b)}% (${b.n})`, c: b.pnl >= 0 ? G : R })), note: `Best: ${entries[0][0]}. Today: ${j.todayTrades} trade(s), ${j.todayPnl >= 0 ? '+' : ''}$${j.todayPnl.toFixed(2)}.` };
   } },
   { id: 'newsrisk', name: 'News Risk', category: 'Timing & News', accent: A, compute: (s) => {
     const ev = upcomingHighImpact(symbolCurrencies(s.symbol), s.calendar, 4)[0];
@@ -464,8 +473,14 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'missedopp', name: 'Missed Opportunity', category: 'Scanner & Opportunity', accent: B, compute: () => {
     return { rows: [{ k: 'Missed setups', v: 'tracked from your rejected signals' }], note: 'Builds from the scanner log — reviews whether a rejection was correct. Does not encourage revenge trading.' };
   } },
-  { id: 'stratperf', name: 'Strategy Performance', category: 'Scanner & Opportunity', accent: B, compute: () => {
-    return { rows: [{ k: 'Live vs backtest', v: 'from engine trade logs' }], note: 'Per-strategy net/win-rate/drawdown builds from real closed engine trades over time.' };
+  { id: 'stratperf', name: 'Strategy Performance', category: 'Scanner & Opportunity', accent: B, compute: (s) => {
+    const j = journalStats(s.closed);
+    const entries = Object.entries(j.bySource).sort((a, b) => b[1].pnl - a[1].pnl);
+    if (!entries.length) return { rows: [{ k: 'By source', v: 'no closed trades yet' }], note: 'Manual vs EMIL vs Scanner vs Auto Hedge/Scan vs EA — from real closes.' };
+    return { rows: [
+      ...entries.map(([src, b]) => ({ k: src, v: `${b.pnl >= 0 ? '+' : ''}$${b.pnl.toFixed(2)} · ${winRate(b)}% (${b.n})`, c: b.pnl >= 0 ? G : R })),
+      { k: 'Profit factor · avg R', v: `${j.profitFactor === Infinity ? '∞' : j.profitFactor ?? '—'} · ${j.avgR ?? '—'}` },
+    ], note: 'Real per-engine attribution from closed trades.' };
   } },
 
   // ═══ Platform & Emergency ═══
@@ -474,9 +489,16 @@ export const WIDGETS: WidgetDef[] = [
     return { rows: b.rows.map((r) => ({ k: r.k, v: r.v })) };
   } },
   { id: 'platform', name: 'Platform Health', category: 'Platform & Emergency', accent: B, compute: (s) => {
-    const quoting = s.universe.length; const fresh = s.prices[s.symbol]?.bid != null;
-    return { tag: fresh && quoting > 0 ? 'healthy' : 'degraded', tagColor: fresh && quoting > 0 ? G : R,
-      rows: [{ k: 'Market data', v: quoting > 0 ? `${quoting} instruments live` : 'no quotes', c: quoting > 0 ? G : R }, { k: 'Price freshness', v: fresh ? 'fresh' : 'stale', c: fresh ? G : R }, { k: 'Risk governor', v: 'active', c: G }, { k: 'Calendar feed', v: s.calendar.length ? `${s.calendar.length} events` : 'loading' }], note: 'Auto Hedge will not arm when platform health is unsafe.' };
+    const h = feedHealth(s.prices, Date.now());
+    const hc = h.status === 'healthy' ? G : h.status === 'degraded' ? A : R;
+    return { tag: h.status, tagColor: hc,
+      rows: [
+        { k: 'Market data', v: h.quoting > 0 ? `${h.quoting} instruments live` : 'no quotes', c: h.quoting > 0 ? G : R },
+        { k: 'Feed integrity', v: h.note, c: hc },
+        { k: 'Stale / wide-spread', v: `${h.stale.length} / ${h.wideSpread.length}`, c: h.stale.length || h.wideSpread.length ? A : G },
+        { k: 'Clock skew', v: h.clockSkewMs != null ? `${Math.abs(h.clockSkewMs)}ms` : '—', c: h.clockSkewMs != null && Math.abs(h.clockSkewMs) > 2000 ? A : G },
+        { k: 'Risk governor', v: 'active', c: G },
+      ], note: h.status === 'unsafe' ? 'feed unsafe — automation stands down' : 'Auto Hedge / Scan will not arm when the feed is unsafe.' };
   } },
   { id: 'emergency', name: 'Emergency Risk', category: 'Platform & Emergency', accent: R, compute: (s) => {
     const open = openPos(s);
