@@ -322,6 +322,9 @@ export default function EmilKnowledge({ builder, prices, calendar, openSymbols, 
               <p className="text-[10px] font-bold text-white">
                 {c.name}{' '}
                 <span className="rounded px-1 py-0.5 font-mono text-[7px] font-bold uppercase" style={{ border: '1px solid rgba(206,147,216,0.4)', color: '#CE93D8' }}>{c.family}</span>{' '}
+                {c.origin && (
+                  <span className="rounded px-1 py-0.5 font-mono text-[7px] font-bold uppercase" style={{ border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.45)' }}>{c.origin}</span>
+                )}{' '}
                 <span className="font-normal text-white/35">{c.timeframes.join(' · ')}{c.pairs.length ? ` · ${c.pairs.join(', ')}` : ''}</span>
               </p>
               <p className="text-[9px] text-white/45"><b className="text-white/60">Uses:</b> {c.indicators.join(' · ')}</p>

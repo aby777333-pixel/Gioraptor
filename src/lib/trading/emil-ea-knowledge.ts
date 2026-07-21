@@ -37,6 +37,8 @@ export interface EAStrategyCard {
   /** The market inefficiency/behavior the strategy claims to exploit. */
   edge: string;
   terms: EATerm[];
+  /** Where the strategy came from; undefined = the owner's own collection. */
+  origin?: string;
 }
 
 // Distilled EA sources live in the sibling data module.
@@ -119,7 +121,7 @@ export function seedEaKnowledgeFacts(): number {
       level: 'strategic',
       subject: `EA strategy · ${c.name}`,
       statement: `${c.family.toUpperCase()} — ${c.edge} Entry: ${c.entry} Exit: ${c.exit}`,
-      evidence: 'distilled from MQL5 source (EA BACK UP JULY 2026)',
+      evidence: c.origin ? `distilled from MQL source (${c.origin})` : 'distilled from MQL5 source (EA BACK UP JULY 2026)',
       confidence: 70,
       freshUntil: Date.now() + 90 * 24 * 3_600_000,
       reason: 'EA library import',
