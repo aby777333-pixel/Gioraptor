@@ -20,6 +20,7 @@ import {
   isScanAutoOn, setScanAutoOn, isScanAutoConsented, recordScanAutoConsent, SCAN_AUTO_DISCLAIMER,
   type ScanAutoParams, type ScanLivePosition, type ScanClosedRow,
 } from '@/lib/trading/scan-auto';
+import TradeCommandBar from '@/components/trading/TradeCommandBar';
 
 const BLUE = '#29ABE2';
 
@@ -173,6 +174,10 @@ export default function AutoScanSection({ ohlcvBuilder, prices, calendar, accoun
           )}
         </div>
       </div>
+
+      {/* Natural-language command bar */}
+      <TradeCommandBar scope="scan" accent={BLUE}
+        onApplied={(summary) => { setParams(loadScanAutoParams()); setOn(isScanAutoOn()); say(summary); }} />
 
       {showParams && (
         <div className="mt-2 grid gap-3 lg:grid-cols-3">

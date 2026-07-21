@@ -19,6 +19,7 @@ import {
   type HedgeAutoParams, type HedgeBasket, type LivePosition,
 } from '@/lib/trading/hedge-auto';
 import { loadGovernorLimits, saveGovernorLimits, type GovernorLimits } from '@/lib/trading/risk-governor';
+import TradeCommandBar from '@/components/trading/TradeCommandBar';
 
 const MINT = '#00E5A0';
 
@@ -219,6 +220,10 @@ export default function AutoHedgeSection({ ohlcvBuilder, prices, specs, calendar
           )}
         </div>
       </div>
+
+      {/* Natural-language command bar */}
+      <TradeCommandBar scope="hedge" accent={MINT}
+        onApplied={(summary) => { setParams(loadHedgeAutoParams()); setGov(loadGovernorLimits()); setOn(isHedgeAutoOn()); say(summary); }} />
 
       {/* Settings */}
       {showParams && (
