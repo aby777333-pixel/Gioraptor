@@ -218,6 +218,9 @@ export function addEligibleSymbol(symbol: string): void {
 export function removeEligibleSymbol(symbol: string): void {
   try { localStorage.setItem(SYMS_KEY, JSON.stringify(loadEligibleSymbols().filter((x) => x !== symbol))); } catch { /* ignore */ }
 }
+export function setEligibleSymbols(list: string[]): void {
+  try { localStorage.setItem(SYMS_KEY, JSON.stringify([...new Set(list)])); } catch { /* ignore */ }
+}
 
 /** Is a SYMBOL actively covered by Auto Hedge right now? (consent + engine on + scope) */
 export function symbolEffectivelyHedged(symbol: string): boolean {
