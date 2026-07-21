@@ -30,6 +30,7 @@ import {
 } from '@/lib/trading/hedge-engine';
 import EmilStrip from '@/components/trading/emil/EmilStrip';
 import { armEmil } from '@/lib/trading/emil-arm';
+import AutoHedgeSection from '@/components/trading/hedge/AutoHedgeSection';
 
 const MINT = '#00E5A0';
 const VIOLET = '#AB47BC';
@@ -288,10 +289,21 @@ export default function HedgePanel({ ohlcvBuilder, onClose, standalone = false }
         </div>
 
         <div className={`overflow-y-auto p-4 ${standalone ? '' : 'max-h-[78vh]'}`} style={{ scrollbarWidth: 'thin' }}>
-          {/* ── EMIL council read ── */}
+          {/* ── EMIL council read (advice only — no execution authority here) ── */}
           <div className="mb-3">
             <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
           </div>
+
+          {/* ── AUTO HEDGE — independent engine (consent-gated) ── */}
+          <AutoHedgeSection
+            ohlcvBuilder={ohlcvBuilder}
+            prices={prices}
+            specs={specs}
+            calendar={calendar}
+            accountId={activeAccountId}
+            say={say}
+            triggerRefresh={triggerRefresh}
+          />
 
           {/* ── Inputs ── */}
           <div className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border p-3" style={{ borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' }}>

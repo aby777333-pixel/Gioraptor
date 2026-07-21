@@ -27,6 +27,7 @@ import {
 } from '@/lib/trading/scanner-engine';
 import EmilStrip from '@/components/trading/emil/EmilStrip';
 import { armEmil } from '@/lib/trading/emil-arm';
+import AutoScanSection from '@/components/trading/scanner/AutoScanSection';
 
 type AutoMode = 'off' | 'signal' | 'manual';
 
@@ -249,14 +250,25 @@ export default function ScannerPanel({ ohlcvBuilder, isLiveData, onClose, standa
               {MODE_META[m].label}
             </button>
           ))}
-          <span className="rounded px-2.5 py-1 text-[10px] font-bold opacity-40" style={chipBtn(false, '#00C27A')}
-            title="Semi-Automatic and Fully Automatic require broker enablement, separate risk limits and recorded consent — not enabled in this build.">
-            SEMI / FULL AUTO 🔒
+          <span className="rounded px-2.5 py-1 text-[10px] font-bold" style={chipBtn(false, '#00C27A')}
+            title="Fully-automatic execution lives in the AUTO SCAN TRADE engine below — its own consent, limits and log, fully separate from Auto Hedge.">
+            FULL AUTO ↓
           </span>
           <span className="ml-auto text-[9px] text-white/35">{meta.desc}</span>
         </div>
 
-        {/* ── EMIL council read ── */}
+        {/* ── AUTO SCAN TRADE — independent engine (separate consent) ── */}
+        <AutoScanSection
+          ohlcvBuilder={ohlcvBuilder}
+          prices={prices}
+          calendar={calendar}
+          accountId={activeAccountId}
+          isLiveData={isLiveData}
+          say={say}
+          triggerRefresh={triggerRefresh}
+        />
+
+        {/* ── EMIL council read (advice only — no execution authority here) ── */}
         <div className="border-b px-4 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <EmilStrip ohlcvBuilder={ohlcvBuilder} onOpenEmil={() => window.open('/terminal/emil', '_blank')} />
         </div>
